@@ -8,10 +8,11 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Searchresults property-card parser'i ile requested-date sold-out ve hotel-level fallback sinyali uretiyor.",
-    supportedScopes: ["beach-eu", "beach-uk", "queen-eu"],
+    notes:
+      "Dogrudan otel oda tablosunu okur; tarih, kisi, para birimi ve konaklama toplamini dogrular. Ana sayfaya yonlendirme veya erisim engeli doluluk olarak isaretlenmez.",
+    supportedScopes: ["beach-eu", "beach-uk", "queen-eu", "queen-uk"],
     searchTemplate:
-      "https://www.booking.com/searchresults.html?ss={hotelName}&checkin={checkIn}&checkout={checkOut}"
+      "https://www.booking.com/searchresults.html?ss={hotelName}&checkin={checkIn}&checkout={checkOut}",
   },
   {
     key: "expedia",
@@ -20,10 +21,11 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Expedia bot korumasi geldiginde collector manual-review quote donduruyor.",
-    supportedScopes: ["beach-eu", "beach-uk", "queen-eu"],
+    notes:
+      "Bolgesel Expedia otel sayfasinda oda kartlarinin mevcut konaklama toplamini okur; tarih/kisi/para birimi dogrulanmayan veya erisim engelli sonuc manual-review kalir.",
+    supportedScopes: ["beach-eu", "beach-uk", "queen-eu", "queen-uk"],
     searchTemplate:
-      "https://www.expedia.com/Hotel-Search?destination={hotelName}&startDate={checkIn}&endDate={checkOut}"
+      "https://www.expedia.com/Hotel-Search?destination={hotelName}&startDate={checkIn}&endDate={checkOut}",
   },
   {
     key: "hotelbeds",
@@ -32,8 +34,9 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "api",
     liveSupported: true,
     readiness: "api-contract",
-    notes: "Live beta aktif. Availability istegi icin resmi Hotelbeds API kullaniliyor; Api-key, X-Signature, mTLS sertifikasi ve hotel code env degerleri gerekli.",
-    supportedScopes: ["beach-eu", "queen-eu"]
+    notes:
+      "Live beta aktif. Availability istegi icin resmi Hotelbeds API kullaniliyor; Api-key, X-Signature, mTLS sertifikasi ve hotel code env degerleri gerekli.",
+    supportedScopes: ["beach-eu", "queen-eu"],
   },
   {
     key: "holidaycheck",
@@ -42,10 +45,11 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Exact-date hotel-only offer sayfasi acilip all-offers-service cevabindan oda ve fiyat okunuyor.",
+    notes:
+      "Live beta aktif. Exact-date hotel-only offer sayfasi acilip all-offers-service cevabindan oda ve fiyat okunuyor.",
     supportedScopes: ["beach-eu", "queen-eu"],
     searchTemplate:
-      "https://www.holidaycheck.de/suche?search={hotelName}&from={checkIn}&to={checkOut}"
+      "https://www.holidaycheck.de/suche?search={hotelName}&from={checkIn}&to={checkOut}",
   },
   {
     key: "loveholidays",
@@ -54,10 +58,11 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Search sayfasina gidip anti-bot, JS gate ve hotel-level fiyat sinyalini kontrol ediyor.",
-    supportedScopes: ["beach-uk"],
+    notes:
+      "Hotel Only oda seceneklerinden konaklama toplamini okur; GBP ve EUR, secilen tarih ve 1 oda/2 yetiskin dogrulanir. Ucakli paket ve gecelik fiyatlar kullanilmaz.",
+    supportedScopes: ["beach-uk", "beach-eu", "queen-eu", "queen-uk"],
     searchTemplate:
-      "https://www.loveholidays.com/holidays/?query={hotelName}&date={checkIn}"
+      "https://www.loveholidays.com/holidays/?query={hotelName}&date={checkIn}",
   },
   {
     key: "onthebeach",
@@ -66,10 +71,10 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Search sayfasina gidip anti-bot, JS gate ve hotel-level fiyat sinyalini kontrol ediyor.",
-    supportedScopes: ["beach-uk"],
-    searchTemplate:
-      "https://www.onthebeach.co.uk/holidays/search?query={hotelName}&depart={checkIn}"
+    notes:
+      "Hotel Only formu: secilen tarih, 2-28 gece, 1 oda/2 yetiskin; otel adi ve Total Hotel Price / per party dogrulanir. GBP toplam oda fiyatini okur.",
+    supportedScopes: ["beach-uk", "queen-uk"],
+    searchTemplate: "https://www.onthebeach.co.uk/_p/hotels",
   },
   {
     key: "tui",
@@ -78,9 +83,10 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     collectionType: "browser",
     liveSupported: true,
     readiness: "selector-mapping",
-    notes: "Live beta aktif. Resmi TUI offer endpoint'inden hotel-only teklifleri ve oda aciklamalari okunuyor.",
+    notes:
+      "Live beta aktif. Resmi TUI offer endpoint'inden hotel-only teklifleri ve oda aciklamalari okunuyor.",
     supportedScopes: ["beach-eu", "queen-eu"],
     searchTemplate:
-      "https://www.tui.com/pauschalreisen/suchen/hotels/?search={hotelName}&from={checkIn}"
-  }
+      "https://www.tui.com/pauschalreisen/suchen/hotels/?search={hotelName}&from={checkIn}",
+  },
 ];

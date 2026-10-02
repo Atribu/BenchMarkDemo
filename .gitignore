@@ -1,7 +1,17 @@
 node_modules
 .next
+.next-*
+.benchmark-state/
 out
 dist
 .DS_Store
 *.log
 *.tsbuildinfo
+.env*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials/
+.ota-sessions/

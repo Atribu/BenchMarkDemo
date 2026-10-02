@@ -5,10 +5,12 @@ import type {
   BenchmarkScopeResult,
   BenchmarkWindowRow,
   CellTone,
+  CollectedOffer,
   ProviderDescriptor,
   ProviderQuote,
   ProviderWin,
-  ReportScopeDefinition
+  ReportScopeDefinition,
+  ScopeProviderSelection,
 } from "@/src/lib/benchmark/types";
 
 interface BuildBenchmarkResultArgs {
@@ -17,22 +19,28 @@ interface BuildBenchmarkResultArgs {
   scopes: ReportScopeDefinition[];
   providers: ProviderDescriptor[];
   quotes: ProviderQuote[];
+  providersByScope?: ScopeProviderSelection;
+  offers?: CollectedOffer[];
 }
 
 function getQuoteKey(
   scopeId: string,
   roomId: string,
   windowId: string,
-  providerKey: string
+  providerKey: string,
 ): string {
   return [scopeId, roomId, windowId, providerKey].join("::");
 }
 
 function getCellTone(
   status: ProviderQuote["status"],
-  differencePct: number | null
+  differencePct: number | null,
 ): CellTone {
-  if (status === "missing" || status === "manual-review" || status === "sold_out") {
+  if (
+    status === "missing" ||
+    status === "manual-review" ||
+    status === "sold_out"
+  ) {
     return "muted";
   }
 
@@ -73,14 +81,21 @@ export function buildBenchmarkResult({
   warnings,
   scopes,
   providers,
-  quotes
+  quotes,
+  providersByScope,
+  offers = [],
 }: BuildBenchmarkResultArgs): BenchmarkRunResult {
   const quotesByKey = new Map<string, ProviderQuote>();
 
   for (const quote of quotes) {
     quotesByKey.set(
-      getQuoteKey(quote.scopeKey, quote.roomId, quote.windowId, quote.providerKey),
-      quote
+      getQuoteKey(
+        quote.scopeKey,
+        quote.roomId,
+        quote.windowId,
+        quote.providerKey,
+      ),
+      quote,
     );
   }
 
@@ -92,10 +107,13 @@ export function buildBenchmarkResult({
   let parityRiskCount = 0;
   let premiumCount = 0;
   let missingCount = 0;
+  let alternativeOfferCount = 0;
 
   for (const scope of scopes) {
     const scopeProviders = providers.filter((provider) =>
-      provider.supportedScopes.includes(scope.id)
+      providersByScope
+        ? providersByScope[scope.id]?.includes(provider.key)
+        : provider.supportedScopes.includes(scope.id),
     );
 
     const scopeSpreadValues: number[] = [];
@@ -120,14 +138,28 @@ export function buildBenchmarkResult({
             currency: scope.currency,
             status: "missing",
             dataMode: mode,
-            sourceHint: provider.searchTemplate ?? ""
+            sourceHint: provider.searchTemplate ?? "",
           };
 
+          const collectedQuote =
+            quotesByKey.get(
+              getQuoteKey(scope.id, room.id, window.id, provider.key),
+            ) ?? fallbackQuote;
           const quote =
-            quotesByKey.get(getQuoteKey(scope.id, room.id, window.id, provider.key)) ??
-            fallbackQuote;
+            collectedQuote.currency !== scope.currency ||
+            (collectedQuote.price !== null &&
+              (!Number.isFinite(collectedQuote.price) ||
+                collectedQuote.price <= 0))
+              ? {
+                  ...collectedQuote,
+                  price: null,
+                  status: "manual-review" as const,
+                }
+              : collectedQuote;
 
           const differencePct =
+            // Live references do not carry equivalent board/refund/tax terms yet.
+            mode === "mock" &&
             quote.status === "available" &&
             quote.price !== null &&
             referencePrice !== null &&
@@ -167,28 +199,39 @@ export function buildBenchmarkResult({
             status: quote.status,
             tone,
             dataMode: quote.dataMode,
-            sourceHint: quote.sourceHint
+            sourceHint: quote.sourceHint,
+            reason: quote.reason,
+            offerDescription: quote.offerDescription,
+            offerConditions: quote.offerConditions,
+            captureMethod: quote.captureMethod,
+            observedAt: quote.observedAt,
+            roomFeatures: quote.roomFeatures,
+            terms: quote.terms,
           };
         });
 
         const availableEntries = entries.filter(
-          (entry) => entry.status === "available" && entry.scrapedPrice !== null
+          (entry) =>
+            entry.status === "available" && entry.scrapedPrice !== null,
         );
-        const cheapestEntry = availableEntries.reduce<BenchmarkCell | null>((current, entry) => {
-          if (!current) {
-            return entry;
-          }
+        const cheapestEntry = availableEntries.reduce<BenchmarkCell | null>(
+          (current, entry) => {
+            if (!current) {
+              return entry;
+            }
 
-          return (entry.scrapedPrice ?? Number.POSITIVE_INFINITY) <
-            (current.scrapedPrice ?? Number.POSITIVE_INFINITY)
-            ? entry
-            : current;
-        }, null);
+            return (entry.scrapedPrice ?? Number.POSITIVE_INFINITY) <
+              (current.scrapedPrice ?? Number.POSITIVE_INFINITY)
+              ? entry
+              : current;
+          },
+          null,
+        );
 
-        if (cheapestEntry) {
+        if (cheapestEntry && mode === "mock") {
           cheapestWinCounts.set(
             cheapestEntry.providerKey,
-            (cheapestWinCounts.get(cheapestEntry.providerKey) ?? 0) + 1
+            (cheapestWinCounts.get(cheapestEntry.providerKey) ?? 0) + 1,
           );
         }
 
@@ -197,13 +240,50 @@ export function buildBenchmarkResult({
           roomName: room.name,
           occupancyLabel: room.occupancyLabel,
           referencePrice,
-          entries
+          entries,
         };
       });
 
+      const selectedIds = new Set(
+        scope.rooms.flatMap((room) =>
+          scopeProviders.map(
+            (provider) =>
+              quotesByKey.get(
+                getQuoteKey(scope.id, room.id, window.id, provider.key),
+              )?.offerId,
+          ),
+        ),
+      );
+      const alternativeOffers = offers
+        .filter(
+          (offer) =>
+            offer.scopeKey === scope.id &&
+            offer.windowId === window.id &&
+            scopeProviders.some(
+              (provider) => provider.key === offer.providerKey,
+            ) &&
+            offer.checkIn === window.checkIn &&
+            offer.checkOut === window.checkOut &&
+            offer.nights === window.nights &&
+            offer.rooms === 1 &&
+            offer.adults === 2 &&
+            offer.currency === scope.currency &&
+            Number.isFinite(offer.price) &&
+            offer.price > 0 &&
+            !selectedIds.has(offer.id),
+        )
+        .map((offer) => ({
+          ...offer,
+          matchReason: offer.matchedRoomId
+            ? "Aynı oda kategorisindeki diğer teklif; operatör veya tarife koşulları farklı olabilir."
+            : offer.matchReason,
+        }))
+        .sort((a, b) => a.price - b.price);
+      alternativeOfferCount += alternativeOffers.length;
       return {
         ...window,
-        rows
+        rows,
+        alternativeOffers,
       };
     });
 
@@ -221,8 +301,8 @@ export function buildBenchmarkResult({
         parityRiskCount: scopeParityRiskCount,
         premiumCount: scopePremiumCount,
         missingCount: scopeMissingCount,
-        averageSpreadPct: average(scopeSpreadValues)
-      }
+        averageSpreadPct: average(scopeSpreadValues),
+      },
     });
   }
 
@@ -230,7 +310,7 @@ export function buildBenchmarkResult({
     .map((provider) => ({
       providerKey: provider.key,
       providerName: provider.name,
-      wins: cheapestWinCounts.get(provider.key) ?? 0
+      wins: cheapestWinCounts.get(provider.key) ?? 0,
     }))
     .filter((provider) => provider.wins > 0)
     .sort((left, right) => right.wins - left.wins);
@@ -247,7 +327,8 @@ export function buildBenchmarkResult({
     parityRiskCount,
     premiumCount,
     missingCount,
-    cheapestProviderWins
+    cheapestProviderWins,
+    alternativeOfferCount,
   };
 
   return {
@@ -257,6 +338,6 @@ export function buildBenchmarkResult({
     warnings,
     providers,
     scopes: scopeResults,
-    summary
+    summary,
   };
 }

@@ -98,7 +98,7 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
   },
   "miramare-queen": {
     pageUrl:
-      "https://www.holidaycheck.de/hi/hotel-miramare-queen/967550f2-2468-3829-ae9c-827ee3b91557",
+      "https://www.holidaycheck.de/hi/miramare-queen-hotel/967550f2-2468-3829-ae9c-827ee3b91557",
     roomAliases: {
       "standard-land": [
         "landseite",
@@ -160,6 +160,13 @@ export const HOTELBEDS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> =
 };
 
 export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
+  "miramare-queen": {
+    pageUrl: "https://www.loveholidays.com/holidays/turkey/antalya/side/miramare-queen.html",
+    roomAliases: {
+      "standard-land": ["Standard Room with Land View", "Standard Room with Garden View"],
+      "standard-sea": ["Standard Room with Sea View", "Standard Room with Partial Sea View"]
+    }
+  },
   "miramare-beach": {
     pageUrl: "https://www.loveholidays.com/de/urlaub/tuerkei/antalya/side/miramare-beach/",
     roomAliases: {
@@ -170,6 +177,13 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
 };
 
 export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
+  "miramare-queen": {
+    pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-queen",
+    roomAliases: {
+      "standard-land": ["standard land view", "standard garden view"],
+      "standard-sea": ["standard sea view", "standard side sea view"]
+    }
+  },
   "miramare-beach": {
     pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-beach",
     roomAliases: {

@@ -1,10 +1,16 @@
-import { createRequire } from "node:module";
+import { chromium as extraChromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import {
+  browserSessionPath,
+  readBrowserSession,
+  writeBrowserSession,
+} from "./browser-session";
 import type {
   CurrencyCode,
   ProviderCollectionResult,
   ProviderDescriptor,
   ProviderQuote,
-  ReportScopeDefinition
+  ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
 
 const DEFAULT_USER_AGENT =
@@ -19,6 +25,7 @@ interface BrowserPageOptions {
   browserChannel?: SupportedBrowserChannel;
   userAgent?: string;
   useStealth?: boolean;
+  sessionKey?: string;
 }
 
 interface BrowserMarketPreset {
@@ -31,30 +38,31 @@ const MARKET_PRESETS: Record<SupportedMarket, BrowserMarketPreset> = {
   default: {
     acceptLanguage: "en-US,en;q=0.9",
     locale: "en-US",
-    timezoneId: "UTC"
+    timezoneId: "UTC",
   },
   uk: {
     acceptLanguage: "en-GB,en;q=0.9",
     locale: "en-GB",
-    timezoneId: "Europe/London"
+    timezoneId: "Europe/London",
   },
   de: {
     acceptLanguage: "de-DE,de;q=0.9,en;q=0.8",
     locale: "de-DE",
-    timezoneId: "Europe/Berlin"
+    timezoneId: "Europe/Berlin",
   },
   us: {
     acceptLanguage: "en-US,en;q=0.9",
     locale: "en-US",
-    timezoneId: "America/New_York"
-  }
+    timezoneId: "America/New_York",
+  },
 };
 
 const PROVIDER_DEFAULT_MARKETS: Partial<Record<string, SupportedMarket>> = {
+  expedia: "uk",
   holidaycheck: "de",
   loveholidays: "uk",
   onthebeach: "uk",
-  tui: "de"
+  tui: "de",
 };
 
 function normalizeMarket(value?: string): SupportedMarket {
@@ -88,139 +96,176 @@ function parseProxyUrl(proxyUrl?: string) {
   return {
     server,
     username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
-    password: parsed.password ? decodeURIComponent(parsed.password) : undefined
+    password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
   };
 }
 
-export async function createBrowserPage(options: BrowserPageOptions = {}) {
-  const browserEngine = options.useStealth
-    ? await (async () => {
-        const require = createRequire(import.meta.url);
-        const playwrightExtraPackage = ["playwright", "extra"].join("-");
-        const stealthPackage = ["puppeteer", "extra", "plugin", "stealth"].join("-");
-        const { chromium } = require(playwrightExtraPackage) as typeof import("playwright-extra");
-        const stealthPluginModule = require(stealthPackage) as {
-          default?: () => unknown;
-        };
-        const stealthPluginFactory =
-          stealthPluginModule.default ??
-          (stealthPluginModule as unknown as () => unknown);
+let stealthRegistered = false;
 
-        (chromium as { use: (plugin: unknown) => void }).use(stealthPluginFactory());
-        return chromium;
-      })()
+export async function createBrowserPage(options: BrowserPageOptions = {}) {
+  if (options.useStealth && !stealthRegistered) {
+    extraChromium.use(StealthPlugin());
+    stealthRegistered = true;
+  }
+  const browserEngine = options.useStealth
+    ? extraChromium
     : (await import("playwright")).chromium;
   const market = normalizeMarket(options.market);
   const browserChannel = normalizeBrowserChannel(options.browserChannel);
   const preset = MARKET_PRESETS[market];
-  const launchArgs = ["--disable-blink-features=AutomationControlled"];
+  const launchArgs = options.useStealth
+    ? ["--disable-blink-features=AutomationControlled"]
+    : [];
   const launchOptions = {
     headless: true,
     args: launchArgs,
     channel: browserChannel === "chrome" ? "chrome" : undefined,
-    proxy: parseProxyUrl(options.proxyUrl)
+    proxy: parseProxyUrl(options.proxyUrl),
   };
   const browser =
     browserChannel === "chrome"
       ? await browserEngine.launch(launchOptions).catch(() =>
           browserEngine.launch({
             ...launchOptions,
-            channel: undefined
-          })
+            channel: undefined,
+          }),
         )
       : await browserEngine.launch(launchOptions);
-  const context = await browser.newContext({
-    extraHTTPHeaders: {
-      "accept-language": preset.acceptLanguage
-    },
-    ignoreHTTPSErrors: true,
-    locale: preset.locale,
-    timezoneId: preset.timezoneId,
-    userAgent: options.userAgent,
-    viewport: { width: 1440, height: 1200 }
-  });
-  const page = await context.newPage();
-
-  await page.addInitScript(({ languages }) => {
-    Object.defineProperty(navigator, "webdriver", {
-      get: () => false
+  const sessionFile =
+    options.sessionKey && process.env.OTA_PERSIST_SESSIONS !== "false"
+      ? browserSessionPath(
+          `${options.sessionKey}:${market}:${browserChannel}:${options.proxyUrl ?? "direct"}`,
+        )
+      : undefined;
+  try {
+    const context = await browser.newContext({
+      storageState: sessionFile
+        ? await readBrowserSession(sessionFile)
+        : undefined,
+      extraHTTPHeaders: {
+        "accept-language": preset.acceptLanguage,
+      },
+      ignoreHTTPSErrors: true,
+      locale: preset.locale,
+      timezoneId: preset.timezoneId,
+      userAgent: options.userAgent,
+      viewport: { width: 1440, height: 1200 },
     });
+    const page = await context.newPage();
 
-    Object.defineProperty(navigator, "languages", {
-      get: () => languages
-    });
+    if (options.useStealth)
+      await page.addInitScript(
+        ({ languages }) => {
+          Object.defineProperty(navigator, "webdriver", {
+            get: () => false,
+          });
 
-    Object.defineProperty(navigator, "plugins", {
-      get: () => [1, 2, 3, 4, 5]
-    });
+          Object.defineProperty(navigator, "languages", {
+            get: () => languages,
+          });
 
-    Object.defineProperty(window, "chrome", {
-      get: () => ({
-        runtime: {}
-      })
-    });
+          Object.defineProperty(navigator, "plugins", {
+            get: () => [1, 2, 3, 4, 5],
+          });
 
-    const originalQuery = window.navigator.permissions?.query?.bind(
-      window.navigator.permissions
-    );
+          Object.defineProperty(window, "chrome", {
+            get: () => ({
+              runtime: {},
+            }),
+          });
 
-    if (originalQuery) {
-      window.navigator.permissions.query = async (parameters) => {
-        if (parameters.name === "notifications") {
-          return {
-            name: parameters.name,
-            onchange: null,
-            state: Notification.permission
-          } as PermissionStatus;
+          const originalQuery = window.navigator.permissions?.query?.bind(
+            window.navigator.permissions,
+          );
+
+          if (originalQuery) {
+            window.navigator.permissions.query = async (parameters) => {
+              if (parameters.name === "notifications") {
+                return {
+                  name: parameters.name,
+                  onchange: null,
+                  state: Notification.permission,
+                } as PermissionStatus;
+              }
+
+              return originalQuery(parameters);
+            };
+          }
+        },
+        {
+          languages: [preset.locale, preset.locale.split("-")[0]],
+        },
+      );
+
+    let closed = false;
+    const close = async () => {
+      if (closed) return;
+      closed = true;
+      try {
+        if (sessionFile) {
+          await writeBrowserSession(
+            sessionFile,
+            await context.storageState(),
+          ).catch(() => undefined);
         }
-
-        return originalQuery(parameters);
-      };
-    }
-  }, {
-    languages: [preset.locale, preset.locale.split("-")[0]]
-  });
-
-  return { browser, context, page };
+      } finally {
+        await browser.close();
+      }
+    };
+    return { browser, context, page, close };
+  } catch (error) {
+    await browser.close().catch(() => undefined);
+    throw error;
+  }
 }
 
-export function resolveProviderLiveConfig(providerKey: string) {
+export function resolveProviderLiveConfig(
+  providerKey: string,
+  currency?: CurrencyCode,
+) {
   const prefix = providerKey.toUpperCase();
   const market = normalizeMarket(
-    process.env[`${prefix}_MARKET`] ??
-      process.env.OTA_MARKET ??
-      PROVIDER_DEFAULT_MARKETS[providerKey]
+    process.env[`${prefix}_MARKET`]?.trim() ||
+      process.env.OTA_MARKET?.trim() ||
+      PROVIDER_DEFAULT_MARKETS[providerKey],
   );
   const browserChannel = normalizeBrowserChannel(
-    process.env[`${prefix}_BROWSER_CHANNEL`] ??
-      process.env.OTA_BROWSER_CHANNEL ??
-      (providerKey === "holidaycheck" ||
+    process.env[`${prefix}_BROWSER_CHANNEL`]?.trim() ||
+      process.env.OTA_BROWSER_CHANNEL?.trim() ||
+      (providerKey === "expedia" ||
+      providerKey === "holidaycheck" ||
       providerKey === "loveholidays" ||
       providerKey === "onthebeach"
         ? "chrome"
-        : "chromium")
+        : "chromium"),
   );
   const userAgent =
-    process.env[`${prefix}_USER_AGENT`] ??
-    process.env.OTA_USER_AGENT ??
-    (providerKey === "loveholidays" || providerKey === "onthebeach"
+    process.env[`${prefix}_USER_AGENT`]?.trim() ||
+    process.env.OTA_USER_AGENT?.trim() ||
+    (providerKey === "expedia" ||
+    providerKey === "loveholidays" ||
+    providerKey === "onthebeach"
       ? undefined
       : DEFAULT_USER_AGENT);
+  const stealthOverride =
+    process.env[`${prefix}_USE_STEALTH`]?.trim() ||
+    process.env.OTA_USE_STEALTH?.trim();
   const useStealth =
-    (process.env[`${prefix}_USE_STEALTH`] ?? process.env.OTA_USE_STEALTH) ===
-      "true" ||
-    providerKey === "holidaycheck" ||
-    providerKey === "loveholidays" ||
-    providerKey === "onthebeach";
+    stealthOverride !== undefined
+      ? stealthOverride === "true"
+      : ["holidaycheck", "loveholidays", "onthebeach"].includes(providerKey);
   const proxyUrl =
-    process.env[`${prefix}_PROXY_URL`] ?? process.env.OTA_PROXY_URL ?? undefined;
+    process.env[`${prefix}_PROXY_URL`]?.trim() ||
+    process.env.OTA_PROXY_URL?.trim() ||
+    undefined;
 
   return {
+    sessionKey: `${providerKey}:${currency ?? "default"}`,
     market,
     browserChannel,
     userAgent,
     useStealth,
-    proxyUrl
+    proxyUrl,
   };
 }
 
@@ -228,7 +273,8 @@ export function buildManualReviewQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
   sourceHint: string,
-  warning?: string
+  warning?: string,
+  reason = "Bağlantı veya yanıt doğrulanamadı. Ayrıntı için rapor uyarılarını kontrol edin.",
 ): ProviderCollectionResult {
   const quotes: ProviderQuote[] = scope.windows.flatMap((window) =>
     scope.rooms.map((room) => ({
@@ -240,26 +286,33 @@ export function buildManualReviewQuotes(
       currency: scope.currency,
       status: "manual-review" as const,
       dataMode: "live" as const,
-      sourceHint
-    }))
+      sourceHint,
+      reason,
+    })),
   );
 
   return {
     quotes,
-    warnings: warning ? [warning] : []
+    warnings: warning ? [warning] : [],
   };
 }
 
-export function parsePriceFromText(text: string, currency: CurrencyCode): number | null {
-  const currencyTokens =
-    currency === "GBP"
-      ? ["£", "GBP", "US$", "$", "€", "EUR"]
-      : ["€", "EUR", "US$", "$", "£", "GBP"];
+export function parsePriceFromText(
+  text: string,
+  currency: CurrencyCode,
+): number | null {
+  const currencyTokens = currency === "GBP" ? ["£", "GBP"] : ["€", "EUR"];
 
   for (const token of currencyTokens) {
     const escaped = token.replace("$", "\\$");
-    const before = new RegExp(`${escaped}\\s*([\\d.,]+)`, "i");
-    const after = new RegExp(`([\\d.,]+)\\s*${escaped}`, "i");
+    const before = new RegExp(
+      `${escaped}\\s*([\\d.,]+(?:[ \\u00a0\\u202f]\\d{3})*(?:[.,]\\d{2})?)`,
+      "i",
+    );
+    const after = new RegExp(
+      `([\\d.,]+(?:[ \\u00a0\\u202f]\\d{3})*(?:[.,]\\d{2})?)\\s*${escaped}`,
+      "i",
+    );
     const match = text.match(before) ?? text.match(after);
 
     if (match?.[1]) {
@@ -284,7 +337,7 @@ export function normalizeInlineText(text: string): string {
 export function findSnippet(lines: string[], aliases: string[]): string | null {
   for (const alias of aliases) {
     const index = lines.findIndex((line) =>
-      line.toLowerCase().includes(alias.toLowerCase())
+      line.toLowerCase().includes(alias.toLowerCase()),
     );
 
     if (index !== -1) {
@@ -298,11 +351,11 @@ export function findSnippet(lines: string[], aliases: string[]): string | null {
 export function extractNightCountPrice(
   text: string,
   nights: number,
-  currency: CurrencyCode
+  currency: CurrencyCode,
 ): number | null {
   const normalized = normalizeInlineText(text);
   const match = normalized.match(
-    new RegExp(`${nights}\\s+nights?\\s+From\\s+([^ ]+\\s*[\\d.,]+)`, "i")
+    new RegExp(`${nights}\\s+nights?\\s+From\\s+([^ ]+\\s*[\\d.,]+)`, "i"),
   );
 
   if (!match?.[1]) {
@@ -312,27 +365,22 @@ export function extractNightCountPrice(
   return parsePriceFromText(match[1], currency);
 }
 
-function normalizeNumber(raw: string): number {
+function normalizeNumber(raw: string): number | null {
   const cleaned = raw.replace(/[^\d.,]/g, "");
-  const lastComma = cleaned.lastIndexOf(",");
-  const lastDot = cleaned.lastIndexOf(".");
-
-  if (lastComma > lastDot) {
-    return Number(cleaned.replace(/\./g, "").replace(",", "."));
+  const separator = Math.max(
+    cleaned.lastIndexOf(","),
+    cleaned.lastIndexOf("."),
+  );
+  const decimals = separator < 0 ? 0 : cleaned.length - separator - 1;
+  let normalized: string;
+  if (separator >= 0 && (decimals === 1 || decimals === 2)) {
+    const integer = cleaned.slice(0, separator);
+    if (!/^\d+$|^\d{1,3}(?:[.,]\d{3})+$/.test(integer)) return null;
+    normalized = `${integer.replace(/[.,]/g, "")}.${cleaned.slice(separator + 1)}`;
+  } else {
+    if (!/^\d+$|^\d{1,3}(?:[.,]\d{3})+$/.test(cleaned)) return null;
+    normalized = cleaned.replace(/[.,]/g, "");
   }
-
-  if (lastDot > lastComma) {
-    return Number(cleaned.replace(/,/g, ""));
-  }
-
-  if (cleaned.includes(",")) {
-    const parts = cleaned.split(",");
-    if (parts.at(-1)?.length === 2) {
-      return Number(cleaned.replace(/\./g, "").replace(",", "."));
-    }
-
-    return Number(cleaned.replace(/,/g, ""));
-  }
-
-  return Number(cleaned);
+  const value = Number(normalized);
+  return Number.isFinite(value) && value > 0 ? value : null;
 }

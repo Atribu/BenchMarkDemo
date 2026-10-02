@@ -2,7 +2,7 @@ import type { CurrencyCode } from "@/src/lib/benchmark/types";
 
 export function formatCurrency(
   value: number | null,
-  currency: CurrencyCode
+  currency: CurrencyCode,
 ): string {
   if (value === null) {
     return "--";
@@ -12,7 +12,7 @@ export function formatCurrency(
     style: "currency",
     currency,
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -25,13 +25,14 @@ export function formatPercent(value: number | null): string {
     style: "percent",
     signDisplay: "always",
     minimumFractionDigits: 1,
-    maximumFractionDigits: 1
+    maximumFractionDigits: 1,
   }).format(value);
 }
 
 export function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("tr-TR", {
     dateStyle: "medium",
-    timeStyle: "short"
+    timeStyle: "short",
+    timeZone: "Europe/Istanbul",
   }).format(new Date(value));
 }

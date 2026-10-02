@@ -1,0 +1,70 @@
+:root {
+  color-scheme: light;
+  --ink: #140f25;
+  --accent: #547ccf;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  width: 380px;
+  margin: 0;
+  padding: 24px;
+  color: var(--ink);
+  background: linear-gradient(135deg, #f8f9fc, #edf4fa);
+  font:
+    14px/1.55 Georgia,
+    serif;
+}
+h1 {
+  font-size: 28px;
+  margin: 8px 0;
+}
+.eyebrow {
+  font: 11px/1.5 monospace;
+  letter-spacing: 2px;
+  color: var(--accent);
+}
+button,
+select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd5e7;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+}
+button {
+  background: var(--ink);
+  color: white;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+button:focus-visible,
+select:focus-visible {
+  outline: 3px solid #54b9cf;
+  outline-offset: 2px;
+}
+select {
+  background: white;
+  margin: 8px 0;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 13px/1.6 monospace;
+  background: #fff;
+  padding: 12px;
+  border-radius: 8px;
+}
+footer {
+  font-size: 12px;
+  border-top: 1px solid #cbd5e7;
+  padding-top: 16px;
+  margin-top: 20px;
+}
+#status {
+  font-weight: bold;
+}

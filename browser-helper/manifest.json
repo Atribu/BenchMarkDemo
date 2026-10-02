@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "DGTLFACE OTA Aktarimi",
+  "version": "1.0.0",
+  "description": "Kullanici baslatimli Loveholidays ve On the Beach oda fiyati aktarimi. Ag istegi, cerez veya hesap erisimi yok.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "OTA fiyatlarini disari aktar"
+  }
+}

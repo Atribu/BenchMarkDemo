@@ -1,7 +1,9 @@
 import { buildBenchmarkResult } from "@/src/lib/benchmark/engine";
+import { nightCount } from "@/src/lib/benchmark/request";
+import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
 import {
   DEFAULT_REQUEST,
-  REPORT_SCOPES
+  REPORT_SCOPES,
 } from "@/src/lib/benchmark/sample-data";
 import type {
   BenchmarkCustomWindowInput,
@@ -13,7 +15,8 @@ import type {
   ProviderDescriptor,
   ProviderQuote,
   RoomDefinition,
-  ReportScopeDefinition
+  ReportScopeDefinition,
+  ScopeKey,
 } from "@/src/lib/benchmark/types";
 import { collectBookingLiveQuotes } from "@/src/lib/ota/live-booking";
 import { collectExpediaLiveQuotes } from "@/src/lib/ota/live-expedia";
@@ -23,9 +26,13 @@ import { buildManualReviewQuotes } from "@/src/lib/ota/live-helpers";
 import { collectTuiLiveQuotes } from "@/src/lib/ota/live-tui";
 import {
   collectLoveholidaysLiveQuotes,
-  collectOnTheBeachLiveQuotes
+  collectOnTheBeachLiveQuotes,
 } from "@/src/lib/ota/live-uk-ota";
 import { OTA_PROVIDERS } from "@/src/lib/ota/registry";
+import { collectInBatches } from "./collection-queue";
+import { collectGoogleHotelPrices } from "./live-google-hotels";
+import { collectHolidayCheckSecondary } from "./holidaycheck-secondary";
+import { collectSerpApiHotelPrices, serpApiEnabled } from "./live-serpapi";
 
 interface ProviderProfile {
   baseMarkup: number;
@@ -41,50 +48,50 @@ const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
     volatility: 0.16,
     missingModulo: 13,
     soldOutModulo: 17,
-    canUndercut: true
+    canUndercut: true,
   },
   expedia: {
     baseMarkup: 0.15,
     volatility: 0.14,
     missingModulo: 15,
     soldOutModulo: 19,
-    canUndercut: true
+    canUndercut: true,
   },
   hotelbeds: {
     baseMarkup: 0.08,
     volatility: 0.1,
     missingModulo: 11,
     soldOutModulo: 23,
-    canUndercut: true
+    canUndercut: true,
   },
   holidaycheck: {
     baseMarkup: 0.12,
     volatility: 0.09,
     missingModulo: 12,
     soldOutModulo: 18,
-    canUndercut: false
+    canUndercut: false,
   },
   loveholidays: {
     baseMarkup: 0.2,
     volatility: 0.13,
     missingModulo: 10,
     soldOutModulo: 16,
-    canUndercut: true
+    canUndercut: true,
   },
   onthebeach: {
     baseMarkup: 0.18,
     volatility: 0.12,
     missingModulo: 14,
     soldOutModulo: 21,
-    canUndercut: true
+    canUndercut: true,
   },
   tui: {
     baseMarkup: 0.11,
     volatility: 0.08,
     missingModulo: 16,
     soldOutModulo: 22,
-    canUndercut: false
-  }
+    canUndercut: false,
+  },
 };
 
 function hashValue(input: string): number {
@@ -102,16 +109,7 @@ function roundToCurrency(value: number): number {
 }
 
 function calculateNightCount(checkIn: string, checkOut: string): number | null {
-  const start = new Date(`${checkIn}T00:00:00Z`);
-  const end = new Date(`${checkOut}T00:00:00Z`);
-
-  if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
-    return null;
-  }
-
-  const diff = end.valueOf() - start.valueOf();
-  const nights = Math.round(diff / 86400000);
-  return nights > 0 ? nights : null;
+  return nightCount(checkIn, checkOut);
 }
 
 function buildWindowId(checkIn: string, checkOut: string): string {
@@ -123,13 +121,16 @@ function buildWindowLabel(checkIn: string, checkOut: string): string {
 }
 
 function buildRequestWindow(
-  customWindow?: BenchmarkCustomWindowInput
+  customWindow?: BenchmarkCustomWindowInput,
 ): BenchmarkWindowDefinition | null {
   if (!customWindow?.checkIn || !customWindow?.checkOut) {
     return null;
   }
 
-  const nights = calculateNightCount(customWindow.checkIn, customWindow.checkOut);
+  const nights = calculateNightCount(
+    customWindow.checkIn,
+    customWindow.checkOut,
+  );
 
   if (!nights) {
     return null;
@@ -140,13 +141,13 @@ function buildRequestWindow(
     label: buildWindowLabel(customWindow.checkIn, customWindow.checkOut),
     checkIn: customWindow.checkIn,
     checkOut: customWindow.checkOut,
-    nights
+    nights,
   };
 }
 
 function averageRoomReference(room: RoomDefinition): number {
   const values = Object.values(room.referenceRates).filter(
-    (value): value is number => typeof value === "number"
+    (value): value is number => typeof value === "number",
   );
 
   if (values.length === 0) {
@@ -159,7 +160,7 @@ function averageRoomReference(room: RoomDefinition): number {
 
 function applyCustomWindow(
   scopes: ReportScopeDefinition[],
-  customWindow?: BenchmarkCustomWindowInput
+  customWindow?: BenchmarkCustomWindowInput,
 ): {
   scopes: ReportScopeDefinition[];
   warnings: string[];
@@ -169,38 +170,25 @@ function applyCustomWindow(
   if (!customWindow) {
     return {
       scopes,
-      warnings: []
+      warnings: [],
     };
   }
 
   if (!requestWindow) {
-    return {
-      scopes,
-      warnings: ["Secilen tarih araligi gecersiz oldugu icin varsayilan benchmark pencereleri kullanildi."]
-    };
+    throw new Error("Geçersiz tarih aralığı. Konaklama 1–60 gece olmalı.");
   }
 
   const warnings: string[] = [];
   const nextScopes = scopes.map((scope) => {
-    const missingReference = scope.rooms.some(
-      (room) => typeof room.referenceRates[requestWindow.id] !== "number"
-    );
-
-    if (missingReference) {
-      warnings.push(
-        `${scope.label} icin ${requestWindow.label} referans fiyat seed'i bulunamadi. Canli fiyat gelse bile fark kolonlari bos kalabilir.`
-      );
-    }
-
     return {
       ...scope,
-      windows: [requestWindow]
+      windows: [requestWindow],
     };
   });
 
   return {
     scopes: nextScopes,
-    warnings
+    warnings,
   };
 }
 
@@ -208,7 +196,7 @@ function interpolateSearchTemplate(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
   roomName: string,
-  window: ReportScopeDefinition["windows"][number]
+  window: ReportScopeDefinition["windows"][number],
 ): string {
   if (!provider.searchTemplate) {
     return "";
@@ -225,9 +213,10 @@ function simulateQuote(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
   room: ReportScopeDefinition["rooms"][number],
-  window: ReportScopeDefinition["windows"][number]
+  window: ReportScopeDefinition["windows"][number],
 ): ProviderQuote {
-  const referencePrice = room.referenceRates[window.id] ?? averageRoomReference(room);
+  const referencePrice =
+    room.referenceRates[window.id] ?? averageRoomReference(room);
   const signature = `${provider.key}:${scope.id}:${room.id}:${window.id}`;
   const seed = hashValue(signature);
   const profile = PROVIDER_PROFILES[provider.key];
@@ -242,7 +231,7 @@ function simulateQuote(
       currency: scope.currency,
       status: "sold_out",
       dataMode: "mock",
-      sourceHint: interpolateSearchTemplate(provider, scope, room.name, window)
+      sourceHint: interpolateSearchTemplate(provider, scope, room.name, window),
     };
   }
 
@@ -256,13 +245,13 @@ function simulateQuote(
       currency: scope.currency,
       status: "missing",
       dataMode: "mock",
-      sourceHint: interpolateSearchTemplate(provider, scope, room.name, window)
+      sourceHint: interpolateSearchTemplate(provider, scope, room.name, window),
     };
   }
 
   const variation = ((seed % 1000) / 1000 - 0.5) * profile.volatility;
   const undercut =
-    profile.canUndercut && seed % 9 === 0 ? -0.03 - ((seed % 5) * 0.01) : 0;
+    profile.canUndercut && seed % 9 === 0 ? -0.03 - (seed % 5) * 0.01 : 0;
   const markup = profile.baseMarkup + variation + undercut;
   const price = roundToCurrency(referencePrice * (1 + markup));
 
@@ -275,23 +264,23 @@ function simulateQuote(
     currency: scope.currency,
     status: "available",
     dataMode: "mock",
-    sourceHint: interpolateSearchTemplate(provider, scope, room.name, window)
+    sourceHint: interpolateSearchTemplate(provider, scope, room.name, window),
   };
 }
 
 async function collectProviderQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
-  _mode: CollectionMode
+  _mode: CollectionMode,
 ): Promise<ProviderQuote[]> {
   return scope.rooms.flatMap((room) =>
-    scope.windows.map((window) => simulateQuote(provider, scope, room, window))
+    scope.windows.map((window) => simulateQuote(provider, scope, room, window)),
   );
 }
 
 async function collectLiveProviderQuotes(
   provider: ProviderDescriptor,
-  scope: ReportScopeDefinition
+  scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
   switch (provider.key) {
     case "booking":
@@ -313,38 +302,44 @@ async function collectLiveProviderQuotes(
         provider,
         scope,
         provider.searchTemplate ?? "",
-        `${provider.name} icin live collector henuz eklenmedi.`
+        `${provider.name} icin live collector henuz eklenmedi.`,
       );
   }
 }
 
 export async function runBenchmarkJob(
-  request: Partial<BenchmarkRequest> = {}
+  request: Partial<BenchmarkRequest> = {},
+  collectLive: typeof collectLiveProviderQuotes = collectLiveProviderQuotes,
 ) {
   const resolvedRequest: BenchmarkRequest = {
     mode: request.mode ?? DEFAULT_REQUEST.mode,
     providerKeys: request.providerKeys ?? DEFAULT_REQUEST.providerKeys,
     scopeKeys: request.scopeKeys ?? DEFAULT_REQUEST.scopeKeys,
-    customWindow: request.customWindow ?? DEFAULT_REQUEST.customWindow
+    customWindow: request.customWindow ?? DEFAULT_REQUEST.customWindow,
   };
 
   const baseScopes = REPORT_SCOPES.filter((scope) =>
-    resolvedRequest.scopeKeys.includes(scope.id)
+    resolvedRequest.scopeKeys.includes(scope.id),
   );
   const customWindowResult = applyCustomWindow(
     baseScopes,
-    resolvedRequest.customWindow
+    resolvedRequest.customWindow,
   );
-  const selectedScopes = customWindowResult.scopes;
   const selectedProviders = OTA_PROVIDERS.filter((provider) =>
-    resolvedRequest.providerKeys.includes(provider.key)
+    resolvedRequest.providerKeys.includes(provider.key),
   );
+  const plan = buildCollectionPlan(
+    customWindowResult.scopes,
+    selectedProviders,
+    REPORT_SCOPES,
+  );
+  const selectedScopes = plan.scopes;
 
-  const warnings: string[] = [...customWindowResult.warnings];
+  const warnings: string[] = [...customWindowResult.warnings, ...plan.warnings];
 
   if (resolvedRequest.mode === "live") {
     warnings.push(
-      "Live mod beta olarak calisiyor. Booking, Expedia, Hotelbeds API, HolidayCheck, Loveholidays, On the Beach ve TUI gercekten deneniyor; eksik credential veya anti-bot durumunda manual-review quote uretiliyor."
+      "Canlı bağlantılar beta aşamasında. Eşleşmeyen gerçek teklifler ayrı gösterilir ve oda kapsamasına katılmaz. Oda eşleşmesi aynı tarife anlamına gelmez: pansiyon, iptal ve vergiler bütünüyle eşitlenmediği için canlı raporda en ucuz OTA/parite sıralaması yapılmaz. Cashback toplamdan düşülmez.",
     );
   }
 
@@ -352,31 +347,145 @@ export async function runBenchmarkJob(
     warnings.push("Hic scope secilmedigi icin rapor bos olustu.");
   }
 
-  const collectionResults = await Promise.all(
-    selectedScopes.flatMap((scope) =>
-      selectedProviders
-        .filter((provider) => provider.supportedScopes.includes(scope.id))
-        .map((provider) =>
-          resolvedRequest.mode === "live"
-            ? collectLiveProviderQuotes(provider, scope)
-            : collectProviderQuotes(provider, scope, resolvedRequest.mode).then((quotes) => ({
-                quotes,
-                warnings: []
-              }))
-        )
-    )
+  const collectionResults = await collectInBatches(
+    plan.tasks.map(
+      ({ provider, scope, supported, reason }) =>
+        async (): Promise<ProviderCollectionResult> => {
+          if (!supported) {
+            const result = buildManualReviewQuotes(
+              provider,
+              scope,
+              "",
+              reason,
+              reason,
+            );
+            return {
+              ...result,
+              quotes: result.quotes.map((quote) => ({
+                ...quote,
+                dataMode: resolvedRequest.mode,
+              })),
+            };
+          }
+          return resolvedRequest.mode === "live"
+            ? collectLive(provider, scope).catch((error) => {
+                const detail = `${provider.name}: ${error instanceof Error ? error.message.split("\n")[0] : "Bağlantı hatası"}`;
+                return buildManualReviewQuotes(
+                  provider,
+                  scope,
+                  "",
+                  detail,
+                  detail,
+                );
+              })
+            : {
+                quotes: await collectProviderQuotes(
+                  provider,
+                  scope,
+                  resolvedRequest.mode,
+                ),
+                warnings: [],
+              };
+        },
+    ),
   );
 
   const quotes = collectionResults.flatMap((result) => result.quotes);
   warnings.push(...collectionResults.flatMap((result) => result.warnings));
 
+  const existingHolidayCheck: Partial<
+    Record<ScopeKey, ProviderCollectionResult>
+  > = {};
+  plan.tasks.forEach((task, index) => {
+    if (task.provider.key === "holidaycheck")
+      existingHolidayCheck[task.scope.id] = collectionResults[index];
+  });
+  const supplementary =
+    resolvedRequest.mode === "live" &&
+    process.env.OTA_HOLIDAYCHECK_SECONDARY !== "false"
+      ? await collectHolidayCheckSecondary({
+          scopes: selectedScopes,
+          catalog: REPORT_SCOPES,
+          providers: selectedProviders,
+          quotes,
+          existing: existingHolidayCheck,
+          holidayCheckProvider: OTA_PROVIDERS.find(
+            (provider) => provider.key === "holidaycheck",
+          )!,
+        })
+      : { secondaryOffers: [], warnings: [] };
+  warnings.push(...supplementary.warnings);
+
+  const managedSource = serpApiEnabled();
+  const missingProviders = (scope: ReportScopeDefinition) =>
+    selectedProviders.filter(
+      (provider) =>
+        plan.providersByScope[scope.id]?.includes(provider.key) &&
+        (managedSource
+          ? provider.key !== "hotelbeds"
+          : ["booking", "expedia"].includes(provider.key)) &&
+        quotes.some(
+          (quote) =>
+            quote.scopeKey === scope.id &&
+            quote.providerKey === provider.key &&
+            quote.status === "manual-review" &&
+            !quotes.some(
+              (other) =>
+                other.scopeKey === quote.scopeKey &&
+                other.windowId === quote.windowId &&
+                other.providerKey === quote.providerKey &&
+                other.status === "available",
+            ) &&
+            !collectionResults.some((result) =>
+              result.offers?.some(
+                (offer) =>
+                  offer.scopeKey === quote.scopeKey &&
+                  offer.windowId === quote.windowId &&
+                  offer.providerKey === quote.providerKey,
+              ),
+            ) &&
+            !supplementary.secondaryOffers.some(
+              (offer) =>
+                offer.hotelKey === scope.hotelKey &&
+                offer.windowId === quote.windowId &&
+                offer.advertisedProviderKey === quote.providerKey,
+            ),
+        ),
+    );
+  const secondaryResults =
+    resolvedRequest.mode === "live" && process.env.OTA_GOOGLE_HOTELS !== "false"
+      ? await collectInBatches(
+          selectedScopes
+            .filter((scope) => missingProviders(scope).length > 0)
+            .map(
+              (scope) => () =>
+                (managedSource
+                  ? collectSerpApiHotelPrices
+                  : collectGoogleHotelPrices)(scope, missingProviders(scope)),
+            ),
+          managedSource ? 1 : 2,
+        )
+      : [];
+  warnings.push(...secondaryResults.flatMap((result) => result.warnings));
+
   const uniqueWarnings = [...new Set(warnings)];
 
-  return buildBenchmarkResult({
+  const report = buildBenchmarkResult({
     mode: resolvedRequest.mode,
     warnings: uniqueWarnings,
     scopes: selectedScopes,
     providers: selectedProviders,
-    quotes
+    quotes,
+    offers: collectionResults.flatMap((result) => result.offers ?? []),
+    providersByScope: plan.providersByScope,
   });
+  return {
+    ...report,
+    summary: {
+      ...report.summary,
+      secondaryOfferCount: supplementary.secondaryOffers.length,
+    },
+    secondaryOffers: supplementary.secondaryOffers,
+    hotelPrices: secondaryResults.flatMap((result) => result.hotelPrices),
+  };
 }

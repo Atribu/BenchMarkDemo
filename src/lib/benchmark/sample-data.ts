@@ -159,6 +159,17 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = [
   }
 ];
 
+const queenEu = REPORT_SCOPES.find((scope) => scope.id === "queen-eu")!;
+REPORT_SCOPES.push({
+  ...queenEu,
+  id: "queen-uk",
+  label: "Queen Birlesik Krallik Benchmark",
+  marketLabel: "Birlesik Krallik",
+  currency: "GBP",
+  notes: "UK kanallari icin ayri para birimi; EUR referanslari GBP olarak kullanilmaz.",
+  rooms: queenEu.rooms.map((room) => ({ ...room, referenceRates: {} })),
+});
+
 export const DEFAULT_PROVIDER_KEYS: OtaKey[] = ["booking"];
 
 export const DEFAULT_REQUEST: BenchmarkRequest = {
