@@ -59,6 +59,18 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = [
     notes: "Referans fiyatlar Google Sheet'teki 2026 Avrupa bloklarindan seed edildi.",
     windows: FUTURE_WINDOWS,
     rooms: [
+       {
+    id: "corner",
+    name: "Köşe Oda",
+    occupancyLabel: "2 Pax",
+    referenceRates: {}
+  },
+        {
+    id: "economy",
+    name: "Ekonomi Oda",
+    occupancyLabel: "2 Pax",
+    referenceRates: {}
+  },
       {
         id: "superior-land",
         name: "Superior Kara Manzarali",
@@ -95,6 +107,18 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = [
     notes: "Loveholidays ve OnTheBeach gibi UK odakli kanallar icin ayrik scope.",
     windows: FUTURE_WINDOWS,
     rooms: [
+      {
+    id: "corner",
+    name: "Köşe Oda",
+    occupancyLabel: "2 Pax",
+    referenceRates: {}
+  },
+       {
+    id: "economy",
+    name: "Ekonomi Oda",
+    occupancyLabel: "2 Pax",
+    referenceRates: {}
+  },
       {
         id: "superior-land",
         name: "Superior Kara Manzarali",

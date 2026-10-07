@@ -145,23 +145,132 @@ export async function collectBookingLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
+
+  console.log("🔥🔥🔥 BOOKING COLLECTOR ÇALIŞTI 🔥🔥🔥", {
+    provider: provider.key,
+    scope: scope.id,
+    hotel: scope.hotelName,
+  });
+
   const quotes: ProviderQuote[] = [];
   const warnings: string[] = [];
-  let handle: Awaited<ReturnType<typeof createBrowserPage>> | undefined;
+
+
+let handle: Awaited<ReturnType<typeof createBrowserPage>> | undefined;
+
+try {
+  const bookingConfig = resolveProviderLiveConfig(
+    "booking",
+    scope.currency,
+  );
+
+  console.log("[Booking] Resolved browser config:", {
+    sessionKey: bookingConfig.sessionKey,
+    market: bookingConfig.market,
+    browserChannel: bookingConfig.browserChannel,
+    userAgent: bookingConfig.userAgent,
+    useStealth: bookingConfig.useStealth,
+    proxyEnabled: Boolean(bookingConfig.proxyUrl),
+  });
+
+  console.log("[Booking] Creating browser...");
+
   try {
-    handle = await createBrowserPage(
-      resolveProviderLiveConfig("booking", scope.currency),
+    handle = await createBrowserPage(bookingConfig);
+
+    console.log("[Booking] Browser created successfully");
+  } catch (error) {
+    console.error(
+      "[Booking] Browser creation FAILED:",
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          }
+        : error,
     );
-    for (const window of scope.windows) {
+
+    throw error;
+  }
+
+  for (const window of scope.windows) {
+
+
       let sourceHint = "";
       try {
         sourceHint = buildBookingUrl(scope, window);
         const page = handle.page;
+
+        console.log("\n========== BOOKING DEBUG START ==========");
+        console.log("[Booking] Requested URL:", sourceHint);
+
+
         const response = await page.goto(sourceHint, {
           waitUntil: "domcontentloaded",
           timeout: 45000,
         });
-        await assertPricePageAccessible(page, response?.status());
+
+
+console.log("[Booking] Response headers:", await response?.allHeaders());
+const html = await page.content().catch(() => "");
+console.log("[Booking] HTML length:", html.length);
+console.log("[Booking] HTML preview:", html.slice(0, 2000));
+const frames = page.frames().map((frame) => ({
+  url: frame.url(),
+  name: frame.name(),
+}));
+console.log("[Booking] Frames:", frames);
+
+
+        console.log("[Booking] HTTP status:", response?.status());
+        console.log("[Booking] Final URL:", page.url());
+        console.log("[Booking] Page title:", await page.title().catch(() => ""));
+
+
+        const browserInfo = await page
+  .evaluate(() => ({
+    language: navigator.language,
+    languages: navigator.languages,
+    userAgent: navigator.userAgent,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }))
+  .catch(() => null);
+
+console.log("[Booking] Browser info:", browserInfo);
+
+const bodyText = await page
+  .locator("body")
+  .innerText({ timeout: 3000 })
+  .catch(() => "");
+console.log("[Booking] Body preview:", bodyText.slice(0, 1500));
+
+await page.waitForTimeout(3000);
+
+console.log("[Booking] After 3s URL:", page.url());
+console.log(
+  "[Booking] After 3s title:",
+  await page.title().catch(() => ""),
+);
+
+const bodyAfterWait = await page
+  .locator("body")
+  .innerText({ timeout: 3000 })
+  .catch(() => "");
+
+console.log(
+  "[Booking] After 3s body preview:",
+  bodyAfterWait.slice(0, 1500),
+);
+
+console.log("========== BOOKING DEBUG ACCESS CHECK ==========");
+
+await assertPricePageAccessible(page, response?.status());
+        
+
+        console.log("[Booking] Access check: OK");
+console.log("========== BOOKING DEBUG END ==========\n");
+
         const dismiss = page.getByRole("button", {
           name: "Dismiss sign-in info.",
           exact: true,
@@ -237,6 +346,15 @@ export async function collectBookingLiveQuotes(
         });
         quotes.push(...parseBookingQuotes(provider, scope, window, snapshot));
       } catch (error) {
+        console.error(
+    "[Booking] Window collection FAILED:",
+    error instanceof Error
+      ? {
+          name: error.name,
+          message: error.message,
+        }
+      : error,
+  );
         let reason =
           error instanceof Error
             ? error.message.split("\n")[0]

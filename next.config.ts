@@ -24,6 +24,9 @@ const nextConfig: NextConfig = {
     "playwright",
     "playwright-extra",
     "puppeteer-extra-plugin-stealth",
+    "patchright",
+    "patchright-core",
+    "chromium-bidi",
   ],
 };
 

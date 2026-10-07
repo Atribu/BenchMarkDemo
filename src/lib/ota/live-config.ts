@@ -53,14 +53,27 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
     roomAliases: {
       "superior-land": [
         "Superior Room with Land View",
-        "Superior Room",
-        "Superior Corner Room"
+        "Superior Room Land View",
+        "Superior Land View"
       ],
       "superior-sea": [
         "Superior Room with Sea View",
+        "Superior Room Sea View",
         "Superior Room with Side Sea View",
+        "Superior Side Sea View",
         "Sea View"
-      ]
+      ],
+
+      "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   },
   "miramare-queen": {

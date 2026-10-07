@@ -11,10 +11,18 @@ export function browserSessionPath(
   directory = process.env.OTA_SESSION_DIR,
 ) {
   const root = directory || path.join(process.cwd(), ".ota-sessions");
-  return path.join(
+
+  const filePath = path.join(
     root,
     `${createHash("sha256").update(key).digest("hex").slice(0, 24)}.json`,
   );
+
+  console.log("[Session] Mapping:", {
+    key,
+    filePath,
+  });
+
+  return filePath;
 }
 
 export async function readBrowserSession(
@@ -22,13 +30,26 @@ export async function readBrowserSession(
 ): Promise<StorageState | undefined> {
   try {
     const info = await stat(file);
-    if (info.size > 5_000_000 || Date.now() - info.mtimeMs > MAX_AGE_MS) return;
+
+    console.log("[Session] Read attempt:", {
+      file,
+      size: info.size,
+      ageMs: Date.now() - info.mtimeMs,
+    });
+
+    if (info.size > 5_000_000 || Date.now() - info.mtimeMs > MAX_AGE_MS) {
+      console.log("[Session] Rejected: expired or too large");
+      return;
+    }
+
     const state = JSON.parse(await readFile(file, "utf8"));
+
     const namedValue = (value: unknown) =>
       !!value &&
       typeof value === "object" &&
       typeof (value as { name?: unknown }).name === "string" &&
       typeof (value as { value?: unknown }).value === "string";
+
     if (
       Array.isArray(state?.cookies) &&
       Array.isArray(state?.origins) &&
@@ -49,10 +70,21 @@ export async function readBrowserSession(
           Array.isArray(origin.localStorage) &&
           origin.localStorage.every(namedValue),
       )
-    )
+    ) {
+      console.log("[Session] Loaded:", {
+        cookieCount: state.cookies.length,
+        originCount: state.origins.length,
+      });
+
       return state;
-  } catch {
-    // An expired, missing or damaged anonymous session must not stop collection.
+    }
+
+    console.log("[Session] Rejected: invalid structure");
+  } catch (error) {
+    console.log(
+      "[Session] Read failed:",
+      error instanceof Error ? error.message : error,
+    );
   }
 }
 

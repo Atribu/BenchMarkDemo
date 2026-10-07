@@ -50,18 +50,72 @@ function dateLabel(date: string) {
 }
 
 // Legacy Booking/Expedia parsers still import this; On the Beach uses strict offers below.
-export function namedRoomRank(roomId: string, name: string): number | null {
-  if (
-    !hasCompatibleView(roomId, name) ||
-    /\b(suite|family|deluxe|corner|familienzimmer|eckzimmer)\b/i.test(name)
-  )
+export function namedRoomRank(
+  roomId: string,
+  name: string,
+): number | null {
+  const normalizedName = normalizeInlineText(name);
+
+  // Economy sadece Economy Room ile eşleşsin.
+  if (roomId === "economy") {
+    if (/^Economy Room$/i.test(normalizedName)) {
+      return 0;
+    }
+
+    if (/^Economy$/i.test(normalizedName)) {
+      return 5;
+    }
+
     return null;
-  if (roomId.startsWith("superior") && !/\bsuperior\b/i.test(name)) return null;
-  if (roomId.startsWith("standard") && /\bsuperior\b/i.test(name)) return null;
+  }
+
+  // Corner sadece Corner Room ile eşleşsin.
+  if (roomId === "corner") {
+    if (/^Superior Corner Room$/i.test(normalizedName)) {
+      return 0;
+    }
+
+    if (/\bcorner\b/i.test(normalizedName)) {
+      return 5;
+    }
+
+    return null;
+  }
+
+  if (
+    !hasCompatibleView(roomId, normalizedName) ||
+    /\b(suite|family|deluxe|corner|familienzimmer|eckzimmer)\b/i.test(
+      normalizedName,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    roomId.startsWith("superior") &&
+    !/\bsuperior\b/i.test(normalizedName)
+  ) {
+    return null;
+  }
+
+  if (
+    roomId.startsWith("standard") &&
+    /\bsuperior\b/i.test(normalizedName)
+  ) {
+    return null;
+  }
+
   return (
-    (/\b(side|partial|seitl|seitlichem|seitlicher|teilmeerblick)\b/i.test(name)
+    (/\b(side|partial|seitl|seitlichem|seitlicher|teilmeerblick)\b/i.test(
+      normalizedName,
+    )
       ? 10
-      : 0) + (/promo|economy|no balcony|without balcony/i.test(name) ? 20 : 0)
+      : 0) +
+    (/promo|economy|no balcony|without balcony/i.test(
+      normalizedName,
+    )
+      ? 20
+      : 0)
   );
 }
 
