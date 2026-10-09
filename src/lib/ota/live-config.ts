@@ -197,18 +197,30 @@ export const HOTELBEDS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> =
     pageUrl: "https://api-mtls.test.hotelbeds.com/hotel-api/1.0/hotels",
     roomAliases: {
       "standard-land": [
-        "standard room",
-        "land view",
-        "garden view",
-        "inland view",
-        "economy"
-      ],
-      "standard-sea": [
-        "standard sea view",
-        "sea view",
-        "side sea view",
-        "meerblick"
-      ]
+      "Standard Room Land View",
+      "Standard Land View",
+      "Standard Room",
+      "Land View",
+      "Garden View",
+      "Inland View",
+      "Standardzimmer mit Landblick",
+      "Standardzimmer mit Gartenblick",
+      "Standardzimmer mit Blick ins Grüne",
+      "Doppelzimmer mit Landblick",
+      "Doppelzimmer mit Gartenblick"
+    ],
+    "standard-sea": [
+      "Standard Room Sea View",
+      "Standard Sea View",
+      "Sea View",
+      "Side Sea View",
+      "Partial Sea View",
+      "Standardzimmer mit Meerblick",
+      "Standard-Doppelzimmer mit Meerblick",
+      "Doppelzimmer mit Meerblick",
+      "Zimmer mit seitlichem Meerblick",
+      "Standardzimmer mit seitlichem Meerblick"
+    ]
     }
   }
 };
@@ -217,8 +229,31 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
   "miramare-queen": {
     pageUrl: "https://www.loveholidays.com/holidays/turkey/antalya/side/miramare-queen.html",
     roomAliases: {
-      "standard-land": ["Standard Room with Land View", "Standard Room with Garden View"],
-      "standard-sea": ["Standard Room with Sea View", "Standard Room with Partial Sea View"]
+     "standard-land": [
+      "Standard Room Land View",
+      "Standard Land View",
+      "Standard Room",
+      "Land View",
+      "Garden View",
+      "Inland View",
+      "Standardzimmer mit Landblick",
+      "Standardzimmer mit Gartenblick",
+      "Standardzimmer mit Blick ins Grüne",
+      "Doppelzimmer mit Landblick",
+      "Doppelzimmer mit Gartenblick"
+    ],
+    "standard-sea": [
+      "Standard Room Sea View",
+      "Standard Sea View",
+      "Sea View",
+      "Side Sea View",
+      "Partial Sea View",
+      "Standardzimmer mit Meerblick",
+      "Standard-Doppelzimmer mit Meerblick",
+      "Doppelzimmer mit Meerblick",
+      "Zimmer mit seitlichem Meerblick",
+      "Standardzimmer mit seitlichem Meerblick"
+    ]
     }
   },
   "miramare-beach": {
@@ -245,8 +280,31 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
   "miramare-queen": {
     pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-queen",
     roomAliases: {
-      "standard-land": ["standard land view", "standard garden view"],
-      "standard-sea": ["standard sea view", "standard side sea view"]
+      "standard-land": [
+      "Standard Room Land View",
+      "Standard Land View",
+      "Standard Room",
+      "Land View",
+      "Garden View",
+      "Inland View",
+      "Standardzimmer mit Landblick",
+      "Standardzimmer mit Gartenblick",
+      "Standardzimmer mit Blick ins Grüne",
+      "Doppelzimmer mit Landblick",
+      "Doppelzimmer mit Gartenblick"
+    ],
+    "standard-sea": [
+      "Standard Room Sea View",
+      "Standard Sea View",
+      "Sea View",
+      "Side Sea View",
+      "Partial Sea View",
+      "Standardzimmer mit Meerblick",
+      "Standard-Doppelzimmer mit Meerblick",
+      "Doppelzimmer mit Meerblick",
+      "Zimmer mit seitlichem Meerblick",
+      "Standardzimmer mit seitlichem Meerblick"
+    ]
     }
   },
   "miramare-beach": {
@@ -301,12 +359,30 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
     offerPageUrl: "https://www.tui.com/hotels/hotel-miramare-queen-4894/hotelinformation/",
     roomAliases: {
       "standard-land": [
-        "Standard Room",
-        "Double Room",
-        "Land View",
-        "Garden View"
-      ],
-      "standard-sea": ["Sea View", "Standard Room Sea View", "Side Sea View"]
+      "Standard Room Land View",
+      "Standard Land View",
+      "Standard Room",
+      "Land View",
+      "Garden View",
+      "Inland View",
+      "Standardzimmer mit Landblick",
+      "Standardzimmer mit Gartenblick",
+      "Standardzimmer mit Blick ins Grüne",
+      "Doppelzimmer mit Landblick",
+      "Doppelzimmer mit Gartenblick"
+    ],
+    "standard-sea": [
+      "Standard Room Sea View",
+      "Standard Sea View",
+      "Sea View",
+      "Side Sea View",
+      "Partial Sea View",
+      "Standardzimmer mit Meerblick",
+      "Standard-Doppelzimmer mit Meerblick",
+      "Doppelzimmer mit Meerblick",
+      "Zimmer mit seitlichem Meerblick",
+      "Standardzimmer mit seitlichem Meerblick"
+    ]
     }
   }
 };
