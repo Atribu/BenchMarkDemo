@@ -26,6 +26,7 @@ interface BrowserPageOptions {
   userAgent?: string;
   useStealth?: boolean;
   sessionKey?: string;
+  headless?: boolean;
 }
 
 interface BrowserMarketPreset {
@@ -117,7 +118,7 @@ export async function createBrowserPage(options: BrowserPageOptions = {}) {
     ? ["--disable-blink-features=AutomationControlled"]
     : [];
   const launchOptions = {
-    headless: true,
+    headless: options.headless ?? true,
     args: launchArgs,
     channel: browserChannel === "chrome" ? "chrome" : undefined,
     proxy: parseProxyUrl(options.proxyUrl),

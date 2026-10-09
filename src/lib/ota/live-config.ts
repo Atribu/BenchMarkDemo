@@ -97,7 +97,8 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "zimmer landseite",
         "land view",
         "garden view",
-        "inland view"
+        "inland view",
+        "Superior-Standardzimmer mit Blick ins Grüne"
       ],
       "superior-sea": [
         "meerblick",
@@ -105,8 +106,21 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "teilmeerblick",
         "seitlicher meerblick",
         "sea view",
-        "side sea view"
-      ]
+        "side sea view",
+        "Superior-Standardzimmer mit Meerblick"
+      ],
+
+            "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two",
+        "Economy Doppelzimmer"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   },
   "miramare-queen": {
@@ -120,7 +134,8 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "economy",
         "bestpreiszimmer",
         "gartenblick",
-        "garden view"
+        "garden view",
+        "Superior-Standardzimmer mit Blick ins Grüne"
       ],
       "standard-sea": [
         "meerblick",
@@ -128,8 +143,21 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "teilmeerblick",
         "seitlicher meerblick",
         "sea view",
-        "side sea view"
-      ]
+        "side sea view",
+        "Superior-Standardzimmer mit Meerblick"
+      ],
+
+       "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two",
+        "Economy Doppelzimmer"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   }
 };
@@ -142,14 +170,27 @@ export const HOTELBEDS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> =
         "superior land view",
         "land view",
         "garden view",
-        "inland view"
+        "inland view",
+        "Superior-Standardzimmer mit Blick ins Grüne"
       ],
       "superior-sea": [
         "superior sea view",
         "sea view",
         "side sea view",
-        "meerblick"
-      ]
+        "meerblick",
+        "Superior-Standardzimmer mit Meerblick"
+      ],
+            "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two",
+        "Economy Doppelzimmer"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   },
   "miramare-queen": {
@@ -184,7 +225,18 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
     pageUrl: "https://www.loveholidays.com/de/urlaub/tuerkei/antalya/side/miramare-beach/",
     roomAliases: {
       "superior-land": ["Superior Doppel- oder Zweibettzimmer mit Landblick", "land view"],
-      "superior-sea": ["Superior Doppel- oder Zweibettzimmer mit Meerblick", "sea view"]
+      "superior-sea": ["Superior Doppel- oder Zweibettzimmer mit Meerblick", "sea view"],
+
+            "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   }
 };
@@ -201,7 +253,19 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
     pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-beach",
     roomAliases: {
       "superior-land": ["land view", "inland view", "garden view"],
-      "superior-sea": ["sea view", "side sea view"]
+      "superior-sea": ["sea view", "side sea view"],
+
+            "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two",
+        "economy room",
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   }
 };
@@ -217,7 +281,18 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
         "Superior Sea View",
         "Superior Side Sea View",
         "Superior Room Sea View"
-      ]
+      ],
+
+            "economy":[
+        "Economy Room",
+        "Economy",
+        "Great for two"
+      ],
+
+       "corner": [
+        "Superior Corner Room",
+        "Corner Room",
+      ],
     }
   },
   "miramare-queen": {

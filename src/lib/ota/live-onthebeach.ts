@@ -1,4 +1,10 @@
-import type { Page } from "playwright";
+//live-onthebeach.ts
+import type { Page } from "patchright";
+
+import {
+  createPatchrightBrowserPage,
+  type PatchrightBrowserHandle,
+} from "./patchright-browser";
 import type {
   BenchmarkWindowDefinition,
   CollectedOffer,
@@ -8,7 +14,6 @@ import type {
   ReportScopeDefinition,
 } from "../benchmark/types";
 import {
-  createBrowserPage,
   normalizeInlineText,
   parsePriceFromText,
   resolveProviderLiveConfig,
@@ -220,12 +225,25 @@ async function dismissCookieNotice(page: Page) {
   await overlay.waitFor({ state: "hidden" });
 }
 
-async function assertSearchAccessible(page: Page) {
-  if (await page.locator(VERIFICATION_FRAME).isVisible())
-    throw new Error(
-      "Site doğrulaması gerekiyor (CAPTCHA); otomatik fiyat alınamadı.",
-    );
-  await assertPricePageAccessible(page);
+async function assertSearchAccessible(
+  page: Page,
+  responseStatus?: number,
+) {
+  const verificationVisible = await page
+    .locator(VERIFICATION_FRAME)
+    .isVisible()
+    .catch(() => false);
+
+  if (verificationVisible) {
+    console.log("[OnTheBeach] Verification challenge detected:", {
+      url: page.url(),
+      title: await page.title().catch(() => ""),
+    });
+
+    throw new Error("ONTHEBEACH_BOT_CHALLENGE");
+  }
+
+  await assertPricePageAccessible(page, responseStatus);
 }
 
 async function runHotelSearch(
@@ -238,11 +256,54 @@ async function runHotelSearch(
     throw new Error(
       "On the Beach uçaksız formu 2–28 gecelik konaklama destekliyor.",
     );
-  const response = await page.goto(SEARCH_URL, {
-    waitUntil: "load",
-    timeout: 45000,
-  });
-  await assertPricePageAccessible(page, response?.status());
+    
+const response = await page.goto(SEARCH_URL, {
+  waitUntil: "load",
+  timeout: 45000,
+});
+
+
+console.log("\n========== ONTHEBEACH DEBUG START ==========");
+console.log("[OnTheBeach] HTTP status:", response?.status());
+console.log("[OnTheBeach] Requested URL:", SEARCH_URL);
+console.log("[OnTheBeach] Final URL:", page.url());
+console.log(
+  "[OnTheBeach] Page title:",
+  await page.title().catch(() => ""),
+);
+
+const verificationFrameVisible = await page
+  .locator(VERIFICATION_FRAME)
+  .isVisible()
+  .catch(() => false);
+
+console.log(
+  "[OnTheBeach] Verification frame visible:",
+  verificationFrameVisible,
+);
+
+const bodyText = await page
+  .locator("body")
+  .innerText({ timeout: 3000 })
+  .catch(() => "");
+
+console.log(
+  "[OnTheBeach] Body preview:",
+  bodyText.slice(0, 2000),
+);
+
+if (response?.status() === 403) {
+  throw new Error("ONTHEBEACH_BOT_CHALLENGE");
+}
+
+await assertSearchAccessible(
+  page,
+  response?.status(),
+);
+
+console.log("[OnTheBeach] Initial access check: OK");
+console.log("========== ONTHEBEACH DEBUG END ==========\n");
+
   onStep("Çerez tercihleri");
   await dismissCookieNotice(page);
   await assertSearchAccessible(page);
@@ -378,32 +439,54 @@ async function runHotelSearch(
   };
 }
 
+async function createOnTheBeachBrowserPage(
+  config: ReturnType<typeof resolveProviderLiveConfig>,
+): Promise<PatchrightBrowserHandle> {
+  return createPatchrightBrowserPage({
+    profilePath: "./.benchmark-state/onthebeach-browser-profile",
+    browserChannel: config.browserChannel,
+    market: config.market,
+    proxyUrl: config.proxyUrl,
+    userAgent: config.userAgent,
+    headless: false,
+  });
+}
+
 export async function collectOnTheBeachLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
-  dependencies: {
-    createPage?: typeof createBrowserPage;
-    search?: typeof runHotelSearch;
-  } = {},
+dependencies: {
+  createPage?: typeof createOnTheBeachBrowserPage;
+  search?: typeof runHotelSearch;
+} = {},
 ): Promise<ProviderCollectionResult> {
   const quotes: ProviderQuote[] = [];
   const warnings: string[] = [];
   const offers: CollectedOffer[] = [];
   for (const window of scope.windows) {
-    let handle: Awaited<ReturnType<typeof createBrowserPage>> | undefined;
+    let handle: PatchrightBrowserHandle | undefined;
     let step = "Hotel Only sayfasını açma";
     try {
-      handle = await (dependencies.createPage ?? createBrowserPage)(
-        resolveProviderLiveConfig(provider.key, scope.currency),
-      );
+     handle = await (
+  dependencies.createPage ?? createOnTheBeachBrowserPage
+)(
+  resolveProviderLiveConfig(provider.key, scope.currency),
+);
       handle.page.setDefaultTimeout(15000);
       const snapshot = await (dependencies.search ?? runHotelSearch)(
         handle.page,
         scope,
         window,
         (next) => {
-          step = next;
-        },
+  step = next;
+
+  console.log("[OnTheBeach] Step:", {
+    step,
+    hotel: scope.hotelName,
+    checkIn: window.checkIn,
+    checkOut: window.checkOut,
+  });
+},
       );
       const windowOffers = parseOnTheBeachOffers(
         provider,
@@ -411,6 +494,13 @@ export async function collectOnTheBeachLiveQuotes(
         window,
         snapshot,
       );
+
+      console.log("[OnTheBeach] Offer parsing:", {
+  rawOfferCount: snapshot.offers.length,
+  parsedOfferCount: windowOffers.length,
+  samples: snapshot.offers.slice(0, 3),
+});
+
       offers.push(...windowOffers);
       quotes.push(
         ...selectOfferQuotes(
@@ -421,41 +511,55 @@ export async function collectOnTheBeachLiveQuotes(
           snapshot.sourceUrl,
         ),
       );
-    } catch (error) {
-      const verificationVisible = await handle?.page
-        .locator(VERIFICATION_FRAME)
-        .isVisible()
-        .catch(() => false);
-      let reason = verificationVisible
-        ? "Site doğrulaması gerekiyor (CAPTCHA); otomatik fiyat alınamadı."
-        : error instanceof Error
-          ? error.message.split("\n")[0]
-          : "Arama tamamlanamadı.";
-      if (handle && !verificationVisible) {
-        try {
-          await assertPricePageAccessible(handle.page);
-        } catch (diagnostic) {
-          reason = diagnostic instanceof Error ? diagnostic.message : reason;
-        }
-      }
-      warnings.push(
-        `On the Beach / ${scope.hotelName} / ${window.checkIn} / ${step}: ${reason}`,
-      );
-      quotes.push(
-        ...scope.rooms.map((room): ProviderQuote => ({
-          providerKey: provider.key,
-          scopeKey: scope.id,
-          roomId: room.id,
-          windowId: window.id,
-          currency: scope.currency,
-          price: null,
-          status: "manual-review",
-          dataMode: "live",
-          sourceHint: handle?.page.url() || SEARCH_URL,
-          reason: `Uçaksız otel araması tamamlanamadı (${step}): ${reason}`,
-        })),
-      );
-    } finally {
+   } catch (error) {
+    console.error("[OnTheBeach] Collection FAILED:", {
+  step,
+  url: handle?.page.url(),
+  error:
+    error instanceof Error
+      ? { name: error.name, message: error.message }
+      : String(error),
+});
+  const blocked =
+    error instanceof Error &&
+    error.message === "ONTHEBEACH_BOT_CHALLENGE";
+
+  let reason = blocked
+    ? "On the Beach site doğrulaması istedi; otomatik oda fiyatı alınamadı."
+    : error instanceof Error
+      ? error.message.split("\n")[0]
+      : "Arama tamamlanamadı.";
+
+  if (handle && !blocked) {
+    try {
+      await assertPricePageAccessible(handle.page);
+    } catch (diagnostic) {
+      reason =
+        diagnostic instanceof Error
+          ? diagnostic.message
+          : reason;
+    }
+  }
+
+  warnings.push(
+    `On the Beach / ${scope.hotelName} / ${window.checkIn} / ${step}: ${reason}`,
+  );
+
+  quotes.push(
+    ...scope.rooms.map((room): ProviderQuote => ({
+      providerKey: provider.key,
+      scopeKey: scope.id,
+      roomId: room.id,
+      windowId: window.id,
+      currency: scope.currency,
+      price: null,
+      status: "manual-review",
+      dataMode: "live",
+      sourceHint: handle?.page.url() || SEARCH_URL,
+      reason: `Uçaksız otel araması tamamlanamadı (${step}): ${reason}`,
+    })),
+  );
+} finally {
       await handle?.close().catch(() => undefined);
     }
   }
