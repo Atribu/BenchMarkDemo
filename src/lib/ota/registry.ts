@@ -85,7 +85,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Live beta aktif. Resmi TUI offer endpoint'inden hotel-only teklifleri ve oda aciklamalari okunuyor.",
-    supportedScopes: ["beach-eu", "queen-eu"],
+    supportedScopes: ["beach-eu", "queen-uk"],
     searchTemplate:
       "https://www.tui.com/pauschalreisen/suchen/hotels/?search={hotelName}&from={checkIn}",
   },

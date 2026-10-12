@@ -7,10 +7,23 @@ interface OtaHotelConfig {
   cardName?: string;
 }
 
+interface TuiMarketConfig {
+  hotelId?: string;
+  productId?: string;
+  market: "de" | "uk";
+  locale: "de-DE" | "en-GB";
+  sourcing?: string;
+}
+
 interface TuiHotelConfig {
   giataId: number;
   offerSlug: string;
   offerPageUrl: string;
+
+  markets: Partial<
+    Record<"EUR" | "GBP", TuiMarketConfig>
+  >;
+
   roomAliases: Record<string, string[]>;
 }
 
@@ -331,6 +344,12 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
 export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
   "miramare-beach": {
     giataId: 4893,
+  markets: {
+    EUR: {
+      market: "de",
+      locale: "de-DE",
+    },
+  },
     offerSlug: "Hotel-Miramare-Beach",
     offerPageUrl: "https://www.tui.com/hotels/hotel-miramare-beach-4893/hotelinformation/",
     roomAliases: {
@@ -355,9 +374,21 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
   },
   "miramare-queen": {
     giataId: 4894,
-    offerSlug: "Hotel-Miramare-Queen",
-    offerPageUrl: "https://www.tui.com/hotels/hotel-miramare-queen-4894/hotelinformation/",
-    roomAliases: {
+  offerSlug: "Hotel-Miramare-Queen",
+  offerPageUrl:
+    "https://www.tui.co.uk/hotels/miramare-queen-a0319662/",
+
+     markets: {
+    GBP: {
+      hotelId: "A0319662",
+      productId: "4924fd92-bd32-4763-a0dd-7d9bf76c872e",
+      market: "uk",
+      locale: "en-GB",
+      sourcing: "DYNAMIC",
+    },
+  },
+
+  roomAliases: {
       "standard-land": [
       "Standard Room Land View",
       "Standard Land View",

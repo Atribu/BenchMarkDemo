@@ -15,7 +15,7 @@ async function main() {
     checkIn = addDays(todayInIstanbul(), 7),
     checkOut = addDays(checkIn, 5),
     providers = "tui,holidaycheck",
-    scopes = "beach-eu,queen-eu",
+    scopes = "beach-eu,queen-uk",
   ] = process.argv.slice(2);
   const request = parseBenchmarkRequest({
     mode: "live",
