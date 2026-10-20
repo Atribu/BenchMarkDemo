@@ -371,7 +371,10 @@ export async function collectExpediaLiveQuotes(
 console.log("\n========== EXPEDIA DEBUG START ==========");
 
 
-handle = await createPatchrightBrowserPage();
+handle = await createPatchrightBrowserPage({
+  profilePath: `./.benchmark-state/expedia-browser-profile-${scope.id}`,
+  headless: false,
+});
 
 const page = handle.page;
 
@@ -408,24 +411,20 @@ const browserInfo = await page
   }))
   .catch(() => null);
 
-console.log("[Expedia] Browser info:", browserInfo);
 
 const bodyText = await page
   .locator("body")
   .innerText({ timeout: 3000 })
   .catch(() => "");
 
-console.log(
-  "[Expedia] Body preview:",
-  bodyText.slice(0, 1800),
-);
+
 
 const frames = page.frames().map((frame) => ({
   url: frame.url(),
   name: frame.name(),
 }));
 
-console.log("[Expedia] Frames:", frames);
+
 
 await page
   .locator(
