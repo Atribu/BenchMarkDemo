@@ -4,6 +4,7 @@ import { REPORT_SCOPES } from "../src/lib/benchmark/sample-data";
 import { OTA_PROVIDERS } from "../src/lib/ota/registry";
 import {
   classifyRoom,
+  matchExactRoomAlias,
   matchOfferRoom,
   selectOfferQuotes,
   deduplicateOffers,
@@ -110,6 +111,62 @@ test("strict room matching recognizes German names without confusing partial/ful
     classifyRoom("Superior mit seitlichem Meerblick").view,
     "partial-sea",
   );
+});
+
+test("explicit economy aliases match only the complete configured room name", () => {
+  assert.equal(
+    matchExactRoomAlias(
+      beach,
+      "Doppelzimmer Economy",
+      "economy",
+      ["Doppelzimmer Economy"],
+      "Test",
+    )?.matchedRoomId,
+    "economy",
+  );
+  for (const roomName of [
+    "Doppelzimmer Economy Meerblick",
+    "Economy Family Room",
+    "Superior Promo Land View",
+    "Best Price Room",
+  ]) {
+    assert.equal(
+      matchExactRoomAlias(
+        beach,
+        roomName,
+        "economy",
+        ["Doppelzimmer Economy"],
+        "Test",
+      ),
+      undefined,
+      roomName,
+    );
+  }
+});
+
+test("HolidayCheck maps the verified Beach economy name without relaxing generic variants", () => {
+  const offers = parseHolidayCheckOffers(
+    hc,
+    beach,
+    window,
+    [
+      raw({
+        room: { name: "Doppelzimmer Economy" },
+        totalPrice: { amount: 1296, currency: "EUR" },
+      }),
+      raw({
+        room: { name: "Superior Promo Land View" },
+        totalPrice: { amount: 1200, currency: "EUR" },
+      }),
+    ],
+    url,
+  );
+  assert.equal(offers[0].matchedRoomId, "economy");
+  assert.equal(offers[1].matchedRoomId, undefined);
+  const economy = selectOfferQuotes(hc, beach, window, offers, url).find(
+    (quote) => quote.roomId === "economy",
+  );
+  assert.equal(economy?.price, 1296);
 });
 
 test("Queen accepts explicit standard/double views but not superior or partial-sea upgrades", () => {
@@ -237,8 +294,10 @@ test("HolidayCheck cheapest economy, unknown and partial rooms survive without r
   );
   assert.equal(offers.length, 4);
   const quotes = selectOfferQuotes(hc, beach, window, offers, url);
-  assert.equal(quotes[0].price, 1500);
-  assert.equal(quotes[1].price, null);
+  assert.deepEqual(
+    quotes.map((quote) => quote.price),
+    [null, null, 1500, null],
+  );
   assert.match(quotes[1].reason!, /Alternatif/);
 });
 
@@ -287,9 +346,9 @@ test("alternative offers are exported separately and never inflate room coverage
     quotes: selectOfferQuotes(hc, beach, window, offers, url),
   });
   assert.equal(report.summary.availableRateCount, 1);
-  assert.equal(report.summary.expectedRateCount, 2);
+  assert.equal(report.summary.expectedRateCount, 4);
   assert.equal(report.summary.alternativeOfferCount, 2);
-  assert.equal(report.summary.coveragePct, 50);
+  assert.equal(report.summary.coveragePct, 25);
   assert.deepEqual(report.summary.cheapestProviderWins, []);
   assert.equal(report.summary.parityRiskCount, 0);
   assert.equal(report.scopes[0].windows[0].alternativeOffers?.[0].price, 900);
@@ -297,7 +356,7 @@ test("alternative offers are exported separately and never inflate room coverage
   assert.match(csv, /ALTERNATİF TEKLİF \/ ODA KAPSAMASINA DAHİL DEĞİL/);
   assert.match(csv, /Standard Zimmer/);
   assert.match(csv, /toplamdan düşülmedi/);
-  assert.equal(csv.split("\r\n").length, 5);
+  assert.equal(csv.split("\r\n").length, 7);
 });
 
 test("engine excludes invalid or unselected alternatives at its report boundary", () => {

@@ -21,10 +21,12 @@ import {
 import {
   classifyRoom,
   deduplicateOffers,
+  matchExactRoomAlias,
   matchOfferRoom,
   selectOfferQuotes,
 } from "./offer-matching";
 import { assertPricePageAccessible } from "./browser-diagnostics";
+import { ONTHEBEACH_HOTEL_CONFIG } from "./live-config";
 import { hasCompatibleView } from "./room-matching";
 
 const SEARCH_URL = "https://www.onthebeach.co.uk/hotels-in";
@@ -58,11 +60,18 @@ function dateLabel(date: string) {
 export function namedRoomRank(
   roomId: string,
   name: string,
+  aliases: string[] = [],
 ): number | null {
   const normalizedName = normalizeInlineText(name);
 
   // Economy sadece Economy Room ile eşleşsin.
   if (roomId === "economy") {
+    const aliasRank = aliases.findIndex(
+      (alias) =>
+        normalizeInlineText(alias).toLowerCase() === normalizedName.toLowerCase(),
+    );
+    if (aliasRank >= 0) return aliasRank;
+
     if (/^Economy Room$/i.test(normalizedName)) {
       return 0;
     }
@@ -168,18 +177,20 @@ const normalMatch = matchOfferRoom(scope, roomFeatures);
 
 let specificMatch:
   | {
-      matchedRoomId: string;
+      matchedRoomId?: string;
       matchReason: string;
     }
   | undefined;
 
 if (scope.hotelKey === "miramare-beach") {
-  if (/^economy room$/i.test(roomName)) {
-    specificMatch = {
-      matchedRoomId: "economy",
-      matchReason: "OnTheBeach Economy Room tam isim eşleşmesi.",
-    };
-  } else if (
+  specificMatch = matchExactRoomAlias(
+    scope,
+    roomName,
+    "economy",
+    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
+    "On the Beach ekonomi",
+  );
+  if (!specificMatch &&
     /^(superior corner|double or twin superior corner balcony)$/i.test(
       roomName,
     )

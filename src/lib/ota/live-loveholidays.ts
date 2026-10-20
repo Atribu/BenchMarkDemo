@@ -21,9 +21,11 @@ import {
   resolveProviderLiveConfig,
 } from "./live-helpers";
 import { assertPricePageAccessible } from "./browser-diagnostics";
+import { LOVEHOLIDAYS_HOTEL_CONFIG } from "./live-config";
 import {
   classifyRoom,
   deduplicateOffers,
+  matchExactRoomAlias,
   matchOfferRoom,
   selectOfferQuotes,
 } from "./offer-matching";
@@ -161,20 +163,16 @@ function matchLoveholidaysRoom(
   features: RoomFeatures,
 ) {
 
-  // Miramare Beach: Economy Room
-  if (
-    scope.hotelKey === "miramare-beach" &&
-    /\beconomy room\b/i.test(normalizedRoomName)
-  ) {
-    return scope.rooms.some((room) => room.id === "economy")
-      ? {
-          matchedRoomId: "economy",
-          matchReason:
-            "Loveholidays Economy oda adı doğrudan doğrulandı.",
-        }
-      : {
-          matchReason: "Economy oda rapor kapsamındaki odalarda yok.",
-        };
+  // Miramare Beach: only explicitly mapped Economy names are accepted.
+  if (scope.hotelKey === "miramare-beach") {
+    const exactEconomyMatch = matchExactRoomAlias(
+      scope,
+      normalizedRoomName,
+      "economy",
+      LOVEHOLIDAYS_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
+      "Loveholidays ekonomi",
+    );
+    if (exactEconomyMatch) return exactEconomyMatch;
   }
 
   // Miramare Beach: Corner Room

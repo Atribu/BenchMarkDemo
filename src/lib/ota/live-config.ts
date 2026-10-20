@@ -37,7 +37,14 @@ export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
       "superior-sea": [
         "Superior Room with Sea View",
         "Superior Room with Side Sea View"
-      ]
+      ],
+      economy: [
+        "Economy Room",
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy",
+        "Double Economy Room"
+      ],
+      corner: ["Superior Corner Room", "Corner Room"]
     }
   },
   "miramare-queen": {
@@ -80,7 +87,9 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
       "economy":[
         "Economy Room",
         "Economy",
-        "Great for two"
+        "Great for two",
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy"
       ],
 
        "corner": [
@@ -127,7 +136,8 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "Economy Room",
         "Economy",
         "Great for two",
-        "Economy Doppelzimmer"
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy"
       ],
 
        "corner": [
@@ -164,7 +174,8 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "Economy Room",
         "Economy",
         "Great for two",
-        "Economy Doppelzimmer"
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy"
       ],
 
        "corner": [
@@ -197,7 +208,8 @@ export const HOTELBEDS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> =
         "Economy Room",
         "Economy",
         "Great for two",
-        "Economy Doppelzimmer"
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy"
       ],
 
        "corner": [
@@ -278,7 +290,9 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
             "economy":[
         "Economy Room",
         "Economy",
-        "Great for two"
+        "Great for two",
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy"
       ],
 
        "corner": [
@@ -341,7 +355,9 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
         "Economy Room",
         "Economy",
         "Great for two",
-        "Economy Doppelzimmer"
+        "Economy Doppelzimmer",
+        "Doppelzimmer Economy",
+        "Double Or Twin Superior Promo Landview No Balcony"
       ],
 
        "corner": [
@@ -375,7 +391,9 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
             "economy":[
         "Economy Room",
         "Economy",
-        "Great for two"
+        "Great for two",
+        "Superior Land View Best Price without Balcony",
+        "Doppel Standard Zimmer (Economy)"
       ],
 
        "corner": [

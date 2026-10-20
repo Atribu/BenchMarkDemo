@@ -105,7 +105,11 @@ export function parseBookingQuotes(
   return scope.rooms.map((room) => {
     const offers = snapshot.rows
       .flatMap((row) => {
-        const rank = namedRoomRank(room.id, row.name);
+        const rank = namedRoomRank(
+          room.id,
+          row.name,
+          BOOKING_HOTEL_CONFIG[scope.hotelKey]?.roomAliases[room.id] ?? [],
+        );
         const text = normalizeInlineText(row.priceText);
         // Never use a search-card/calendar price or multiply a nightly estimate.
         const amount =

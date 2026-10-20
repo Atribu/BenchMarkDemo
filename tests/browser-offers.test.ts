@@ -154,6 +154,24 @@ test("On the Beach retains partial sea, economy, balcony-free and unknown rooms 
   }
 });
 
+test("On the Beach maps only the observed Beach promo room alias to economy", () => {
+  const offers = parseOnTheBeachOffers(otb, uk, window, {
+    ...otbSnapshot,
+    offers: [
+      {
+        ...otbSnapshot.offers[0],
+        roomName: "Double Or Twin Superior Promo Landview No Balcony",
+      },
+      {
+        ...otbSnapshot.offers[0],
+        roomName: "Superior Promo Land View",
+      },
+    ],
+  });
+  assert.equal(offers[0].matchedRoomId, "economy");
+  assert.equal(offers[1].matchedRoomId, undefined);
+});
+
 test("On the Beach rejects zero, deposits, mixed units and malformed totals before retaining offers", () => {
   for (const priceText of [
     "£0 per party",

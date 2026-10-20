@@ -103,6 +103,7 @@ test("Loveholidays collector returns unmatched offers instead of losing them in 
   };
   const page = {
     setDefaultTimeout() {},
+    async waitForTimeout() {},
     async goto() {
       if (++navigations > 1) throw new Error("Second window unavailable");
       return { status: () => 200 };
@@ -170,20 +171,47 @@ test("Loveholidays preserves room totals but requires balcony evidence for Beach
   const de = parseLoveholidaysQuotes(love, eu, window, loveDe);
   assert.deepEqual(
     de.map((quote) => quote.price),
-    [null, null],
+    [null, null, 1698, 1818],
   );
   const offers = parseLoveholidaysOffers(love, eu, window, loveDe);
   assert.deepEqual(
     offers.map((offer) => offer.price),
     [1698, 1758, 1818],
   );
-  assert.ok(offers.every((offer) => !offer.matchedRoomId && offer.observedAt));
+  assert.ok(offers.every((offer) => offer.observedAt));
   assert.equal(offers[1].roomFeatures.view, "partial-sea");
   assert.equal(
-    parseLoveholidaysQuotes(love, uk, window, loveEn)[0].price,
+    parseLoveholidaysQuotes(love, uk, window, loveEn)[2].price,
     1598,
   );
   assert.ok(de.every((quote) => quote.captureMethod === "automated"));
+});
+
+test("Loveholidays maps an explicit Beach economy room and rejects extended variants", () => {
+  const snapshot: LoveholidaysSnapshot = {
+    ...loveEn,
+    offers: [
+      {
+        name: "Economy Room",
+        priceText: "£250 per night\n£1,250 total",
+        description: "All inclusive",
+      },
+      {
+        name: "Economy Family Room",
+        priceText: "£240 per night\n£1,200 total",
+        description: "All inclusive",
+      },
+    ],
+  };
+  const offers = parseLoveholidaysOffers(love, uk, window, snapshot);
+  assert.equal(offers[0].matchedRoomId, "economy");
+  assert.equal(offers[1].matchedRoomId, undefined);
+  assert.equal(
+    parseLoveholidaysQuotes(love, uk, window, snapshot).find(
+      (quote) => quote.roomId === "economy",
+    )?.price,
+    1250,
+  );
 });
 
 test("Loveholidays Queen 23-28 Oct browser sample retains prices without guessing generic room views", () => {
@@ -327,7 +355,7 @@ test("Loveholidays handles singular nights and unpadded English calendar days", 
     nightsLabel: "1 night",
   };
   assert.equal(
-    parseLoveholidaysQuotes(love, uk, oneNight, snapshot)[0].price,
+    parseLoveholidaysQuotes(love, uk, oneNight, snapshot)[2].price,
     1598,
   );
 });
@@ -361,7 +389,7 @@ test("Booking reads selectable room totals, not hotel starting prices", () => {
     parseBookingQuotes(booking, eu, window, bookingSnapshot).map(
       (quote) => quote.price,
     ),
-    [1500, 1700],
+    [null, null, 1500, 1700],
   );
   const queenUrl = new URL(buildBookingUrl(queen, window));
   assert.match(queenUrl.pathname, /miramare-queen\.en-gb\.html$/);

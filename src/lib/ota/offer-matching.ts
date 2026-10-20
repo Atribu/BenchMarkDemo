@@ -18,6 +18,30 @@ function normalize(text: string) {
     .trim();
 }
 
+export function matchExactRoomAlias(
+  scope: ReportScopeDefinition,
+  roomName: string,
+  roomId: string,
+  aliases: string[],
+  providerLabel: string,
+) {
+  const normalizedRoomName = normalize(roomName);
+  const matchesAlias = aliases.some(
+    (alias) => normalize(alias) === normalizedRoomName,
+  );
+
+  if (!matchesAlias) return undefined;
+
+  return scope.rooms.some((room) => room.id === roomId)
+    ? {
+        matchedRoomId: roomId,
+        matchReason: `${providerLabel} oda adı açık alias ile doğrulandı.`,
+      }
+    : {
+        matchReason: `${providerLabel} oda adı doğrulandı ancak oda rapor kapsamında değil.`,
+      };
+}
+
 export function classifyRoom(name: string, details = ""): RoomFeatures {
   const text = normalize(`${name} ${details}`);
   const variant =

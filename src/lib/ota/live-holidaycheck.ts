@@ -16,6 +16,7 @@ import {
 import {
   classifyRoom,
   deduplicateOffers,
+  matchExactRoomAlias,
   matchOfferRoom,
   selectOfferQuotes,
 } from "./offer-matching";
@@ -134,6 +135,17 @@ export function parseHolidayCheckOffers(
       .map((text) => normalizeInlineText(text.text ?? ""))
       .filter(Boolean)
       .join(" / ");
+    const exactEconomyMatch =
+      scope.hotelKey === "miramare-beach"
+        ? matchExactRoomAlias(
+            scope,
+            roomName,
+            "economy",
+            HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
+            "HolidayCheck ekonomi",
+          )
+        : undefined;
+
     offers.push({
       id: `holidaycheck:${scope.id}:${window.id}:${offers.length}`,
       providerKey: provider.key,
@@ -150,7 +162,7 @@ export function parseHolidayCheckOffers(
       roomFeatures,
       sourceHint,
       observedAt,
-      ...matchOfferRoom(scope, roomFeatures),
+      ...(exactEconomyMatch ?? matchOfferRoom(scope, roomFeatures)),
       terms: {
         board: offer.mealTypeName || "Belirtilmedi",
         operator: offer.tourOperator?.name,

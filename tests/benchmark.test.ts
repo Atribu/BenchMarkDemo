@@ -185,6 +185,7 @@ test("TUI requests hotel-only rooms and prefers exact land/sea over cheapest var
       assert.equal(init?.method, "POST");
       assert.deepEqual(JSON.parse(String(init?.body)), {
         hotelId: "4893",
+        giataId: "4893",
         locale: "de-DE",
         market: "de",
         ages: "30,30",
@@ -233,20 +234,20 @@ test("TUI requests hotel-only rooms and prefers exact land/sea over cheapest var
   const result = await collectTuiLiveQuotes(tuiProvider, scope);
   assert.deepEqual(
     result.quotes.map((quote) => quote.price),
-    [1502, 1604],
+    [null, 1456, 1502, 1604],
   );
   assert.equal(
-    result.quotes[1].offerDescription,
+    result.quotes[3].offerDescription,
     "Superior Sea View · All inclusive",
   );
   assert.equal(
-    new URL(result.quotes[0].sourceHint).searchParams.get("selectedDuration"),
+    new URL(result.quotes[2].sourceHint).searchParams.get("selectedDuration"),
     "5",
   );
   assert.equal(result.offers?.length, 5);
   assert.ok(
     result.offers?.find(
-      (offer) => offer.price === 1456 && !offer.matchedRoomId,
+      (offer) => offer.price === 1456 && offer.matchedRoomId === "economy",
     ),
   );
   assert.ok(
@@ -257,8 +258,8 @@ test("TUI requests hotel-only rooms and prefers exact land/sea over cheapest var
         !offer.matchedRoomId,
     ),
   );
-  assert.equal(result.quotes[0].terms?.cancellation, "Ücretsiz iptal yok");
-  assert.ok(result.quotes[0].observedAt);
+  assert.equal(result.quotes[2].terms?.cancellation, "Ücretsiz iptal yok");
+  assert.ok(result.quotes[2].observedAt);
 });
 
 test("TUI rejects per-person prices, wrong dates, hotel, currency and occupancy", async (t) => {
@@ -315,10 +316,17 @@ test("TUI failure for a later window preserves earlier prices", async (t) => {
     ...REPORT_SCOPES[0],
     windows: REPORT_SCOPES[0].windows.slice(0, 2),
   });
-  assert.equal(result.quotes.length, 4);
-  assert.equal(result.quotes[0].price, 1502);
+  assert.equal(result.quotes.length, 8);
+  assert.equal(
+    result.quotes.find(
+      (quote) =>
+        quote.windowId === REPORT_SCOPES[0].windows[0].id &&
+        quote.roomId === "superior-land",
+    )?.price,
+    1502,
+  );
   assert.ok(
-    result.quotes.slice(2).every((quote) => quote.status === "manual-review"),
+    result.quotes.slice(4).every((quote) => quote.status === "manual-review"),
   );
 });
 

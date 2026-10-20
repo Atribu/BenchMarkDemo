@@ -9,6 +9,7 @@ import { TUI_HOTEL_CONFIG } from "@/src/lib/ota/live-config";
 import {
   classifyRoom,
   deduplicateOffers,
+  matchExactRoomAlias,
   matchOfferRoom,
   selectOfferQuotes,
 } from "./offer-matching";
@@ -349,10 +350,17 @@ if (typeof price !== "number") {
       facilities,
     );
 
-    const match = matchOfferRoom(
-      scope,
-      roomFeatures,
-    );
+    const exactEconomyMatch =
+      scope.hotelKey === "miramare-beach"
+        ? matchExactRoomAlias(
+            scope,
+            name,
+            "economy",
+            config.roomAliases.economy ?? [],
+            "TUI ekonomi",
+          )
+        : undefined;
+    const match = exactEconomyMatch ?? matchOfferRoom(scope, roomFeatures);
 
     console.log("[TUI] Accepted offer:", {
       roomName: name,

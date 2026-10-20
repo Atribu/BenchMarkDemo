@@ -239,7 +239,11 @@ export function parseExpediaQuotes(
 });
 
     const matched = snapshot.cards.flatMap((card) => {
-      const rank = namedRoomRank(room.id, card.name);
+      const rank = namedRoomRank(
+        room.id,
+        card.name,
+        EXPEDIA_HOTEL_CONFIG[scope.hotelKey]?.roomAliases[room.id] ?? [],
+      );
       return rank !== null ? [{ ...card, rank }] : [];
     });
 
