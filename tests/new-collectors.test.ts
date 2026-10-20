@@ -19,7 +19,6 @@ import {
   type GoogleHotelsSnapshot,
 } from "../src/lib/ota/live-google-hotels";
 import { buildBenchmarkResult } from "../src/lib/benchmark/engine";
-import type { createBrowserPage } from "../src/lib/ota/live-helpers";
 
 const eu = REPORT_SCOPES.find((scope) => scope.id === "beach-eu")!;
 const uk = REPORT_SCOPES.find((scope) => scope.id === "beach-uk")!;
@@ -128,13 +127,16 @@ test("Loveholidays collector returns unmatched offers instead of losing them in 
       throw new Error(`Unexpected locator: ${String(name)}`);
     },
   };
-  const factory: typeof createBrowserPage = async () =>
+  type CreateLoveholidaysPage = NonNullable<
+    Parameters<typeof collectLoveholidaysLiveQuotes>[2]
+  >;
+  const factory: CreateLoveholidaysPage = async () =>
     ({
       page,
       close: async () => {
         closes++;
       },
-    }) as unknown as Awaited<ReturnType<typeof createBrowserPage>>;
+    }) as unknown as Awaited<ReturnType<CreateLoveholidaysPage>>;
   const result = await collectLoveholidaysLiveQuotes(
     love,
     {

@@ -27,7 +27,7 @@ import {
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import { hasCompatibleView } from "./room-matching";
 
-const SEARCH_URL = "https://www.onthebeach.co.uk/_p/hotels";
+const SEARCH_URL = "https://www.onthebeach.co.uk/hotels-in";
 const DESTINATION = "Antalya (Alanya, Belek, Lara Beach, Side), Turkey";
 const VERIFICATION_FRAME = 'iframe[title="Verification system"]';
 
@@ -162,8 +162,42 @@ export function parseOnTheBeachOffers(
     const roomName = normalizeInlineText(offer.roomName);
     if (price === null || !Number.isFinite(price) || price <= 0 || !roomName)
       continue;
-    const roomFeatures = classifyRoom(roomName);
-    offers.push({
+const roomFeatures = classifyRoom(roomName);
+
+const normalMatch = matchOfferRoom(scope, roomFeatures);
+
+let specificMatch:
+  | {
+      matchedRoomId: string;
+      matchReason: string;
+    }
+  | undefined;
+
+if (scope.hotelKey === "miramare-beach") {
+  if (/^economy room$/i.test(roomName)) {
+    specificMatch = {
+      matchedRoomId: "economy",
+      matchReason: "OnTheBeach Economy Room tam isim eşleşmesi.",
+    };
+  } else if (
+    /^(superior corner|double or twin superior corner balcony)$/i.test(
+      roomName,
+    )
+  ) {
+    specificMatch = {
+      matchedRoomId: "corner",
+      matchReason: "OnTheBeach Superior Corner oda eşleşmesi.",
+    };
+  }
+}
+
+const roomMatch =
+  specificMatch &&
+  scope.rooms.some((room) => room.id === specificMatch.matchedRoomId)
+    ? specificMatch
+    : normalMatch;
+
+offers.push({
       id: `onthebeach:${scope.id}:${window.id}:${offers.length}`,
       providerKey: provider.key,
       scopeKey: scope.id,
@@ -177,7 +211,7 @@ export function parseOnTheBeachOffers(
       currency: scope.currency,
       roomName,
       roomFeatures,
-      ...matchOfferRoom(scope, roomFeatures),
+      ...roomMatch,
       observedAt: new Date().toISOString(),
       sourceHint: snapshot.sourceUrl,
       terms: {
@@ -246,6 +280,9 @@ async function assertSearchAccessible(
   await assertPricePageAccessible(page, responseStatus);
 }
 
+
+
+
 async function runHotelSearch(
   page: Page,
   scope: ReportScopeDefinition,
@@ -256,10 +293,47 @@ async function runHotelSearch(
     throw new Error(
       "On the Beach uçaksız formu 2–28 gecelik konaklama destekliyor.",
     );
-    
+    console.log("[OnTheBeach] Before navigation:", {
+  currentUrl: page.url(),
+  target: SEARCH_URL,
+});
+
 const response = await page.goto(SEARCH_URL, {
-  waitUntil: "load",
-  timeout: 45000,
+  waitUntil: "commit",
+  timeout: 60000,
+});
+
+console.log("[OnTheBeach] Navigation committed:", {
+  status: response?.status(),
+  url: page.url(),
+  responseUrl: response?.url(),
+  contentType: response?.headers()["content-type"],
+  server: response?.headers()["server"],
+  retryAfter: response?.headers()["retry-after"],
+});
+
+console.log("[OnTheBeach] Browser diagnostics:", {
+  status: response?.status(),
+  url: page.url(),
+
+  browser: await page.evaluate(() => ({
+    userAgent: navigator.userAgent,
+    language: navigator.language,
+    cookieEnabled: navigator.cookieEnabled,
+    webdriver: navigator.webdriver,
+    visibilityState: document.visibilityState,
+  })),
+
+  cookies: (await page.context().cookies()).map((cookie) => ({
+    name: cookie.name,
+    domain: cookie.domain,
+    expires: cookie.expires,
+  })),
+});
+
+await page.locator("body").waitFor({
+  state: "attached",
+  timeout: 15000,
 });
 
 
@@ -307,143 +381,981 @@ console.log("========== ONTHEBEACH DEBUG END ==========\n");
   onStep("Çerez tercihleri");
   await dismissCookieNotice(page);
   await assertSearchAccessible(page);
-  onStep("Hotel Only formunu açma");
-  await page.getByRole("tab", { name: "Hotel Only", exact: true }).click();
-  const destination = page.getByRole("searchbox", {
-    name: "Enter destination",
-    exact: true,
-  });
-  await destination.waitFor({ timeout: 30000 });
-  onStep("Çerez tercihleri");
-  await dismissCookieNotice(page);
-  onStep("Antalya seçimi");
-  await assertSearchAccessible(page);
-  await destination.fill("Antaly");
-  await destination.pressSequentially("a");
-  await page.getByRole("button", { name: DESTINATION, exact: true }).click();
-  onStep("Giriş tarihi seçimi");
-  await page.getByRole("button", { name: /Check-in Date/ }).click();
-  await page
-    .locator(`label[for="departure-date_${window.checkIn.slice(0, 7)}"]`)
-    .click();
-  await page
-    .locator(`button.datepicker__button[value="${window.checkIn}"]`)
-    .click();
-  onStep("Gece ve kişi seçimi");
-  await page.getByRole("button", { name: /^Nights/ }).click();
-  await page
-    .locator('select[name="search[nights]"]')
-    .selectOption(String(window.nights));
-  if (
-    await page
-      .getByRole("heading", { name: "How long for?", exact: true })
-      .isVisible()
-  )
-    await page.getByRole("button", { name: /^Nights/ }).click();
-  await page.getByRole("button", { name: /^Your Party/ }).click();
-  for (const [field, value] of Object.entries({
-    adults: "2",
-    children: "0",
-    infants: "0",
-    number_of_rooms: "1",
-  })) {
-    await page.locator(`select[name="search[${field}]"]`).selectOption(value);
-  }
-  await page.getByRole("button", { name: /^Your Party/ }).click();
-  onStep("Otel arama sonuçları");
-  await page.getByRole("button", { name: /^Search/ }).click();
-  await page.waitForURL(/\/hotel_searches\/show\/\d+/, { timeout: 60000 });
-  await page
-    .locator(".hotel-result")
-    .first()
-    .waitFor({ state: "visible", timeout: 60000 });
-  onStep("Otel adı filtresi");
-  await assertSearchAccessible(page);
-  const hotelFilter = page.getByRole("textbox", {
-    name: "Hotel Name",
-    exact: true,
-  });
-  await hotelFilter.fill(scope.hotelName.slice(0, -1));
-  await hotelFilter.pressSequentially(scope.hotelName.slice(-1));
-  await page
-    .locator(".autocomplete__item")
-    .filter({ hasText: scope.hotelName })
-    .click();
-  const card = page
-    .locator(".hotel-result")
-    .filter({ has: page.locator("h3").filter({ hasText: scope.hotelName }) });
-  await card.waitFor({ state: "visible", timeout: 30000 });
-  onStep("Toplam otel fiyatı seçimi");
-  const totalToggle = card.locator(
-    'input[type="checkbox"][name="price[toggle]"]',
-  );
-  // The native checkbox sits off-screen; use its visible label instead.
-  if (!(await totalToggle.isChecked()))
-    await card
-      .locator("label.toggle-switch__label .toggle-switch__handle")
-      .click();
-  await card
-    .locator(".board-option__price-label")
-    .filter({ hasText: "per party" })
-    .first()
-    .waitFor();
-  onStep("Oda seçenekleri");
-  const more = card.getByText("View more board options", { exact: true });
-  if (await more.isVisible()) {
-    await more.click();
-    await card.getByText("Minimise board options", { exact: true }).waitFor();
-  }
-  onStep("Fiyat ve arama koşullarını doğrulama");
-  const offers = await card.locator(".board-option").evaluateAll((rows) =>
-    rows
-      .filter((row) => (row as HTMLElement).getClientRects().length > 0)
-      .map((row) => {
-        const title = row.querySelector(".board-option__title");
-        const board = title?.querySelector("strong")?.textContent?.trim() ?? "";
-        return {
-          roomName: (title?.textContent ?? "").replace(board, "").trim(),
-          board,
-          priceText:
-            row.querySelector(".board-option__price")?.textContent ?? "",
-        };
-      }),
-  );
-  const numbers = await page
-    .locator('select[name^="search["]')
-    .evaluateAll((selects) =>
-      Object.fromEntries(
-        selects.map((el) => [
-          (el as HTMLSelectElement).name,
-          Number((el as HTMLSelectElement).value),
-        ]),
-      ),
-    );
-  return {
-    sourceUrl: page.url(),
-    hotelName: await card.locator("h3").first().innerText(),
-    checkInLabel: await page
-      .getByRole("button", { name: /Check-in Date/ })
-      .innerText(),
-    returnLabel: await page
-      .getByText(new RegExp(`^Return ${dateLabel(window.checkOut)}$`))
-      .innerText(),
-    nights: numbers["search[nights]"],
-    adults: numbers["search[adults]"],
-    children: numbers["search[children]"],
-    infants: numbers["search[infants]"],
-    rooms: numbers["search[number_of_rooms]"],
-    totalSelected: await card
-      .locator('input[type="checkbox"][name="price[toggle]"]')
-      .isChecked(),
-    offers,
-  };
+
+onStep("Otel arama formunu hazırlama");
+
+onStep("Hotel Only sekmesini seçme");
+
+const hotelsTab = page.getByRole("tab", {
+  name: "Hotels",
+  exact: true,
+});
+
+await hotelsTab.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Before Hotels click:", {
+  url: page.url(),
+  selected: await hotelsTab.getAttribute("aria-selected"),
+});
+
+if ((await hotelsTab.getAttribute("aria-selected")) !== "true") {
+  await hotelsTab.click();
 }
+
+await page.waitForURL(
+  (url) => url.searchParams.get("mode") === "ho",
+  { timeout: 30000 },
+);
+
+await page.locator("body").waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Hotel Only navigation:", {
+  url: page.url(),
+  mode: new URL(page.url()).searchParams.get("mode"),
+  title: await page.title(),
+  bodyPreview: (
+    await page.locator("body").innerText()
+  ).slice(0, 1500),
+});
+
+onStep("Hotel Only form alanlarını inceleme");
+
+console.log(
+  "[OnTheBeach] Hotel Only controls:",
+  await page
+    .locator("input, button, select, [role='combobox']")
+    .evaluateAll((elements) =>
+      elements
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 100) ?? "",
+          type: element.getAttribute("type"),
+          name: element.getAttribute("name"),
+          id: element.getAttribute("id"),
+          placeholder: element.getAttribute("placeholder"),
+          ariaLabel: element.getAttribute("aria-label"),
+          testId: element.getAttribute("data-testid"),
+          value:
+            element instanceof HTMLInputElement ||
+            element instanceof HTMLSelectElement
+              ? element.value
+              : null,
+        }))
+        .filter(
+          (item) =>
+            /where|date|night|party|room|search|check/i.test(
+              [
+                item.text,
+                item.name,
+                item.id,
+                item.placeholder,
+                item.ariaLabel,
+              ].join(" "),
+            ),
+        )
+        .slice(0, 50),
+    ),
+);
+
+console.log(
+  "[OnTheBeach] Hotel Only form buttons:",
+  await page.locator("button").evaluateAll((buttons) =>
+    buttons
+      .map((button) => ({
+        text: button.textContent?.trim().slice(0, 150) ?? "",
+        ariaLabel: button.getAttribute("aria-label"),
+        id: button.getAttribute("id"),
+        className: button.getAttribute("class"),
+        testId: button.getAttribute("data-testid"),
+      }))
+      .filter((button) => button.text || button.ariaLabel)
+      .slice(0, 60),
+  ),
+);
+
+onStep("Hotel Only destinasyon alanını inceleme");
+
+console.log(
+  "[OnTheBeach] Destination elements:",
+  await page.locator("input, button, [role='combobox']").evaluateAll(
+    (elements) =>
+      elements
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 150) ?? "",
+          type: element.getAttribute("type"),
+          name: element.getAttribute("name"),
+          placeholder: element.getAttribute("placeholder"),
+          ariaLabel: element.getAttribute("aria-label"),
+          className: element.getAttribute("class"),
+          outerHtml: element.outerHTML.slice(0, 500),
+        }))
+        .filter((element) =>
+          /where to|destination|location|search-field|input-select/i.test(
+            [
+              element.text,
+              element.name,
+              element.placeholder,
+              element.ariaLabel,
+              element.className,
+            ].join(" "),
+          ),
+        )
+        .slice(0, 25),
+  ),
+);
+
+onStep("Hotel Only Antalya destinasyonunu arama");
+
+const hotelOnlyDestinationInput = page.locator(
+  'input[name="destination"][type="search"]',
+);
+
+await hotelOnlyDestinationInput.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+await hotelOnlyDestinationInput.fill("Antalya");
+
+await page.waitForTimeout(1200);
+
+console.log("[OnTheBeach] Antalya destination results:", {
+  inputValue: await hotelOnlyDestinationInput.inputValue(),
+
+  visibleText: (
+    await page.locator("body").innerText()
+  ).slice(0, 1800),
+
+  candidates: await page
+    .locator("li, [role='option'], [class*='input-select']")
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            /antalya|side|belek|alanya/i.test(
+              element.textContent ?? "",
+            )
+          );
+        })
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 200),
+          className: element.getAttribute("class"),
+          role: element.getAttribute("role"),
+          outerHtml: element.outerHTML.slice(0, 700),
+        }))
+        .slice(0, 20),
+    ),
+});
+
+onStep("Hotel Only Antalya destinasyonunu seçme");
+
+const antalyaOption = page
+  .locator("button.input-select__option")
+  .filter({
+    hasText: DESTINATION,
+  });
+
+await antalyaOption.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+await antalyaOption.click();
+
+await page.waitForTimeout(500);
+
+console.log("[OnTheBeach] Destination selection result:", {
+  inputValue: await hotelOnlyDestinationInput.inputValue(),
+
+  selectedOptions: await page
+    .locator(".input-select__option")
+    .allTextContents(),
+
+  formPreview: (
+    await page.locator("body").innerText()
+  ).slice(0, 500),
+});
+
+onStep("Hotel Only giriş tarihi takvimini açma");
+
+const hotelOnlyDateButton = page
+  .locator("button.search-field-button")
+  .filter({
+    has: page.locator(".search-field-button__label", {
+      hasText: "Check-in Date",
+    }),
+  });
+
+await hotelOnlyDateButton.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Date before click:", {
+  text: await hotelOnlyDateButton.innerText(),
+  targetDate: window.checkIn,
+});
+
+await hotelOnlyDateButton.click();
+
+console.log("[OnTheBeach] Calendar inspection:", {
+  visibleText: (
+    await page.locator("body").innerText()
+  ).slice(0, 1600),
+
+  dateButtons: await page
+    .locator("button.datepicker__button")
+    .evaluateAll((buttons) =>
+      buttons.slice(0, 45).map((button) => ({
+        text: button.textContent?.trim(),
+        className: button.getAttribute("class"),
+        disabled: (button as HTMLButtonElement).disabled,
+        outerHtml: button.outerHTML.slice(0, 500),
+      })),
+    ),
+});
+
+onStep("Hotel Only giriş tarihini seçme");
+
+const hotelOnlyCheckInDay = page.locator(
+  `button.datepicker__button[value="${window.checkIn}"]`,
+);
+
+await hotelOnlyCheckInDay.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+await hotelOnlyCheckInDay.click();
+
+await page.waitForTimeout(400);
+
+console.log("[OnTheBeach] Check-in selection result:", {
+  requested: window.checkIn,
+  displayed: await hotelOnlyDateButton.innerText(),
+  url: page.url(),
+});
+
+onStep("Hotel Only gece seçimi alanını inceleme");
+
+const hotelOnlyNightsButton = page
+  .locator("button.search-field-button")
+  .filter({
+    has: page.locator(".search-field-button__label", {
+      hasText: "Nights",
+    }),
+  });
+
+await hotelOnlyNightsButton.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Nights before click:", {
+  requested: window.nights,
+  displayed: await hotelOnlyNightsButton.innerText(),
+});
+
+await hotelOnlyNightsButton.click();
+
+console.log("[OnTheBeach] Nights options inspection:", {
+  visibleText: (
+    await page.locator("body").innerText()
+  ).slice(0, 1200),
+
+selects: await page.locator("select").evaluateAll((elements) =>
+  elements.map((element) => {
+    const select = element as HTMLSelectElement;
+
+    return {
+      name: select.name,
+      className: select.className,
+      value: select.value,
+      options: Array.from(select.options).map((option) => ({
+        text: option.textContent?.trim(),
+        value: option.value,
+        selected: option.selected,
+      })),
+    };
+  }),
+),
+
+  options: await page
+    .locator("button, [role='option'], input[type='radio']")
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+
+          return rect.width > 0 && rect.height > 0;
+        })
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 100) ?? "",
+          value: element.getAttribute("value"),
+          className: element.getAttribute("class"),
+          outerHtml: element.outerHTML.slice(0, 350),
+        }))
+        .filter((item) =>
+          /night|^[1-9]\d?$/.test(
+            `${item.text} ${item.className ?? ""}`,
+          ),
+        )
+        .slice(0, 40),
+    ),
+});
+
+onStep("Hotel Only gece sayısını seçme");
+
+const hotelOnlyNightsSelect = page.locator(
+  'select[name="search[nights]"]',
+);
+
+await hotelOnlyNightsSelect.waitFor({
+  state: "attached",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Nights select before:", {
+  requested: window.nights,
+  currentValue: await hotelOnlyNightsSelect.inputValue(),
+});
+
+await hotelOnlyNightsSelect.selectOption(String(window.nights));
+
+await page.waitForTimeout(400);
+
+console.log("[OnTheBeach] Nights selection result:", {
+  requested: window.nights,
+  selectedValue: await hotelOnlyNightsSelect.inputValue(),
+  displayed: await hotelOnlyNightsButton.innerText(),
+  checkIn: await hotelOnlyDateButton.innerText(),
+  returnText: await page
+    .getByText(/^Return\s+\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/)
+    .first()
+    .innerText()
+    .catch(() => "Return alanı bulunamadı"),
+});
+
+onStep("Hotel Only misafir ve oda sayısını doğrulama");
+
+const hotelOnlyGuestValues = {
+  adults: await page
+    .locator('select[name="search[adults]"]')
+    .inputValue(),
+
+  children: await page
+    .locator('select[name="search[children]"]')
+    .inputValue(),
+
+  infants: await page
+    .locator('select[name="search[infants]"]')
+    .inputValue(),
+
+  rooms: await page
+    .locator('select[name="search[number_of_rooms]"]')
+    .inputValue(),
+};
+
+console.log(
+  "[OnTheBeach] Hotel Only guest verification:",
+  hotelOnlyGuestValues,
+);
+
+if (
+  hotelOnlyGuestValues.adults !== "2" ||
+  hotelOnlyGuestValues.children !== "0" ||
+  hotelOnlyGuestValues.infants !== "0" ||
+  hotelOnlyGuestValues.rooms !== "1"
+) {
+  throw new Error(
+    "Hotel Only misafir veya oda sayısı beklenen değerlerle eşleşmiyor.",
+  );
+}
+
+console.log("[OnTheBeach] Hotel Only guest verification: OK");
+
+onStep("Hotel Only aramasını başlatma");
+
+const hotelOnlySearchButton = page.locator(
+  "button.button--primary.button--with-arrow",
+).filter({
+  hasText: /^Search$/,
+});
+
+console.log("[OnTheBeach] Search button inspection:", {
+  matchingButtons: await hotelOnlySearchButton.count(),
+
+buttons: await page.locator("button").evaluateAll((buttons) =>
+  buttons
+    .filter((button) => /search/i.test(button.textContent ?? ""))
+    .map((button) => {
+      const rect = button.getBoundingClientRect();
+
+      const style =
+        button.ownerDocument.defaultView?.getComputedStyle(button);
+
+      return {
+        text: button.textContent?.trim(),
+        className: button.getAttribute("class"),
+        disabled: (button as HTMLButtonElement).disabled,
+        visible:
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style?.visibility !== "hidden" &&
+          style?.display !== "none",
+        outerHtml: button.outerHTML.slice(0, 600),
+      };
+    }),
+),
+
+  calendarVisible: await page
+    .locator("button.datepicker__button")
+    .first()
+    .isVisible()
+    .catch(() => false),
+});
+
+await hotelOnlySearchButton.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Before Hotel Only search:", {
+  hotel: scope.hotelName,
+  url: page.url(),
+  destination: await hotelOnlyDestinationInput.inputValue(),
+  checkIn: await hotelOnlyDateButton.innerText(),
+  nights: await hotelOnlyNightsSelect.inputValue(),
+  guests: hotelOnlyGuestValues,
+});
+
+await hotelOnlySearchButton.click({
+  timeout: 15000,
+});
+
+onStep("Hotel Only arama sonuçlarını bekleme");
+
+console.log("[OnTheBeach] Search loading started:", {
+  url: page.url(),
+  title: await page.title(),
+});
+
+const searchStartTime = Date.now();
+
+const resultsLoaded = await page
+  .waitForURL(
+    (url) => {
+      return (
+        url.hostname === "www.onthebeach.co.uk" &&
+        url.searchParams.get("mode") !== "ho" &&
+        url.pathname !== "/"
+      );
+    },
+    {
+      timeout: 60000,
+      waitUntil: "domcontentloaded",
+    },
+  )
+  .then(() => true)
+  .catch(() => false);
+
+console.log("[OnTheBeach] Search navigation result:", {
+  resultsLoaded,
+  elapsedMs: Date.now() - searchStartTime,
+  url: page.url(),
+  title: await page.title().catch(() => ""),
+  bodyPreview: (
+    await page.locator("body").innerText().catch(() => "")
+  ).slice(0, 2000),
+});
+
+if (!resultsLoaded) {
+  throw new Error(
+    "Hotel Only araması 60 saniye içinde sonuç sayfasına yönlenmedi.",
+  );
+}
+
+await assertSearchAccessible(page);
+
+const targetHotelName = scope.hotelName.trim();
+const filteredResultsUrl = new URL(page.url());
+filteredResultsUrl.searchParams.set("filters[hotel_name]", targetHotelName);
+filteredResultsUrl.searchParams.set("pagination[page]", "1");
+
+onStep("Hotel Only sonuçlarını hedef otele filtreleme");
+
+const filteredResponse = await page.goto(filteredResultsUrl.toString(), {
+  waitUntil: "domcontentloaded",
+  timeout: 60000,
+});
+
+await assertSearchAccessible(page, filteredResponse?.status());
+
+await page
+  .locator("#search_results .hotel-result.search-result")
+  .first()
+  .waitFor({ state: "attached", timeout: 30000 });
+
+console.log("[OnTheBeach] Hotel Only search result:", {
+  hotel: scope.hotelName,
+  url: page.url(),
+  title: await page.title().catch(() => ""),
+  bodyPreview: (
+    await page.locator("body").innerText().catch(() => "")
+  ).slice(0, 2500),
+});
+
+onStep("Hotel Only sonuç kartlarını inceleme");
+
+console.log("[OnTheBeach] Results structure inspection:", {
+  url: page.url(),
+
+  targetHotel: scope.hotelName,
+
+  hotelNameMatches: await page
+    .getByText(/Miramare (Beach|Queen)/i)
+    .allTextContents(),
+
+  hotelLinks: await page.locator("a").evaluateAll((links) =>
+    links
+      .filter((link) =>
+        /hotel|miramare/i.test(
+          `${link.textContent ?? ""} ${link.getAttribute("href") ?? ""}`,
+        ),
+      )
+      .slice(0, 25)
+      .map((link) => ({
+        text: link.textContent?.trim().slice(0, 120),
+        href: link.getAttribute("href"),
+        className: link.getAttribute("class"),
+        outerHtml: link.outerHTML.slice(0, 500),
+      })),
+  ),
+
+  pagination: await page
+    .locator("a, button, [role='button']")
+    .evaluateAll((elements) =>
+      elements
+        .filter((element) => {
+          const text = element.textContent?.trim() ?? "";
+          const ariaLabel = element.getAttribute("aria-label") ?? "";
+          const className = element.getAttribute("class") ?? "";
+
+          return (
+            /^(next|previous|prev|[1-9]\d?)$/i.test(text) ||
+            /pagination|page|next|previous/i.test(
+              `${ariaLabel} ${className}`,
+            )
+          );
+        })
+        .slice(0, 40)
+        .map((element) => ({
+          tag: element.tagName,
+          text: element.textContent?.trim().slice(0, 100),
+          href: element.getAttribute("href"),
+          ariaLabel: element.getAttribute("aria-label"),
+          className: element.getAttribute("class"),
+          outerHtml: element.outerHTML.slice(0, 500),
+        })),
+    ),
+
+  resultTextSamples: await page
+    .locator("body")
+    .innerText()
+    .then((text) => ({
+      containsMiramare: /miramare/i.test(text),
+      containsHotels: /hotel|results|sort by/i.test(text),
+      last4000Characters: text.slice(-4000),
+    })),
+});
+
+onStep("Hotel Only hedef oteli sonuç sayfalarında arama");
+
+const hotelNameLocator = page.getByText(targetHotelName, {
+  exact: true,
+});
+
+const currentResultsUrl = new URL(page.url());
+
+if (!/^\/hotel_searches\/show\/\d+\/?$/.test(currentResultsUrl.pathname)) {
+  throw new Error("Hotel Only sonuç sayfası doğrulanamadı.");
+}
+
+let currentPage = Number(
+  currentResultsUrl.searchParams.get("pagination[page]") ?? "1",
+);
+
+let targetHotelFound = false;
+
+const visitedPages = new Set<number>();
+
+while (currentPage <= 3) {
+  if (visitedPages.has(currentPage)) {
+    throw new Error(`Sayfalama döngüsü algılandı: ${currentPage}`);
+  }
+
+  visitedPages.add(currentPage);
+
+  const hotelMatches = await hotelNameLocator.allTextContents();
+
+  console.log("[OnTheBeach] Hotel search page:", {
+    page: currentPage,
+    url: page.url(),
+    targetHotel: targetHotelName,
+    matches: hotelMatches,
+  });
+
+  if (hotelMatches.length > 0) {
+    targetHotelFound = true;
+
+    console.log("[OnTheBeach] TARGET HOTEL FOUND:", {
+      hotel: targetHotelName,
+      page: currentPage,
+      url: page.url(),
+    });
+
+    break;
+  }
+
+  const nextButton = page.locator(
+    'button.pagination__button[data-direction="1"]',
+  );
+
+  if (!(await nextButton.isVisible()) || !(await nextButton.isEnabled())) {
+    console.log("[OnTheBeach] Last results page reached:", {
+      page: currentPage,
+      url: page.url(),
+    });
+
+    break;
+  }
+
+  const expectedNextPage = currentPage + 1;
+
+const previousFirstHotel = await page
+  .locator("#search_results .hotel-result.search-result")
+  .first()
+  .getAttribute("data-result-id");
+
+await nextButton.click();
+
+await page.waitForFunction(
+  ({ expectedPage, previousFirstHotel }) => {
+    const currentUrl = new URL(document.location.href);
+
+    const currentPageNumber = Number(
+      currentUrl.searchParams.get("pagination[page]"),
+    );
+
+    const firstHotel = document.querySelector(
+      "#search_results .hotel-result.search-result",
+    );
+
+    const currentFirstHotel = firstHotel?.getAttribute("data-result-id");
+
+    return (
+      currentPageNumber === expectedPage &&
+      firstHotel !== null &&
+      currentFirstHotel !== null &&
+      currentFirstHotel !== previousFirstHotel
+    );
+  },
+  {
+    expectedPage: expectedNextPage,
+    previousFirstHotel,
+  },
+  {
+    timeout: 30000,
+  },
+);
+
+await assertSearchAccessible(page);
+
+currentPage = expectedNextPage;
+
+console.log("[OnTheBeach] Pagination completed:", {
+  page: currentPage,
+  url: page.url(),
+  firstHotelId: await page
+    .locator("#search_results .hotel-result.search-result")
+    .first()
+    .getAttribute("data-result-id"),
+  hotelCards: await page
+    .locator("#search_results .hotel-result.search-result")
+    .count(),
+});
+}
+
+if (!targetHotelFound) {
+  throw new Error(
+    `${targetHotelName} oteli taranan sonuç sayfalarında bulunamadı.`,
+  );
+}
+
+onStep("Hotel Only hedef otel kartını inceleme");
+
+const hotelCardInspection = await page
+  .getByText(targetHotelName, { exact: true })
+  .first()
+  .evaluate((element) => {
+    const ancestors = [];
+
+    let current: Element | null = element;
+
+    for (let level = 0; level < 8 && current; level++) {
+      ancestors.push({
+        level,
+        tag: current.tagName,
+        className: current.getAttribute("class"),
+        id: current.getAttribute("id"),
+        text: current.textContent?.trim().slice(0, 1200),
+        html: current.outerHTML.slice(0, 1800),
+      });
+
+      current = current.parentElement;
+    }
+
+    return ancestors;
+  });
+
+console.log(
+  "[OnTheBeach] Target hotel card inspection:",
+  JSON.stringify(
+    {
+      hotel: targetHotelName,
+      page: currentPage,
+      ancestors: hotelCardInspection,
+    },
+    null,
+    2,
+  ),
+);
+
+onStep("Hotel Only hedef otelin oda ve fiyat alanlarını inceleme");
+
+const targetHotelCard = page
+  .locator(".hotel-result.search-result")
+  .filter({
+    has: page.locator("h3.hotel-result__title").filter({
+      hasText: new RegExp(
+        `^\\s*${targetHotelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
+        "i",
+      ),
+    }),
+  });
+
+await targetHotelCard.waitFor({
+  state: "visible",
+  timeout: 15000,
+});
+
+console.log("[OnTheBeach] Target hotel price inspection:", {
+  hotel: targetHotelName,
+  page: currentPage,
+
+  hotelId: await targetHotelCard.getAttribute("data-hotel-id"),
+  initialRoomType: await targetHotelCard.getAttribute("data-room-type"),
+  boardCode: await targetHotelCard.getAttribute("data-board-code"),
+
+  cardText: (
+    await targetHotelCard.innerText()
+  ).slice(-4500),
+
+  priceRelatedElements: await targetHotelCard
+    .locator(
+      '[class*="price"], [class*="room"], [class*="board"], input[type="radio"], label',
+    )
+    .evaluateAll((elements) =>
+      elements.slice(0, 65).map((element) => ({
+        tag: element.tagName,
+        className: element.getAttribute("class"),
+        text: element.textContent?.trim().slice(0, 150),
+        outerHtml: element.outerHTML.slice(0, 500),
+      })),
+    ),
+
+  buttons: await targetHotelCard.locator("button").evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      text: button.textContent?.trim().slice(0, 100),
+      className: button.getAttribute("class"),
+      outerHtml: button.outerHTML.slice(0, 500),
+    })),
+  ),
+});
+
+onStep("Hotel Only toplam otel fiyatını seçme");
+
+const priceToggle = targetHotelCard.locator(
+  'input.toggle-switch__input[name="price[toggle]"]',
+);
+
+const priceToggleLabel = targetHotelCard.locator(
+  "label.toggle-switch__label",
+);
+
+const getDisplayedPrices = async () =>
+  targetHotelCard
+    .locator(".board-option")
+    .evaluateAll((elements) =>
+      elements.map((element) => ({
+        room: element
+          .querySelector(".board-option__title")
+          ?.textContent?.trim()
+          .replace(/\s+/g, " "),
+
+        amount: element
+          .querySelector(".board-option__amount")
+          ?.textContent?.trim()
+          .replace(/\s+/g, ""),
+
+        priceLabel: element
+          .querySelector(".board-option__price-label")
+          ?.textContent?.trim(),
+      })),
+    );
+
+const totalPriceSelected = await priceToggle.isChecked();
+
+console.log("[OnTheBeach] Price toggle before:", {
+  checked: totalPriceSelected,
+  value: await priceToggle.getAttribute("value"),
+  prices: (await getDisplayedPrices()).slice(0, 3),
+});
+
+if (!totalPriceSelected) {
+  const priceModeUrl = page.url();
+
+  await Promise.all([
+    page.waitForURL((url) => url.toString() !== priceModeUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    }),
+    priceToggleLabel.click(),
+  ]);
+
+  const totalPriceResultsUrl = new URL(page.url());
+  totalPriceResultsUrl.searchParams.set("filters[hotel_name]", targetHotelName);
+  totalPriceResultsUrl.searchParams.set("pagination[page]", "1");
+
+  const totalPriceResponse = await page.goto(totalPriceResultsUrl.toString(), {
+    waitUntil: "domcontentloaded",
+    timeout: 60000,
+  });
+
+  await assertSearchAccessible(page, totalPriceResponse?.status());
+  await targetHotelCard.waitFor({ state: "visible", timeout: 30000 });
+  await priceToggle.waitFor({ state: "attached", timeout: 15000 });
+}
+
+if (!(await priceToggle.isChecked())) {
+  throw new Error("Total Hotel Price seçimi etkinleşmedi.");
+}
+
+console.log("[OnTheBeach] Price toggle after:", {
+  url: page.url(),
+  checked: await priceToggle.isChecked().catch(() => null),
+  prices: (await getDisplayedPrices()).slice(0, 6),
+});
+
+onStep("Hotel Only toplam oda fiyatlarını toplama");
+
+const collectedOffers = await targetHotelCard
+  .locator(".board-option")
+  .evaluateAll((elements) =>
+    elements.map((element) => {
+      const title = element.querySelector(".board-option__title");
+
+      const board =
+        title?.querySelector("strong")?.textContent?.trim() ?? "";
+
+      const roomName =
+        title?.textContent
+          ?.replace(board, "")
+          .replace(/\s+/g, " ")
+          .trim() ?? "";
+
+      const amount =
+        element
+          .querySelector(".board-option__amount")
+          ?.textContent?.replace(/\s+/g, "") ?? "";
+
+      const priceLabel =
+        element
+          .querySelector(".board-option__price-label")
+          ?.textContent?.trim() ?? "";
+
+      return {
+        roomName,
+        board,
+        priceText: `${amount}${priceLabel.replace(/\s+/g, "")}`,
+      };
+    }),
+  );
+
+console.log("[OnTheBeach] Collected offers:", collectedOffers);
+
+const invalidOffers = collectedOffers.filter(
+  (offer) =>
+    !offer.roomName ||
+    !offer.board ||
+    !/^£[\d,]+(?:\.\d{2})?perparty$/i.test(offer.priceText),
+);
+
+if (invalidOffers.length > 0 || collectedOffers.length === 0) {
+  throw new Error(
+    "Hotel Only oda isimleri veya toplam fiyatları doğrulanamadı.",
+  );
+}
+
+const snapshot: OnTheBeachSnapshot = {
+  sourceUrl: page.url(),
+  hotelName: targetHotelName,
+  checkInLabel: dateLabel(window.checkIn),
+  returnLabel: dateLabel(window.checkOut),
+  nights: window.nights,
+  adults: Number(hotelOnlyGuestValues.adults),
+  children: Number(hotelOnlyGuestValues.children),
+  infants: Number(hotelOnlyGuestValues.infants),
+  rooms: Number(hotelOnlyGuestValues.rooms),
+  totalSelected: await priceToggle.isChecked(),
+  offers: collectedOffers,
+};
+
+console.log("[OnTheBeach] Final snapshot:", {
+  hotel: snapshot.hotelName,
+  checkIn: snapshot.checkInLabel,
+  checkOut: snapshot.returnLabel,
+  nights: snapshot.nights,
+  totalSelected: snapshot.totalSelected,
+  offerCount: snapshot.offers.length,
+  offers: snapshot.offers,
+});
+
+return snapshot;
+
+} // runHotelSearch fonksiyonunun kapanışı
 
 async function createOnTheBeachBrowserPage(
   config: ReturnType<typeof resolveProviderLiveConfig>,
+  scope: ReportScopeDefinition,
 ): Promise<PatchrightBrowserHandle> {
   return createPatchrightBrowserPage({
-    profilePath: "./.benchmark-state/onthebeach-browser-profile",
+    profilePath:
+      `./.benchmark-state/onthebeach-browser-profile-${scope.id}`,
+
     browserChannel: config.browserChannel,
     market: config.market,
     proxyUrl: config.proxyUrl,
@@ -465,12 +1377,13 @@ dependencies: {
   const offers: CollectedOffer[] = [];
   for (const window of scope.windows) {
     let handle: PatchrightBrowserHandle | undefined;
-    let step = "Hotel Only sayfasını açma";
+    let step = "Otel arama sayfasını açma";
     try {
-     handle = await (
+handle = await (
   dependencies.createPage ?? createOnTheBeachBrowserPage
 )(
   resolveProviderLiveConfig(provider.key, scope.currency),
+  scope,
 );
       handle.page.setDefaultTimeout(15000);
       const snapshot = await (dependencies.search ?? runHotelSearch)(
@@ -560,8 +1473,8 @@ dependencies: {
     })),
   );
 } finally {
-      await handle?.close().catch(() => undefined);
-    }
+  await handle?.close().catch(() => undefined);
+}
   }
   return { quotes, warnings, offers };
 }

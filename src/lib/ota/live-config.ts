@@ -323,17 +323,29 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
   "miramare-beach": {
     pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-beach",
     roomAliases: {
-      "superior-land": ["land view", "inland view", "garden view"],
-      "superior-sea": ["sea view", "side sea view"],
-
+      "superior-land": [
+        "superior land view",
+        "land view",
+        "garden view",
+        "inland view",
+        "Superior-Standardzimmer mit Blick ins Grüne"
+      ],
+      "superior-sea": [
+        "superior sea view",
+        "sea view",
+        "side sea view",
+        "meerblick",
+        "Superior-Standardzimmer mit Meerblick"
+      ],
             "economy":[
         "Economy Room",
         "Economy",
         "Great for two",
-        "economy room",
+        "Economy Doppelzimmer"
       ],
 
        "corner": [
+         "Superior Corner",
         "Superior Corner Room",
         "Corner Room",
       ],

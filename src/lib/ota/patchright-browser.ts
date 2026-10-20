@@ -57,6 +57,17 @@ export async function createPatchrightBrowserPage(
     ? MARKET_PRESETS[options.market]
     : undefined;
 
+  console.log("[Patchright] Browser launch configuration:", {
+  profilePath: options.profilePath,
+  browserChannel: options.browserChannel ?? "chrome",
+  headless: options.headless ?? false,
+  market: options.market ?? "default",
+  locale: preset?.locale ?? "browser default",
+  timezoneId: preset?.timezoneId ?? "browser default",
+  proxyConfigured: Boolean(options.proxyUrl),
+  customUserAgentConfigured: Boolean(options.userAgent),
+});
+
   const context = await chromium.launchPersistentContext(
     options.profilePath ??
       "./.benchmark-state/expedia-browser-profile",

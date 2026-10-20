@@ -13,7 +13,6 @@ import {
 } from "../src/lib/ota/live-expedia";
 import { REPORT_SCOPES } from "../src/lib/benchmark/sample-data";
 import { OTA_PROVIDERS } from "../src/lib/ota/registry";
-import type { createBrowserPage } from "../src/lib/ota/live-helpers";
 import { buildBenchmarkResult } from "../src/lib/benchmark/engine";
 
 const uk = REPORT_SCOPES.find((scope) => scope.id === "beach-uk")!;
@@ -80,17 +79,22 @@ test("On the Beach reads the party total including split pennies, preferring ful
   const quotes = parseOnTheBeachQuotes(otb, uk, window, otbSnapshot);
   assert.deepEqual(
     quotes.map((quote) => quote.price),
-    [1429.01, 1524.87],
+    [null, null, 1429.01, 1524.87],
   );
+  const availableQuotes = quotes.filter((quote) => quote.status === "available");
   assert.ok(
-    quotes.every(
+    availableQuotes.every(
       (quote) =>
         quote.captureMethod === "automated" &&
         quote.status === "available" &&
         quote.observedAt,
     ),
   );
-  assert.match(quotes[1].offerDescription!, /Sea View With Balcony/);
+  assert.match(
+    availableQuotes.find((quote) => quote.roomId === "superior-sea")!
+      .offerDescription!,
+    /Sea View With Balcony/,
+  );
 });
 
 test("On the Beach refuses wrong dates, hotel, currency, occupancy and non-total searches", () => {
@@ -263,13 +267,17 @@ test("On the Beach alternatives enter the report without increasing matched-room
   });
   assert.equal(result.summary.availableRateCount, 2);
   assert.equal(result.summary.alternativeOfferCount, 1);
-  assert.equal(quotes[1].roomFeatures?.view, "sea");
-  assert.equal(quotes[1].terms?.board, "All Inclusive");
+  const seaQuote = quotes.find((quote) => quote.roomId === "superior-sea")!;
+  assert.equal(seaQuote.roomFeatures?.view, "sea");
+  assert.equal(seaQuote.terms?.board, "All Inclusive");
 });
 
 test("On the Beach collector keeps earlier offers when a later search fails and closes both browsers", async () => {
   let closes = 0;
-  const factory: typeof createBrowserPage = async () =>
+  type CreateOnTheBeachPage = NonNullable<
+    NonNullable<Parameters<typeof collectOnTheBeachLiveQuotes>[2]>["createPage"]
+  >;
+  const factory: CreateOnTheBeachPage = async () =>
     ({
       page: {
         setDefaultTimeout() {},
@@ -283,7 +291,7 @@ test("On the Beach collector keeps earlier offers when a later search fails and 
       close: async () => {
         closes++;
       },
-    }) as unknown as Awaited<ReturnType<typeof createBrowserPage>>;
+    }) as unknown as Awaited<ReturnType<CreateOnTheBeachPage>>;
   const result = await collectOnTheBeachLiveQuotes(
     otb,
     { ...uk, windows: [window, { ...window, id: "second" }] },
@@ -299,7 +307,7 @@ test("On the Beach collector keeps earlier offers when a later search fails and 
   assert.equal(result.offers?.length, 3);
   assert.deepEqual(
     result.quotes.map((quote) => quote.price),
-    [1429.01, 1524.87, null, null],
+    [null, null, 1429.01, 1524.87, null, null, null, null],
   );
   assert.match(result.warnings[0], /Second window failed/);
   assert.equal(closes, 2);
