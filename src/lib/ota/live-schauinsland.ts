@@ -333,6 +333,308 @@ export function selectSchauinslandBestOffer(
 }
 
 
+export function getSchauinslandPaginationOffsets(
+  resultsTotal: number,
+  pageSize = 50,
+): number[] {
+  if (
+    !Number.isSafeInteger(resultsTotal) ||
+    resultsTotal < 0 ||
+    !Number.isSafeInteger(pageSize) ||
+    pageSize <= 0
+  ) {
+    throw new Error("Geçersiz Schauinsland pagination değeri.");
+  }
+
+  const offsets: number[] = [];
+
+  for (let offset = 0; offset < resultsTotal; offset += pageSize) {
+    offsets.push(offset);
+  }
+
+  return offsets;
+}
+
+
+interface SchauinslandCapturedRequest {
+  url: string;
+  body: string;
+  headers: Record<string, string>;
+}
+
+interface SchauinslandPaginationClient {
+  post: (
+    url: string,
+    options: {
+      data: string;
+      headers: Record<string, string>;
+      timeout: number;
+    },
+  ) => Promise<{
+    status: () => number;
+    json: () => Promise<unknown>;
+  }>;
+}
+
+export async function fetchSchauinslandRemainingPages(
+  client: SchauinslandPaginationClient,
+  captured: SchauinslandCapturedRequest,
+  firstResult: unknown,
+  pageSize = 50,
+): Promise<unknown> {
+  const first = asRecord(firstResult);
+  const firstData = getRecord(first, "data");
+  const firstProductOffers = getRecord(
+    firstData,
+    "productOffers",
+  );
+
+  const pagination = getRecord(
+    firstProductOffers,
+    "pagination",
+  );
+
+  const total = pagination?.resultsTotal;
+  const firstHotels = firstProductOffers?.hotels;
+
+  if (
+    typeof total !== "number" ||
+    !Array.isArray(firstHotels)
+  ) {
+    throw new Error(
+      "Schauinsland pagination bilgisi eksik.",
+    );
+  }
+
+  const offsets = getSchauinslandPaginationOffsets(
+    total,
+    pageSize,
+  );
+
+  // Güvenlik sınırı: sınırsız sayfa isteği gönderme.
+  if (offsets.length > 20) {
+    throw new Error(
+      "Schauinsland pagination güvenlik sınırı aşıldı.",
+    );
+  }
+
+  const allHotels: unknown[] = [...firstHotels];
+
+  const seenIds = new Set<string>();
+  let receivedCount = 0;
+
+  function appendOfferIds(hotels: unknown[]) {
+    for (const rawHotel of hotels) {
+      const hotel = asRecord(rawHotel);
+      const offers = hotel?.offers;
+
+      if (!Array.isArray(offers)) {
+        throw new Error(
+          "Schauinsland sayfasında teklif listesi eksik.",
+        );
+      }
+
+      for (const rawOffer of offers) {
+        const offer = asRecord(rawOffer);
+        const id = getString(offer, "id");
+
+        if (!id || seenIds.has(id)) {
+          throw new Error(
+            "Schauinsland teklif kimliği eksik veya tekrarlı.",
+          );
+        }
+
+        seenIds.add(id);
+        receivedCount += 1;
+      }
+    }
+  }
+
+  appendOfferIds(firstHotels);
+
+  if (receivedCount > Math.min(pageSize, total)) {
+    throw new Error(
+      "Schauinsland ilk sayfası beklenen boyutu aşıyor.",
+    );
+  }
+
+  const originalPayload = JSON.parse(
+    captured.body,
+  ) as unknown;
+
+  const originalOperations = Array.isArray(
+    originalPayload,
+  )
+    ? originalPayload
+    : [originalPayload];
+
+  const operationIndex = originalOperations.findIndex(
+    (operation) =>
+      asRecord(operation)?.operationName === "getOfferList",
+  );
+
+  if (operationIndex < 0) {
+    throw new Error(
+      "Schauinsland GraphQL operasyonu bulunamadı.",
+    );
+  }
+
+  // Browser context çerezleri otomatik kullanılır.
+  // Eski Content-Length/Cookie gibi başlıklar taşınmaz.
+  const headers: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(
+    captured.headers,
+  )) {
+    const lower = key.toLowerCase();
+
+    if (
+      lower === "content-type" ||
+      lower === "accept" ||
+      lower === "authorization" ||
+      lower === "origin" ||
+      lower === "referer" ||
+      lower.startsWith("x-")
+    ) {
+      headers[key] = value;
+    }
+  }
+
+  for (const offset of offsets.slice(1)) {
+    const operations = structuredClone(
+      originalOperations,
+    ) as UnknownRecord[];
+
+    const operation = operations[operationIndex];
+    const variables = getRecord(
+      operation,
+      "variables",
+    );
+    const packageRequest = getRecord(
+      variables,
+      "packageOfferRequest",
+    );
+
+    if (!variables || !packageRequest) {
+      throw new Error(
+        "Schauinsland GraphQL değişkenleri eksik.",
+      );
+    }
+
+    const originalPagination = getRecord(
+      packageRequest,
+      "pagination",
+    );
+
+    operation.variables = {
+      ...variables,
+      packageOfferRequest: {
+        ...packageRequest,
+        pagination: {
+          ...originalPagination,
+          resultsPerPage: pageSize,
+          showingResultsFrom: offset,
+        },
+      },
+    };
+
+    const body = JSON.stringify(
+      Array.isArray(originalPayload)
+        ? operations
+        : operations[0],
+    );
+
+    const response = await client.post(
+      captured.url,
+      {
+        data: body,
+        headers,
+        timeout: 45_000,
+      },
+    );
+
+    if (response.status() !== 200) {
+      throw new Error(
+        `Schauinsland sayfa HTTP ${response.status()} ` +
+          `(offset=${offset})`,
+      );
+    }
+
+    const responseBody = await response.json();
+
+    const results = Array.isArray(responseBody)
+      ? responseBody
+      : [responseBody];
+
+    const result = asRecord(
+      results[operationIndex] ??
+        (operations.length === 1
+          ? results[0]
+          : null),
+    );
+
+    const errors = result?.errors;
+
+    if (
+      !result ||
+      (Array.isArray(errors) && errors.length > 0)
+    ) {
+      throw new Error(
+        `Schauinsland GraphQL sayfa hatası: ${offset}`,
+      );
+    }
+
+    const data = getRecord(result, "data");
+    const productOffers = getRecord(
+      data,
+      "productOffers",
+    );
+    const pagePagination = getRecord(
+      productOffers,
+      "pagination",
+    );
+    const hotels = productOffers?.hotels;
+
+    if (
+      pagePagination?.resultsTotal !== total ||
+      !Array.isArray(hotels)
+    ) {
+      throw new Error(
+        "Schauinsland pagination toplamı değişti.",
+      );
+    }
+
+    appendOfferIds(hotels);
+    allHotels.push(...hotels);
+
+    console.log(
+      "[SCHAUINSLAND] Additional page:",
+      {
+        offset,
+        receivedCount,
+        resultsTotal: total,
+      },
+    );
+  }
+
+  if (receivedCount !== total) {
+    throw new Error(
+      `Schauinsland teklif listesi eksik: ` +
+        `${receivedCount}/${total}`,
+    );
+  }
+
+  return {
+    ...first,
+    data: {
+      ...firstData,
+      productOffers: {
+        ...firstProductOffers,
+        hotels: allHotels,
+      },
+    },
+  };
+}
 
 
 function buildSchauinslandUrl(
@@ -392,6 +694,14 @@ const sourceHint = buildSchauinslandUrl(
       });
 
       const page = handle.page;
+
+      let capturedGraphqlRequest:
+  | {
+      url: string;
+      body: string;
+      headers: Record<string, string>;
+    }
+  | undefined;
 
       // GraphQL isteğini sayfa açılmadan önce yakala.
       await page.route("**/api/graphql", async (route) => {
@@ -511,11 +821,21 @@ const sourceHint = buildSchauinslandUrl(
           );
         }
 
-        await route.continue(
-          updatedPostData !== undefined
-            ? { postData: updatedPostData }
-            : undefined,
-        );
+       
+if (updatedPostData !== undefined) {
+  capturedGraphqlRequest = {
+    url: request.url(),
+    body: updatedPostData,
+    headers: request.headers(),
+  };
+}
+
+await route.continue(
+  updatedPostData !== undefined
+    ? { postData: updatedPostData }
+    : undefined,
+);
+
       });
 
       // Yalnızca doğru getOfferList isteğini bekle.
@@ -644,8 +964,22 @@ console.log("[SCHAUINSLAND] Pagination response:", {
         );
       }
 
- const parsedOffers = parseSchauinslandOffers(
-  offerResult,
+
+if (!capturedGraphqlRequest) {
+  throw new Error(
+    "Schauinsland GraphQL istek bilgileri yakalanamadı.",
+  );
+}
+
+const completeOfferResult =
+  await fetchSchauinslandRemainingPages(
+    page.request,
+    capturedGraphqlRequest,
+    offerResult,
+  );
+
+const parsedOffers = parseSchauinslandOffers(
+  completeOfferResult,
   {
     hotelId: hotelConfig.giataId,
     checkIn: window.checkIn,
@@ -653,6 +987,7 @@ console.log("[SCHAUINSLAND] Pagination response:", {
     nights: window.nights,
   },
 );
+
 
 
 console.table(
@@ -669,29 +1004,25 @@ console.table(
 
 
 
-const paginationInfo = offerResult?.data?.productOffers?.pagination;
 
-const resultsTotal =
-  typeof paginationInfo?.resultsTotal === "number"
-    ? paginationInfo.resultsTotal
-    : null;
+const completeProductOffers = getRecord(
+  getRecord(
+    asRecord(completeOfferResult),
+    "data",
+  ),
+  "productOffers",
+);
 
-const returnedOfferCount =
-  offerResult?.data?.productOffers?.hotels?.reduce(
-    (
-      total: number,
-      hotel: { offers?: unknown[] },
-    ) => total + (hotel.offers?.length ?? 0),
-    0,
-  ) ?? 0;
+const completePagination = getRecord(
+  completeProductOffers,
+  "pagination",
+);
 
-if (resultsTotal !== null && returnedOfferCount < resultsTotal) {
-  warnings.push(
-    `Schauinsland / ${scope.hotelName} / ${window.checkIn}: ` +
-      `${returnedOfferCount}/${resultsTotal} teklif alındı. ` +
-      "Sonuçların tamamı henüz toplanmadı.",
-  );
-}
+console.log("[SCHAUINSLAND] Complete pagination:", {
+  hotel: scope.hotelName,
+  resultsTotal: completePagination?.resultsTotal,
+  parsedOffers: parsedOffers.length,
+});
 
 
       if (parsedOffers.length === 0) {
