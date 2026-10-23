@@ -4,13 +4,15 @@ export type HotelKey = "miramare-beach" | "miramare-queen";
 export type ScopeKey = "beach-eu" | "beach-uk" | "queen-eu" | "queen-uk";
 export type ScopeProviderSelection = Partial<Record<ScopeKey, OtaKey[]>>;
 export type OtaKey =
+  | "anextour"
   | "booking"
   | "expedia"
   | "hotelbeds"
   | "holidaycheck"
   | "loveholidays"
   | "onthebeach"
-  | "tui";
+  | "tui"
+  | "schauinsland";
 
 export interface BenchmarkWindowDefinition {
   id: string;
@@ -27,6 +29,7 @@ export interface RoomDefinition {
   referenceRates: Partial<Record<string, number>>;
 }
 
+
 export interface ReportScopeDefinition {
   id: ScopeKey;
   label: string;
@@ -34,10 +37,15 @@ export interface ReportScopeDefinition {
   hotelName: string;
   marketLabel: string;
   currency: CurrencyCode;
+
+  // İsteğe bağlı benchmark pansiyon standardı.
+  requiredBoard?: "all-inclusive" | "all-inclusive-plus";
+
   notes?: string;
   windows: BenchmarkWindowDefinition[];
   rooms: RoomDefinition[];
 }
+
 
 export interface ProviderDescriptor {
   key: OtaKey;
@@ -106,6 +114,11 @@ export interface CollectedOffer {
   observedAt: string;
   matchedRoomId?: string;
   matchReason: string;
+  sourceOfferId?: string;
+sourceProductCode?: string;
+sourceTravelType?: string | null;
+sourceSystemCode?: string;
+sourceBoardCode?: string;
 }
 
 export interface ProviderCollectionResult {

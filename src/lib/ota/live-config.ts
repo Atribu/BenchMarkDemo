@@ -27,6 +27,13 @@ interface TuiHotelConfig {
   roomAliases: Record<string, string[]>;
 }
 
+interface SchauinslandHotelConfig {
+  giataId: "4893" | "4894";
+  pageUrl: string;
+  market: "de";
+  currency: "EUR";
+}
+
 export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
   "miramare-beach": {
     pageUrl: "https://www.booking.com/hotel/tr/miramare-beach-hotel-side.html",
@@ -447,3 +454,24 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
     }
   }
 };
+
+
+export const SCHAUINSLAND_HOTEL_CONFIG: Partial<
+  Record<HotelKey, SchauinslandHotelConfig>
+> = {
+  "miramare-beach": {
+    giataId: "4893",
+    pageUrl:
+      "https://www.schauinsland-reisen.de/hotel/4893-miramare-beach-hotel",
+    market: "de",
+    currency: "EUR",
+  },
+  "miramare-queen": {
+    giataId: "4894",
+    pageUrl:
+      "https://www.schauinsland-reisen.de/hotel/4894-miramare-queen-hotel",
+    market: "de",
+    currency: "EUR",
+  },
+};
+

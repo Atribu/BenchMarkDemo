@@ -2,6 +2,18 @@ import type { ProviderDescriptor } from "@/src/lib/benchmark/types";
 
 export const OTA_PROVIDERS: ProviderDescriptor[] = [
   {
+  key: "anextour",
+  name: "ANEX Tour",
+  shortName: "ANEX",
+  collectionType: "browser",
+  liveSupported: false,
+  readiness: "selector-mapping",
+  notes:
+    "ANEX Tour teklifleri. Yalnizca ANEX operatorune ait, secilen tarih ve 2 yetiskin icin EUR toplam konaklama fiyatlari kabul edilir. Canli collector henuz baglanmadi.",
+  supportedScopes: ["beach-eu", "queen-eu"],
+  searchTemplate: "https://nurhotel.anextour.de/",
+},
+  {
     key: "booking",
     name: "Booking.com",
     shortName: "Booking",
@@ -89,4 +101,23 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     searchTemplate:
       "https://www.tui.com/pauschalreisen/suchen/hotels/?search={hotelName}&from={checkIn}",
   },
+
+
+{
+  key: "schauinsland",
+  name: "Schauinsland Reisen",
+  shortName: "Schauinsland",
+  collectionType: "browser",
+  liveSupported: true,
+  readiness: "selector-mapping",
+  notes:
+    "Schauinsland Reisen GraphQL getOfferList uzerinden " +
+    "yalnizca SLR operatorune ait HOTEL_ONLY teklifleri toplanir. " +
+    "Secilen tarih, 1 oda / 2 yetiskin ve EUR toplam fiyat dogrulanir. " +
+    "Canli collector baglantisi henuz tamamlanmadi.",
+  supportedScopes: ["beach-eu", "queen-eu"],
+  searchTemplate:
+    "https://www.schauinsland-reisen.de/hotel/4893-miramare-beach-hotel",
+},
+
 ];

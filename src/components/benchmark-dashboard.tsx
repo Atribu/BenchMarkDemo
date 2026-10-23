@@ -93,6 +93,22 @@ const CHANNEL_INFO: Record<
   OtaKey,
   { label: string; detail: string; type: "beta" | "setup" }
 > = {
+  schauinsland: {
+  label: "Hotel-only · Beta",
+  detail:
+    "Schauinsland Reisen GraphQL üzerinden yalnızca SLR operatörüne ait " +
+    "uçaksız konaklama tekliflerini okur. EUR toplam fiyat, 2 yetişkin, " +
+    "kesin tarih ve oda kategorisi doğrulanır. " +
+    "Eşleşmeyen oda kategorileri manuel kontrole bırakılır.",
+  type: "beta",
+},
+
+  anextour: {
+  label: "Entegrasyon hazırlanıyor",
+  detail:
+    "ANEX Tour Nur Hotel (uçaksız konaklama). Yalnızca ANEX operatörünün EUR toplam fiyatları kabul edilecek. Canlı fiyat toplama henüz bağlı değil.",
+  type: "setup",
+},
   tui: {
     label: "Hotel-only · Beta",
     detail:

@@ -33,6 +33,8 @@ import { collectInBatches } from "./collection-queue";
 import { collectGoogleHotelPrices } from "./live-google-hotels";
 import { collectHolidayCheckSecondary } from "./holidaycheck-secondary";
 import { collectSerpApiHotelPrices, serpApiEnabled } from "./live-serpapi";
+import { collectAnexTourLiveQuotes } from "@/src/lib/ota/live-anextour";
+import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
 
 interface ProviderProfile {
   baseMarkup: number;
@@ -43,6 +45,20 @@ interface ProviderProfile {
 }
 
 const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
+  schauinsland: {
+  baseMarkup: 0.12,
+  volatility: 0.1,
+  missingModulo: 13,
+  soldOutModulo: 19,
+  canUndercut: false,
+},
+  anextour: {
+  baseMarkup: 0.12,
+  volatility: 0.1,
+  missingModulo: 13,
+  soldOutModulo: 19,
+  canUndercut: false,
+},
   booking: {
     baseMarkup: 0.17,
     volatility: 0.16,
@@ -283,6 +299,10 @@ async function collectLiveProviderQuotes(
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
   switch (provider.key) {
+    case "schauinsland":
+    return collectSchauinslandLiveQuotes(provider, scope);
+    case "anextour":
+    return collectAnexTourLiveQuotes(provider, scope);
     case "booking":
       return collectBookingLiveQuotes(provider, scope);
     case "expedia":

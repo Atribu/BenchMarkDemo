@@ -56,6 +56,7 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = [
     hotelName: "Miramare Beach",
     marketLabel: "Avrupa",
     currency: "EUR",
+    requiredBoard: undefined,
     notes: "Referans fiyatlar Google Sheet'teki 2026 Avrupa bloklarindan seed edildi.",
     windows: FUTURE_WINDOWS,
     rooms: [
@@ -152,6 +153,7 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = [
     hotelName: "Miramare Queen",
     marketLabel: "Avrupa",
     currency: "EUR",
+    requiredBoard: undefined,
     notes: "Queen icin ilk surum Avrupa kanal karmasina odaklaniyor.",
     windows: FUTURE_WINDOWS,
     rooms: [
