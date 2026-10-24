@@ -35,6 +35,7 @@ import { collectHolidayCheckSecondary } from "./holidaycheck-secondary";
 import { collectSerpApiHotelPrices, serpApiEnabled } from "./live-serpapi";
 import { collectAnexTourLiveQuotes } from "@/src/lib/ota/live-anextour";
 import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
+import { collectCheck24LiveQuotes } from "./live-check24-provider";
 
 interface ProviderProfile {
   baseMarkup: number;
@@ -108,6 +109,15 @@ const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
     soldOutModulo: 22,
     canUndercut: false,
   },
+
+check24: {
+  baseMarkup: 0,
+  volatility: 0.03,
+  missingModulo: 7,
+  soldOutModulo: 0,
+  canUndercut: false,
+},
+
 };
 
 function hashValue(input: string): number {
@@ -299,6 +309,8 @@ async function collectLiveProviderQuotes(
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
   switch (provider.key) {
+    case "check24":
+  return collectCheck24LiveQuotes(provider, scope);
     case "schauinsland":
     return collectSchauinslandLiveQuotes(provider, scope);
     case "anextour":

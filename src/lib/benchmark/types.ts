@@ -6,6 +6,7 @@ export type ScopeProviderSelection = Partial<Record<ScopeKey, OtaKey[]>>;
 export type OtaKey =
   | "anextour"
   | "booking"
+  | "check24"
   | "expedia"
   | "hotelbeds"
   | "holidaycheck"

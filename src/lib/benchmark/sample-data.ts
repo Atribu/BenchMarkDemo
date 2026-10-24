@@ -44,8 +44,8 @@ const FUTURE_WINDOWS: BenchmarkWindowDefinition[] = [
 ];
 
 export const DEFAULT_CUSTOM_WINDOW = {
-  checkIn: FUTURE_WINDOWS[0].checkIn,
-  checkOut: FUTURE_WINDOWS[0].checkOut
+  checkIn: "2026-10-31",
+  checkOut: "2026-11-05",
 };
 
 export const REPORT_SCOPES: ReportScopeDefinition[] = [

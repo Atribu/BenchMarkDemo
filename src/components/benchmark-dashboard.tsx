@@ -151,6 +151,14 @@ const CHANNEL_INFO: Record<
       "Birleşik Krallık pazarı. Hotel Only formunda 2–28 gece ve 1 oda / 2 yetişkin toplamını GBP olarak okur. CAPTCHA doğrulaması otomatik sorguyu engelleyebilir; uçaklı veya kişi başı fiyat kullanılmaz.",
     type: "beta",
   },
+check24: {
+  label: "Kurulum aşamasında",
+  detail:
+    "CHECK24 Almanya otel fiyatları için canlı veri toplama " +
+    "ve oda eşleştirme entegrasyonu hazırlanıyor.",
+  type: "setup",
+},
+
 };
 
 const PORTFOLIOS: { value: string; label: string; scopes: ScopeKey[] }[] = [

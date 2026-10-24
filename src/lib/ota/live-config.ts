@@ -475,3 +475,23 @@ export const SCHAUINSLAND_HOTEL_CONFIG: Partial<
   },
 };
 
+
+
+export const CHECK24_HOTEL_CONFIG = {
+  "miramare-beach": {
+    hotelId: "7776197",
+    hotelName: "Miramare Beach Hotel - Ultra All Inclusive",
+    pageUrl: "https://hotel.check24.de/hotel/turkey/7776197",
+    market: "de",
+    currency: "EUR",
+  },
+  "miramare-queen": {
+    hotelId: "8571549",
+    hotelName: "Miramare Queen Hotel - Ultra All Inclusive",
+    pageUrl: "https://hotel.check24.de/hotel/turkey/8571549",
+    market: "de",
+    currency: "EUR",
+  },
+} as const;
+
+

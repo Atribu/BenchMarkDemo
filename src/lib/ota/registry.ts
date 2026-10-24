@@ -26,6 +26,27 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     searchTemplate:
       "https://www.booking.com/searchresults.html?ss={hotelName}&checkin={checkIn}&checkout={checkOut}",
   },
+
+{
+  key: "check24",
+  name: "CHECK24 Hotels",
+  shortName: "CHECK24",
+  collectionType: "browser",
+  liveSupported: true,
+  readiness: "selector-mapping",
+  notes:
+    "CHECK24 Almanya canlı otel fiyatları. " +
+    "Miramare Beach için eski ve yeni API desteklenir. " +
+    "Seçilen tarih, 1 oda / 2 yetişkin, EUR ve " +
+    "All Inclusive fiyat adayları toplanır. " +
+    "Oda eşdeğerliği ile iptal/vergi koşulları " +
+    "henüz kesinleştirilmediği için teklifler " +
+    "otomatik parite hesabına dahil edilmez. " +
+    "Miramare Queen henüz desteklenmiyor.",
+  supportedScopes: ["beach-eu"],
+  searchTemplate: "https://hotels.check24.de/",
+},
+
   {
     key: "expedia",
     name: "Expedia",
@@ -114,7 +135,9 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     "Schauinsland Reisen GraphQL getOfferList uzerinden " +
     "yalnizca SLR operatorune ait HOTEL_ONLY teklifleri toplanir. " +
     "Secilen tarih, 1 oda / 2 yetiskin ve EUR toplam fiyat dogrulanir. " +
-    "Canli collector baglantisi henuz tamamlanmadi.",
+    "Canli collector baglantisi henuz tamamlanmadi." + "Canli GraphQL collector, oda eslestirme, " +
+"pansiyon filtreleme ve pagination destegi aktif. " +
+"Iptal ve vergi kosullari ayrica dogrulanmali.",
   supportedScopes: ["beach-eu", "queen-eu"],
   searchTemplate:
     "https://www.schauinsland-reisen.de/hotel/4893-miramare-beach-hotel",
