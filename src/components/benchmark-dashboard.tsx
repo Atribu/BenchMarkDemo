@@ -133,12 +133,6 @@ const CHANNEL_INFO: Record<
       "Doğrudan oda sorgusu doğrulama ekranına takılabilir. HolidayCheck'teki Expedia etiketli teklifler varsa ayrı ek kaynak bölümünde gösterilir; doğrudan Expedia fiyatı sayılmaz.",
     type: "setup",
   },
-  hotelbeds: {
-    label: "API erişimi gerekli",
-    detail:
-      "API anahtarı, secret, mTLS sertifikaları ve otel kodları gerekir. Net maliyet değil, doğrulanmış satış fiyatı kullanılır.",
-    type: "setup",
-  },
   loveholidays: {
     label: "Erişim & eşleştirme",
     detail:

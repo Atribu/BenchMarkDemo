@@ -31,6 +31,131 @@ function child(
   return asRecord(record?.[key]);
 }
 
+
+let check24OldInspected = false;
+let check24NewInspected = false;
+
+function inspectObjectKeys(
+  label: string,
+  value: unknown,
+): void {
+  const record = asRecord(value);
+
+  if (!record) {
+    console.log(`[CHECK24 DEBUG] ${label}: not an object`);
+    return;
+  }
+
+  console.log(
+    `[CHECK24 DEBUG] ${label}:`,
+    Object.keys(record).sort(),
+  );
+}
+
+function inspectCheck24OldShape(
+  response: unknown,
+): void {
+  if (
+    process.env.CHECK24_DEBUG_SHAPE !== "1" ||
+    check24OldInspected
+  ) {
+    return;
+  }
+
+  const root = asRecord(response);
+  const rooms = root?.roomRates;
+
+  if (!Array.isArray(rooms) || rooms.length === 0) {
+    return;
+  }
+
+  check24OldInspected = true;
+
+  const room = asRecord(rooms[0]);
+  const recommendation = child(room, "recommendation");
+
+  const firstRateWrapper = Array.isArray(room?.rates)
+    ? asRecord(room.rates[0])
+    : null;
+
+  const rate = child(firstRateWrapper, "rate");
+
+  inspectObjectKeys("OLD room", room);
+  inspectObjectKeys(
+    "OLD room.roomInformation",
+    child(room, "roomInformation"),
+  );
+  inspectObjectKeys(
+    "OLD recommendation",
+    recommendation,
+  );
+  inspectObjectKeys(
+    "OLD recommendation.roomInformation",
+    child(recommendation, "roomInformation"),
+  );
+  inspectObjectKeys(
+    "OLD recommendation.priceStructure",
+    child(recommendation, "priceStructure"),
+  );
+  inspectObjectKeys("OLD rate", rate);
+  inspectObjectKeys(
+    "OLD rate.roomInformation",
+    child(rate, "roomInformation"),
+  );
+}
+
+function inspectCheck24NewShape(
+  response: unknown,
+): void {
+  if (
+    process.env.CHECK24_DEBUG_SHAPE !== "1" ||
+    check24NewInspected
+  ) {
+    return;
+  }
+
+  const root = asRecord(response);
+  const offersData = child(root, "offers");
+
+  if (offersData?.status !== 2) {
+    return;
+  }
+
+  const categories = offersData.roomCategoriesFitting;
+
+  if (
+    !Array.isArray(categories) ||
+    categories.length === 0
+  ) {
+    return;
+  }
+
+  const category = asRecord(categories[0]);
+
+  const groups = category?.characteristicsGroupsFitting;
+
+  const group = Array.isArray(groups)
+    ? asRecord(groups[0])
+    : null;
+
+  const offer = Array.isArray(group?.offers)
+    ? asRecord(group.offers[0])
+    : null;
+
+  if (!offer) return;
+
+  check24NewInspected = true;
+
+  inspectObjectKeys("NEW category", category);
+  inspectObjectKeys("NEW group", group);
+  inspectObjectKeys("NEW offer", offer);
+  inspectObjectKeys(
+    "NEW offer.priceComposition",
+    child(offer, "priceComposition"),
+  );
+}
+
+
 export function parseCheck24OldRecommendations(
   response: unknown,
   expectedNights: number,

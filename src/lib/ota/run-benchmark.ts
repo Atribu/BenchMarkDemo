@@ -21,7 +21,6 @@ import type {
 import { collectBookingLiveQuotes } from "@/src/lib/ota/live-booking";
 import { collectExpediaLiveQuotes } from "@/src/lib/ota/live-expedia";
 import { collectHolidayCheckLiveQuotes } from "@/src/lib/ota/live-holidaycheck";
-import { collectHotelbedsLiveQuotes } from "@/src/lib/ota/live-hotelbeds";
 import { buildManualReviewQuotes } from "@/src/lib/ota/live-helpers";
 import { collectTuiLiveQuotes } from "@/src/lib/ota/live-tui";
 import {
@@ -72,13 +71,6 @@ const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
     volatility: 0.14,
     missingModulo: 15,
     soldOutModulo: 19,
-    canUndercut: true,
-  },
-  hotelbeds: {
-    baseMarkup: 0.08,
-    volatility: 0.1,
-    missingModulo: 11,
-    soldOutModulo: 23,
     canUndercut: true,
   },
   holidaycheck: {
@@ -319,8 +311,6 @@ async function collectLiveProviderQuotes(
       return collectBookingLiveQuotes(provider, scope);
     case "expedia":
       return collectExpediaLiveQuotes(provider, scope);
-    case "hotelbeds":
-      return collectHotelbedsLiveQuotes(provider, scope);
     case "holidaycheck":
       return collectHolidayCheckLiveQuotes(provider, scope);
     case "loveholidays":
@@ -453,9 +443,7 @@ export async function runBenchmarkJob(
     selectedProviders.filter(
       (provider) =>
         plan.providersByScope[scope.id]?.includes(provider.key) &&
-        (managedSource
-          ? provider.key !== "hotelbeds"
-          : ["booking", "expedia"].includes(provider.key)) &&
+        (managedSource || ["booking", "expedia"].includes(provider.key)) &&
         quotes.some(
           (quote) =>
             quote.scopeKey === scope.id &&

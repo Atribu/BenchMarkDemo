@@ -27,7 +27,7 @@ const scope = {
   windows: [window],
 };
 const providers = OTA_PROVIDERS.filter((item) =>
-  ["booking", "expedia", "hotelbeds"].includes(item.key),
+  ["booking", "expedia"].includes(item.key),
 );
 const now = Date.parse("2026-10-02T12:00:00Z");
 
@@ -114,7 +114,7 @@ test("wrong hotel, dates, party, market, currency and stale data fail closed", (
 test("unknown sellers, nightly prices, bad amounts and untrusted URLs are never rates", () => {
   for (const patch of [
     { source: "Booking.com special" },
-    { source: "Hotelbeds" },
+    { source: "Unknown Travel" },
     { num_guests: 1 },
     { num_rooms: 2 },
     {

@@ -17,7 +17,6 @@ const SOURCE_HOSTS: Record<string, string[]> = {
   loveholidays: ["loveholidays.com"],
   tui: ["tui.com"],
   holidaycheck: ["holidaycheck.de"],
-  hotelbeds: ["hotelbeds.com"],
 };
 
 function key(

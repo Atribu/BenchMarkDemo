@@ -8,11 +8,7 @@ test("unavailable rates distinguish configuration, access, mapping and query fai
       "Booking otel sayfasini Turkiye ana sayfasina yonlendirdi; bu bir doluluk sonucu degil.",
       "Bölgesel erişim engeli",
     ],
-    [
-      "Hotelbeds API anahtarı, secret veya mTLS sertifikası eksik.",
-      "API ayarı eksik",
-    ],
-    ["Hotelbeds otel kodu tanımlı değil.", "Otel eşleştirmesi eksik"],
+    ["Servis API anahtarı eksik.", "API ayarı eksik"],
     ["Queen için otel/pazar eşleştirmesi eksik.", "Otel eşleştirmesi eksik"],
     ["Expedia erişim doğrulaması istedi.", "Site doğrulaması gerekli"],
     [

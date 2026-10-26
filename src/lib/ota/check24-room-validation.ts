@@ -15,6 +15,11 @@ import {
   extractCheck24RoomFeatures,
 } from "./check24-room-features";
 
+import {
+  CHECK24_BEACH_OFFICIAL_ROOMS,
+  type Check24BeachRoomId,
+} from "./check24-official-rooms";
+
 export type Check24RoomValidationStatus =
   | "candidate"
   | "manual-review"
@@ -27,25 +32,70 @@ export interface Check24RoomValidationResult {
   reasons: string[];
 }
 
-const EXPECTED_FEATURES: Record<
-  string,
-  Partial<RoomFeatures>
-> = {
-  economy: {
-    category: "standard",
-  },
-  "superior-land": {
-    category: "superior",
-    view: "land",
-  },
-  "superior-sea": {
-    category: "superior",
-    view: "sea",
-  },
-  corner: {
-    category: "variant",
-  },
-};
+
+function validateOfficialRoomFeatures(
+  roomId: string,
+  features: RoomFeatures,
+): {
+  rejected: boolean;
+  reasons: string[];
+} {
+  const reference =
+    CHECK24_BEACH_OFFICIAL_ROOMS[
+      roomId as Check24BeachRoomId
+    ];
+
+  if (!reference) {
+    return {
+      rejected: true,
+      reasons: ["Resmî oda referansı bulunamadı."],
+    };
+  }
+
+  const reasons: string[] = [];
+
+  const keys: Array<keyof RoomFeatures> = [
+    "category",
+    "view",
+    "balcony",
+  ];
+
+  for (const key of keys) {
+    const expected = reference.features[key];
+    if (!expected) continue;
+
+    const actual = features[key];
+
+    if (actual === "unknown") {
+      reasons.push(
+        `${key}: CHECK24 kaynağında belirtilmemiş.`,
+      );
+      continue;
+    }
+
+    if (actual !== expected) {
+      return {
+        rejected: true,
+        reasons: [
+          `${key} uyuşmazlığı: ` +
+          `resmî=${expected}, CHECK24=${actual}`,
+        ],
+      };
+    }
+  }
+
+  if (reference.reviewRequired) {
+    reasons.push(
+      "Resmî oda eşdeğerliği manuel inceleme gerektiriyor.",
+    );
+  }
+
+  return {
+    rejected: false,
+    reasons,
+  };
+}
+
 
 export function validateCheck24BeachOffer(
   offer: Check24ParsedOffer,
@@ -102,40 +152,23 @@ export function validateCheck24BeachOffer(
     return reject("Oda adı benchmark kategorileriyle eşleşmedi.");
   }
 
-  const expected = EXPECTED_FEATURES[roomId];
+  const officialValidation =
+  validateOfficialRoomFeatures(roomId, features);
 
-  if (!expected) {
-    return reject("Bu oda için doğrulama kuralı bulunmuyor.");
-  }
+if (officialValidation.rejected) {
+  return {
+    status: "rejected",
+    roomId,
+    features,
+    reasons: [
+      ...reasons,
+      ...officialValidation.reasons,
+    ],
+  };
+}
 
-  // 3. Kaynak özellikleriyle çelişki kontrolü
-  const featureKeys: Array<keyof RoomFeatures> = [
-    "category",
-    "view",
-    "balcony",
-  ];
-
-  for (const key of featureKeys) {
-    const expectedValue = expected[key];
-
-    if (!expectedValue) continue;
-
-    const actual = features[key];
-
-    if (
-      actual !== "unknown" &&
-      actual !== expectedValue
-    ) {
-      return reject(
-        `${key} uyuşmuyor: beklenen=${expectedValue}, gelen=${actual}`,
-      );
-    }
-
-    if (actual === "unknown") {
-      reasons.push(`${key} bilgisi kaynakta belirsiz.`);
-    }
-  }
-
+reasons.push(...officialValidation.reasons);
+  
   // 4. Oda bazlı ilave kontroller
   if (roomId === "economy") {
     reasons.push(

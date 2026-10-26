@@ -1,12 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { gzipSync } from "node:zlib";
 import {
   parsePriceFromText,
   resolveProviderLiveConfig,
 } from "../src/lib/ota/live-helpers";
 import { hasCompatibleView } from "../src/lib/ota/room-matching";
-import { __hotelbedsInternal as hotelbeds } from "../src/lib/ota/live-hotelbeds";
 import { collectTuiLiveQuotes } from "../src/lib/ota/live-tui";
 import { __ukOtaInternal as ukOta } from "../src/lib/ota/live-uk-ota";
 import {
@@ -58,50 +56,6 @@ test("view matching rejects generic and opposite views, accepts German aliases",
     true,
   );
   assert.equal(hasCompatibleView("superior-land", "Land or Sea View"), false);
-});
-
-test("Hotelbeds handles gzip and uncompressed JSON", () => {
-  const data = { hotels: { hotels: [], total: 0 } };
-  const buffer = Buffer.from(JSON.stringify(data));
-  assert.deepEqual(
-    hotelbeds.decodeHotelbedsResponse(gzipSync(buffer), "gzip"),
-    data,
-  );
-  assert.deepEqual(hotelbeds.decodeHotelbedsResponse(buffer), data);
-  assert.throws(() =>
-    hotelbeds.decodeHotelbedsResponse(Buffer.from("not json")),
-  );
-});
-
-test("Hotelbeds excludes net rates, recheck rates and opposite-view rooms", () => {
-  assert.equal(hotelbeds.parseRatePrice({ net: "900" }), null);
-  assert.equal(
-    hotelbeds.parseRatePrice({ net: "900", sellingRate: "1100" }),
-    1100,
-  );
-  assert.equal(hotelbeds.parseRatePrice({ sellingRate: "-5" }), null);
-  const rooms = [
-    {
-      name: "Standard Room Sea View",
-      rates: [{ sellingRate: "800", rateType: "BOOKABLE" }],
-    },
-    {
-      name: "Standard Land View",
-      rates: [
-        { net: "700", rateType: "BOOKABLE" },
-        { sellingRate: "850", rateType: "RECHECK" },
-        { sellingRate: "1000", rateType: "BOOKABLE" },
-      ],
-    },
-  ];
-  assert.equal(
-    hotelbeds.findRoomCandidate(
-      rooms,
-      ["Standard Room", "Standard Land View"],
-      "standard-land",
-    )?.rate.sellingRate,
-    "1000",
-  );
 });
 
 function tuiOffer(name: string, amount: number, giataCode = "4893") {

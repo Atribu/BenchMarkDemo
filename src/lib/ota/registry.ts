@@ -61,17 +61,6 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
       "https://www.expedia.com/Hotel-Search?destination={hotelName}&startDate={checkIn}&endDate={checkOut}",
   },
   {
-    key: "hotelbeds",
-    name: "Hotelbeds",
-    shortName: "Hotelbeds",
-    collectionType: "api",
-    liveSupported: true,
-    readiness: "api-contract",
-    notes:
-      "Live beta aktif. Availability istegi icin resmi Hotelbeds API kullaniliyor; Api-key, X-Signature, mTLS sertifikasi ve hotel code env degerleri gerekli.",
-    supportedScopes: ["beach-eu", "queen-eu"],
-  },
-  {
     key: "holidaycheck",
     name: "HolidayCheck",
     shortName: "HolidayCheck",

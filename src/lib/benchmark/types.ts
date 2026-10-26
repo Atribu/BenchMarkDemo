@@ -8,7 +8,6 @@ export type OtaKey =
   | "booking"
   | "check24"
   | "expedia"
-  | "hotelbeds"
   | "holidaycheck"
   | "loveholidays"
   | "onthebeach"
