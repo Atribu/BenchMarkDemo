@@ -431,3 +431,29 @@ export const CHECK24_HOTEL_CONFIG = {
 } as const;
 
 
+interface CoralTravelHotelConfig {
+  pageUrl: string;
+  hotelName: string;
+  market: "de";
+  currency: "EUR";
+}
+
+export const CORALTRAVEL_HOTEL_CONFIG: Partial<
+  Record<HotelKey, CoralTravelHotelConfig>
+> = {
+  "miramare-beach": {
+    pageUrl:
+      "https://coraltravel.de/hotels/miramare-beach-hotel/",
+    hotelName: "Miramare Beach Hotel",
+    market: "de",
+    currency: "EUR",
+  },
+
+  "miramare-queen": {
+    pageUrl:
+      "https://coraltravel.de/hotels/miramare-queen-hotel/",
+    hotelName: "Miramare Queen Hotel",
+    market: "de",
+    currency: "EUR",
+  },
+};

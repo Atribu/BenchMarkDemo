@@ -132,4 +132,19 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     "https://www.schauinsland-reisen.de/hotel/4893-miramare-beach-hotel",
 },
 
+{
+  key: "coraltravel",
+  name: "Coral Travel",
+  shortName: "Coral",
+  collectionType: "browser",
+  liveSupported: true,
+  readiness: "selector-mapping",
+  notes:
+    "CoralTravel Almanya Nur Hotel. " +
+    "Miramare Beach için gerçek fiyat API'si test edildi. " +
+    "Miramare Queen henüz doğrulanmadı.",
+  supportedScopes: ["beach-eu"],
+  searchTemplate: "https://coraltravel.de/",
+},
+
 ];

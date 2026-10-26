@@ -21,7 +21,7 @@ import {
 } from "./check24-official-rooms";
 
 export type Check24RoomValidationStatus =
-  | "candidate"
+  | "matched"
   | "manual-review"
   | "rejected";
 
@@ -103,7 +103,7 @@ export function validateCheck24BeachOffer(
 ): Check24RoomValidationResult {
   const features = extractCheck24RoomFeatures(
     offer.roomName,
-    offer.roomCategoryName,
+    offer.sourceRoomDescription ?? offer.roomName,
   );
 
   const reasons: string[] = [];
@@ -117,6 +117,23 @@ export function validateCheck24BeachOffer(
     features,
     reasons: [...reasons, reason],
   });
+
+  const offerRoomText = [offer.roomName, offer.sourceRoomDescription]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLocaleLowerCase("de-DE");
+
+  const hasPartialSeaView =
+    /side[\s-]*sea|partial[\s-]*sea|seitlich(?:er|es|e|en)?\s*meerblick|teilblick/.test(
+      offerRoomText,
+    );
+
+  if (roomId === "superior-sea" && hasPartialSeaView) {
+    return reject(
+      "Kısmi/yan deniz manzaralı teklif, tam deniz " +
+        "manzaralı Superior oda ile eşleştirilemez.",
+    );
+  }
 
   // 1. Rezervasyon koşulları
   if (offer.roomOccupancy !== "[A|A]") {
@@ -152,22 +169,18 @@ export function validateCheck24BeachOffer(
     return reject("Oda adı benchmark kategorileriyle eşleşmedi.");
   }
 
-  const officialValidation =
-  validateOfficialRoomFeatures(roomId, features);
+  const officialValidation = validateOfficialRoomFeatures(roomId, features);
 
-if (officialValidation.rejected) {
-  return {
-    status: "rejected",
-    roomId,
-    features,
-    reasons: [
-      ...reasons,
-      ...officialValidation.reasons,
-    ],
-  };
-}
+  if (officialValidation.rejected) {
+    return {
+      status: "rejected",
+      roomId,
+      features,
+      reasons: [...reasons, ...officialValidation.reasons],
+    };
+  }
 
-reasons.push(...officialValidation.reasons);
+  reasons.push(...officialValidation.reasons);
   
   // 4. Oda bazlı ilave kontroller
   if (roomId === "economy") {
@@ -212,15 +225,20 @@ reasons.push(...officialValidation.reasons);
     };
   }
 
-  // 5. Teknik kontroller tamamlandı.
-  // Henüz resmî oda eşdeğerliği onaylanmadı.
+  const missingFeatures = reasons.some((reason) =>
+    reason.includes("CHECK24 kaynağında belirtilmemiş"),
+  );
+
   return {
-    status: "candidate",
+    status: "matched",
     roomId,
     features,
     reasons: [
       ...reasons,
-      "Teknik kontroller başarılı; resmî oda eşdeğerliği bekleniyor.",
+      missingFeatures
+        ? "Oda adı ve manzara eşleşti; kaynakta yer almayan ek özellikler ayrıca gösterilir."
+        : "Oda özellikleri teknik olarak uyumlu.",
+      "Tarife koşulları oda eşleşmesinden bağımsız olarak gösterilir.",
     ],
   };
 }

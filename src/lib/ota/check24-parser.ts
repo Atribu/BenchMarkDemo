@@ -1,4 +1,13 @@
 
+export interface Check24CancellationRule {
+  feePercentage: number | null;
+  feeAmount: number | null;
+  fromHotel: string | null;
+  untilHotel: string | null;
+  isActive: boolean | null;
+}
+
+
 export interface Check24ParsedOffer {
   offerId: string;
   roomName: string;
@@ -12,6 +21,19 @@ export interface Check24ParsedOffer {
   taxesIncluded: boolean;
   source: "recommendation" | "rate" | "group";
 supplierId?: string;
+cancellationRules?: Check24CancellationRule[];
+  cancellationNote?: string | null;
+  paymentMoment?: string | null;
+  localFeesHint?: string | null;
+  taxesIncludedStatus?: boolean | null;
+  sourceRoomId?: string;
+sourceRoomRateId?: string;
+groupRoomId?: string;
+groupRoomRateId?: string;
+sourceRoomDescription?: string;
+groupRoomDescription?: string;
+sourceRoomDetails?: string;
+sourceRoomSize?: number;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -30,6 +52,73 @@ function child(
 ): UnknownRecord | null {
   return asRecord(record?.[key]);
 }
+
+
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim()
+    ? value.trim()
+    : null;
+}
+
+function nullableNumber(value: unknown): number | null {
+  return typeof value === "number" &&
+    Number.isFinite(value)
+    ? value
+    : null;
+}
+
+function nullableId(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function parseCheck24CancellationRules(
+  value: unknown,
+): Check24CancellationRule[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((rawRule) => {
+    const rule = asRecord(rawRule);
+    if (!rule) return [];
+
+    return [{
+      feePercentage: nullableNumber(
+        rule.cancelationFeePercentage,
+      ),
+      feeAmount: nullableNumber(
+        rule.cancelationFee,
+      ),
+      fromHotel: nullableString(
+        rule.cancelableFromHotel,
+      ),
+      untilHotel: nullableString(
+        rule.cancelableUntilHotel,
+      ),
+      isActive:
+        typeof rule.isActive === "boolean"
+          ? rule.isActive
+          : null,
+    }];
+  });
+}
+
+function parseTaxesIncludedStatus(
+  priceStructure: UnknownRecord | null,
+): boolean | null {
+  const value = priceStructure?.inclusiveTaxesAndFees;
+
+  return typeof value === "boolean"
+    ? value
+    : null;
+}
+
 
 
 let check24OldInspected = false;
@@ -103,6 +192,131 @@ function inspectCheck24OldShape(
     child(rate, "roomInformation"),
   );
 }
+
+
+const inspectedRoomTypes = new Set<string>();
+
+function inspectCheck24OldOfferDetails(
+  roomName: string,
+  room: UnknownRecord,
+  offer: UnknownRecord,
+): void {
+  if (process.env.CHECK24_DEBUG_SHAPE !== "1") {
+    return;
+  }
+
+  const name = roomName.toLocaleLowerCase("de-DE");
+
+  let roomType: string;
+
+  if (/corner|eckzimmer/.test(name)) {
+    roomType = "corner";
+  } else if (/economy|sparzimmer/.test(name)) {
+    roomType = "economy";
+  } else if (/superior.*(meerblick|sea view)/.test(name)) {
+    roomType = "superior-sea";
+  } else if (/superior.*(landblick|land view)/.test(name)) {
+    roomType = "superior-land";
+  } else {
+    return;
+  }
+
+  if (inspectedRoomTypes.has(roomType)) {
+    return;
+  }
+
+  inspectedRoomTypes.add(roomType);
+
+  const roomInfo = child(room, "roomInformation");
+  const offerRoomInfo = child(offer, "roomInformation");
+  const priceStructure = child(offer, "priceStructure");
+
+  // Tanılama çıktısının çok büyümesini engelle.
+  function preview(value: unknown): string {
+    if (value === undefined) return "(missing)";
+
+    try {
+      const serialized = JSON.stringify(value);
+      return serialized
+        ? serialized.slice(0, 2000)
+        : String(value);
+    } catch {
+      return "(not serializable)";
+    }
+  }
+
+  console.log(`\n[CHECK24 DETAILS] ${roomType}`);
+
+  console.log("roomName:", roomName);
+
+  console.log(
+    "room.description:",
+    preview(roomInfo?.description),
+  );
+
+  console.log(
+    "room.facilities:",
+    preview(roomInfo?.facilities),
+  );
+
+  console.log(
+    "room.size:",
+    preview(roomInfo?.size),
+  );
+
+  console.log(
+    "room.providerRoomDescription:",
+    preview(roomInfo?.providerRoomDescription),
+  );
+
+  console.log(
+    "offer.roomInformation:",
+    preview(offerRoomInfo),
+  );
+
+  console.log(
+    "offer.cancelationRules:",
+    preview(offer.cancelationRules),
+  );
+
+  console.log(
+    "offer.cancelationNote:",
+    preview(offer.cancelationNote),
+  );
+
+  console.log(
+    "offer.cancelationMinFee:",
+    preview(offer.cancelationMinFee),
+  );
+
+  console.log(
+    "price.inclusiveTaxesAndFees:",
+    preview(priceStructure?.inclusiveTaxesAndFees),
+  );
+
+  console.log(
+    "price.inclusiveTaxesAndFeesLabel:",
+    preview(priceStructure?.inclusiveTaxesAndFeesLabel),
+  );
+
+  console.log(
+    "price.localFeesHint:",
+    preview(priceStructure?.localFeesHint),
+  );
+
+  console.log(
+    "offer.paymentMoment:",
+    preview(offer.paymentMoment),
+  );
+
+  console.log(
+    "offer.onRequest:",
+    preview(offer.onRequest),
+  );
+
+  console.log("[CHECK24 DETAILS] END\n");
+}
+
 
 function inspectCheck24NewShape(
   response: unknown,
@@ -269,6 +483,9 @@ export function parseCheck24OldAllOffers(
   response: unknown,
   expectedNights: number,
 ): Check24ParsedOffer[] {
+  
+   inspectCheck24OldShape(response);
+
   const root = asRecord(response);
   const status = child(root, "status");
 
@@ -367,12 +584,10 @@ export function parseCheck24OldAllOffers(
         continue;
       }
 
-      const roomNameCandidates = [
-        offer.providerRoomDescription,
-        roomInformation?.providerRoomName,
-        groupRoomInformation?.providerRoomName,
-        room.roomCategoryTitle,
-      ];
+     const roomNameCandidates = [
+  offer.providerRoomDescription,
+  roomInformation?.providerRoomName,
+];
 
       const roomName = roomNameCandidates.find(
         (value): value is string =>
@@ -380,9 +595,15 @@ export function parseCheck24OldAllOffers(
           value.trim().length > 0,
       );
 
-      if (!roomName) continue;
+     if (!roomName) continue;
 
-      seenIds.add(offerId);
+inspectCheck24OldOfferDetails(
+  roomName,
+  room,
+  offer,
+);
+
+seenIds.add(offerId);
 
       offers.push({
         offerId,
@@ -409,6 +630,51 @@ export function parseCheck24OldAllOffers(
         nights: expectedNights,
         taxesIncluded:
           priceStructure?.inclusiveTaxesAndFees === true,
+
+          cancellationRules: parseCheck24CancellationRules(
+  offer.cancelationRules,
+),
+
+cancellationNote: nullableString(
+  offer.cancelationNote,
+),
+
+paymentMoment: nullableString(
+  offer.paymentMoment,
+),
+
+localFeesHint: nullableString(
+  priceStructure?.localFeesHint,
+),
+
+taxesIncludedStatus:
+  parseTaxesIncludedStatus(priceStructure),
+
+  sourceRoomId: nullableId(offer.roomId),
+
+sourceRoomRateId: nullableId(offer.roomRateId),
+
+groupRoomId: nullableId(room.roomId),
+
+groupRoomRateId: nullableId(room.roomRateId),
+
+sourceRoomDescription:
+  nullableString(offer.providerRoomDescription) ??
+  undefined,
+
+groupRoomDescription:
+  nullableString(
+    groupRoomInformation?.providerRoomDescription,
+  ) ?? undefined,
+
+  sourceRoomDetails:
+  nullableString(roomInformation?.description) ??
+  undefined,
+
+sourceRoomSize:
+  nullableNumber(roomInformation?.size) ??
+  undefined,
+
         source: candidate.source,
       });
     }
@@ -534,6 +800,9 @@ export function parseCheck24NewRecommendations(
 export function parseCheck24NewAllOffers(
   response: unknown,
 ): Check24ParsedOffer[] {
+
+  inspectCheck24NewShape(response);
+
   const root = asRecord(response);
   const offersData = child(root, "offers");
 

@@ -1,4 +1,3 @@
-
 import type {
   CollectedOffer,
   ProviderCollectionResult,
@@ -7,17 +6,17 @@ import type {
   ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
 
+import { buildCheck24OfferTerms } from "./check24-offer-terms";
+
+import { validateCheck24RoomIdentity } from "./check24-room-identity";
+
 import { createPatchrightBrowserPage } from "./patchright-browser";
 import { buildManualReviewQuotes } from "./live-helpers";
 import { collectCheck24Beach } from "./live-check24";
 
-import {
-  extractCheck24RoomFeatures,
-} from "./check24-room-features";
+import { extractCheck24RoomFeatures } from "./check24-room-features";
 
-import {
-  validateCheck24BeachOffer,
-} from "./check24-room-validation";
+import { validateCheck24BeachOffer } from "./check24-room-validation";
 
 export async function collectCheck24LiveQuotes(
   provider: ProviderDescriptor,
@@ -28,10 +27,7 @@ export async function collectCheck24LiveQuotes(
   const warnings: string[] = [];
 
   // Şimdilik yalnızca doğruladığımız Miramare Beach.
-  if (
-    scope.id !== "beach-eu" ||
-    scope.currency !== "EUR"
-  ) {
+  if (scope.id !== "beach-eu" || scope.currency !== "EUR") {
     return buildManualReviewQuotes(
       provider,
       scope,
@@ -51,25 +47,15 @@ export async function collectCheck24LiveQuotes(
         "019ab52846f67e3fa61a67dc9422e9de",
     );
 
-    sourceUrl.searchParams.set(
-      "checkinDate",
-      window.checkIn,
-    );
-    sourceUrl.searchParams.set(
-      "checkoutDate",
-      window.checkOut,
-    );
-    sourceUrl.searchParams.set(
-      "occupancy",
-      "[A|A]",
-    );
+    sourceUrl.searchParams.set("checkinDate", window.checkIn);
+    sourceUrl.searchParams.set("checkoutDate", window.checkOut);
+    sourceUrl.searchParams.set("occupancy", "[A|A]");
 
     let sourceHint = sourceUrl.toString();
 
     try {
       handle = await createPatchrightBrowserPage({
-        profilePath:
-          `./.benchmark-state/check24-${scope.id}`,
+        profilePath: `./.benchmark-state/check24-${scope.id}`,
         headless: false,
         market: "de",
       });
@@ -81,9 +67,7 @@ export async function collectCheck24LiveQuotes(
       );
 
       if (result.nights !== window.nights) {
-        throw new Error(
-          "CHECK24 konaklama süresi uyuşmuyor.",
-        );
+        throw new Error("CHECK24 konaklama süresi uyuşmuyor.");
       }
 
       sourceHint = result.url;
@@ -97,183 +81,184 @@ export async function collectCheck24LiveQuotes(
         checkOut: window.checkOut,
         nights: result.nights,
         totalOffers: result.totalOffers,
-        roomCandidates:
-          Object.keys(result.bestOffers).length,
+        roomCandidates: Object.keys(result.bestOffers).length,
       });
 
-      // Oda eşleştirmeleri şu anda aday seviyesinde.
-      // Doğrulanmadan matchedRoomId vermiyoruz.
+      const bestValidatedOffers = new Map<
+        string,
+        {
+          offer: (typeof result.offers)[number];
+          validation: ReturnType<typeof validateCheck24BeachOffer>;
+        }
+      >();
 
-const bestValidatedOffers = new Map<
-  string,
-  {
-    offer: (typeof result.offers)[number];
-    validation: ReturnType<
-      typeof validateCheck24BeachOffer
-    >;
-  }
->();
+      for (const offer of result.offers) {
+        const validation = validateCheck24BeachOffer(offer, window.nights);
 
-for (const offer of result.offers) {
-  const validation = validateCheck24BeachOffer(
-    offer,
-    window.nights,
-  );
+        if (validation.status === "rejected" || !validation.roomId) {
+          continue;
+        }
 
-  if (
-    validation.status === "rejected" ||
-    !validation.roomId
-  ) {
-    continue;
-  }
+        const roomId = validation.roomId;
 
-  const roomId = validation.roomId;
+        const previous = bestValidatedOffers.get(roomId);
 
-  const previous = bestValidatedOffers.get(roomId);
+        // Teknik eşleşmesi daha güçlü olan adayları
+        // manuel inceleme gerektirenlerden önce seç.
+        const priority = {
+          matched: 0,
+          "manual-review": 1,
+          rejected: 2,
+        } as const;
 
-  // Teknik eşleşmesi daha güçlü olan adayları
-  // manuel inceleme gerektirenlerden önce seç.
-  const priority = {
-    candidate: 0,
-    "manual-review": 1,
-    rejected: 2,
-  } as const;
+        if (
+          !previous ||
+          priority[validation.status] < priority[previous.validation.status] ||
+          (priority[validation.status] ===
+            priority[previous.validation.status] &&
+            offer.totalPrice < previous.offer.totalPrice)
+        ) {
+          bestValidatedOffers.set(roomId, {
+            offer,
+            validation,
+          });
+        }
+      }
 
-  if (
-    !previous ||
-    priority[validation.status] <
-      priority[previous.validation.status] ||
-    (
-      priority[validation.status] ===
-        priority[previous.validation.status] &&
-      offer.totalPrice <
-        previous.offer.totalPrice
-    )
-  ) {
-    bestValidatedOffers.set(roomId, {
-      offer,
-      validation,
-    });
-  }
-}
+      console.log(
+        "[CHECK24] Validated room candidates:",
+        [...bestValidatedOffers.entries()].map(([roomId, entry]) => ({
+          roomId,
+          room: entry.offer.roomName,
+          price: entry.offer.totalPrice,
+          status: entry.validation.status,
+        })),
+      );
 
-console.log(
-  "[CHECK24] Validated room candidates:",
-  [...bestValidatedOffers.entries()].map(
-    ([roomId, entry]) => ({
-      roomId,
-      room: entry.offer.roomName,
-      price: entry.offer.totalPrice,
-      status: entry.validation.status,
-    }),
-  ),
-);
+      const candidateOffers = [...bestValidatedOffers.values()];
+      const confirmedMatchCount = candidateOffers.filter(
+        ({ validation }) => validation.status === "matched",
+      ).length;
+      const manualReviewCount =
+        candidateOffers.length - confirmedMatchCount;
 
+      console.log("[CHECK24] Match summary:", {
+        hotel: scope.hotelName,
+        window: window.id,
+        pricesFound: candidateOffers.length,
+        confirmedMatches: confirmedMatchCount,
+        manualReviewCandidates: manualReviewCount,
+      });
 
-
-     for (const [
-  candidateId,
-  { offer, validation },
-] of bestValidatedOffers) {
-        if (!offer) continue;
-
-//         const validation = validateCheck24BeachOffer(
-//   offer,
-//   window.nights,
-// );
-
-// if (validation.status === "rejected") {
-//   console.warn("[CHECK24] Rejected offer:", {
-//     roomId: candidateId,
-//     room: offer.roomName,
-//     reasons: validation.reasons,
-//   });
-
-//   continue;
-// }
-
-console.log("[CHECK24] Room validation:", {
-  roomId: candidateId,
-  room: offer.roomName,
-  status: validation.status,
-  features: validation.features,
-  reasons: validation.reasons,
-});
+      for (const [candidateId, { offer, validation }] of bestValidatedOffers) {
+        const identity = validateCheck24RoomIdentity(offer);
+        const terms = buildCheck24OfferTerms(offer);
+        const confirmed = validation.status === "matched";
 
         offers.push({
           id:
             `check24:${scope.id}:${window.id}:` +
             `${candidateId}:${offer.offerId}`,
-
           sourceOfferId: offer.offerId,
           providerKey: provider.key,
           scopeKey: scope.id,
           windowId: window.id,
-
           checkIn: window.checkIn,
           checkOut: window.checkOut,
           nights: window.nights,
           rooms: 1,
           adults: 2,
-
-         price: offer.totalPrice,
-currency: "EUR",
-
-roomName: offer.roomName,
-
-roomFeatures: validation.features,
-
-terms: {
-            board: "All Inclusive",
-            cancellation: "Kaynakta doğrulanmalı",
-            taxes:
-              "Toplam fiyata dahil ücretler ve " +
-              "olası yerel ek ücretler doğrulanmalı",
-            operator: offer.supplierName,
-            availability:
-              "Tamamlanan CHECK24 aramasında listelendi",
-          },
-
+          price: offer.totalPrice,
+          currency: "EUR",
+          roomName: offer.roomName,
+          roomFeatures: validation.features,
+          terms,
           sourceHint,
           observedAt: collectedAt,
-
-          // Bilerek matchedRoomId vermiyoruz.
+          matchedRoomId: confirmed ? candidateId : undefined,
           matchReason:
-  `CHECK24 oda adayı: ${candidateId}. ` +
-  `Kaynak kategorisi: ${offer.roomCategoryName}. ` +
-  validation.reasons.join(" "),
+            `${
+              confirmed
+                ? "Doğrulanmış oda eşleşmesi."
+                : "Manuel oda eşleşme incelemesi gerekiyor."
+            } ` +
+            `Hedef oda: ${candidateId}. ` +
+            `Kaynak kategorisi: ${offer.roomCategoryName}. ` +
+            validation.reasons.join(" ") +
+            " " +
+            identity.reason,
         });
       }
 
-      // Doğrulanmamış fiyatı otomatik benchmark
-      // karşılaştırmasına dahil etmiyoruz.
       for (const room of scope.rooms) {
+        const selected = bestValidatedOffers.get(room.id);
+
+        if (!selected) {
+          quotes.push({
+            providerKey: provider.key,
+            scopeKey: scope.id,
+            roomId: room.id,
+            windowId: window.id,
+            price: null,
+            currency: scope.currency,
+            status: "manual-review",
+            dataMode: "live",
+            sourceHint,
+            observedAt: collectedAt,
+            reason:
+              "CHECK24 üzerinde bu oda için " +
+              "uygun bir fiyat adayı bulunamadı.",
+          });
+          continue;
+        }
+
+        const { offer, validation } = selected;
+        const identity = validateCheck24RoomIdentity(offer);
+        const terms = buildCheck24OfferTerms(offer);
+        const confirmed = validation.status === "matched";
+        const offerId =
+          `check24:${scope.id}:${window.id}:` +
+          `${room.id}:${offer.offerId}`;
+
         quotes.push({
           providerKey: provider.key,
           scopeKey: scope.id,
           roomId: room.id,
           windowId: window.id,
-
-          price: null,
+          price: offer.totalPrice,
           currency: scope.currency,
-          status: "manual-review",
-
+          status: confirmed ? "available" : "manual-review",
           dataMode: "live",
           sourceHint,
           observedAt: collectedAt,
-
+          offerId: confirmed ? offerId : undefined,
+          offerDescription: offer.roomName,
+          roomFeatures: validation.features,
+          terms,
           reason:
-            "CHECK24 canlı fiyat adayları toplandı. " +
-            "Bu oda için eşdeğerlik ve tarife " +
-            "koşulları henüz onaylanmadı.",
+            `${
+              confirmed
+                ? "CHECK24 oda adı, manzara, tarih, kişi sayısı, pansiyon ve toplam fiyat kontrolleri eşleşti."
+                : "Manuel oda eşleşmesi gerekiyor."
+            } ` +
+            `CHECK24: ${offer.roomName}. ` +
+            `Operatör: ${offer.supplierName}. ` +
+            validation.reasons.join(" ") +
+            " " +
+            identity.reason +
+            " " +
+            `İptal: ${terms.cancellation}. ` +
+            `Vergi: ${terms.taxes}.`,
         });
       }
+
 
       warnings.push(
         `CHECK24 / ${scope.hotelName} / ` +
           `${window.checkIn}: ` +
           `${result.totalOffers} teklif ayrıştırıldı; ` +
-          "oda eşleşmeleri inceleme bekliyor.",
+          `${confirmedMatchCount} oda eşleşti, ` +
+          `${manualReviewCount} teklif manuel inceleme bekliyor.`,
       );
     } catch (error) {
       const reason =
@@ -289,8 +274,7 @@ terms: {
       });
 
       warnings.push(
-        `CHECK24 / ${scope.hotelName} / ` +
-          `${window.checkIn}: ${reason}`,
+        `CHECK24 / ${scope.hotelName} / ` + `${window.checkIn}: ${reason}`,
       );
 
       for (const room of scope.rooms) {

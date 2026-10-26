@@ -36,6 +36,8 @@ import { collectAnexTourLiveQuotes } from "@/src/lib/ota/live-anextour";
 import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
 import { collectCheck24LiveQuotes } from "./live-check24-provider";
 
+import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
+
 interface ProviderProfile {
   baseMarkup: number;
   volatility: number;
@@ -107,6 +109,14 @@ check24: {
   volatility: 0.03,
   missingModulo: 7,
   soldOutModulo: 0,
+  canUndercut: false,
+},
+
+coraltravel: {
+  baseMarkup: 0.12,
+  volatility: 0.1,
+  missingModulo: 13,
+  soldOutModulo: 19,
   canUndercut: false,
 },
 
@@ -319,6 +329,8 @@ async function collectLiveProviderQuotes(
       return collectOnTheBeachLiveQuotes(provider, scope);
     case "tui":
       return collectTuiLiveQuotes(provider, scope);
+    case "coraltravel":
+  return collectCoralTravelLiveQuotes(provider, scope);
     default:
       return buildManualReviewQuotes(
         provider,

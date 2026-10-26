@@ -42,6 +42,14 @@ export function matchCheck24BeachRoom(
     return null;
   }
 
+    // Balkon bulunmadığı açıkça belirtilen odaları
+  // balkonlu oda ile eşleştirmiyoruz.
+  if (
+    /\b(without balcony|no balcony|ohne balkon)\b/.test(name)
+  ) {
+    return null;
+  }
+
   if (
     /\b(economy|economical|sparzimmer)\b/.test(name)
   ) {
@@ -52,14 +60,6 @@ export function matchCheck24BeachRoom(
     /\b(corner|eckzimmer|eck dreibettzimmer)\b/.test(name)
   ) {
     return "corner";
-  }
-
-  // Balkon bulunmadığı açıkça belirtilen odaları
-  // balkonlu oda ile eşleştirmiyoruz.
-  if (
-    /\b(without balcony|no balcony|ohne balkon)\b/.test(name)
-  ) {
-    return null;
   }
 
   if (

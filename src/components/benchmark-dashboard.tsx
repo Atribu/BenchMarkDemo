@@ -146,12 +146,23 @@ const CHANNEL_INFO: Record<
     type: "beta",
   },
 check24: {
-  label: "Kurulum aşamasında",
+  label: "Hotel-only · Beta",
   detail:
-    "CHECK24 Almanya otel fiyatları için canlı veri toplama " +
-    "ve oda eşleştirme entegrasyonu hazırlanıyor.",
-  type: "setup",
+    "CHECK24 Almanya üzerinden Miramare Beach için " +
+    "canlı konaklama fiyatları toplanır. " +
+    "Oda adı, manzara, kişi sayısı, tarih, pansiyon ve " +
+    "toplam fiyatı eşleşen teklifler oda tablosuna alınır. " +
+    "Belirsiz oda eşdeğerlikleri alternatif teklif olarak kalır.",
+  type: "beta",
 },
+  coraltravel: {
+    label: "Entegrasyon hazırlanıyor",
+    detail:
+      "Coral Travel Almanya Nur Hotel akışında otel ve tarih seçimi " +
+      "doğrulanıyor. Uçuşlu paketler karşılaştırmaya alınmayacak; " +
+      "canlı fiyat collector henüz aktif değil.",
+    type: "setup",
+  },
 
 };
 
@@ -580,6 +591,53 @@ export function BenchmarkDashboard({
         ),
       0,
     ) ?? 0;
+
+  const check24MatchedCount =
+    report?.scopes.reduce(
+      (scopeTotal, scope) =>
+        scopeTotal +
+        scope.windows.reduce(
+          (windowTotal, window) =>
+            windowTotal +
+            window.rows.reduce(
+              (rowTotal, row) =>
+                rowTotal +
+                row.entries.filter(
+                  (entry) =>
+                    entry.providerKey === "check24" &&
+                    entry.status === "available" &&
+                    entry.scrapedPrice !== null,
+                ).length,
+              0,
+            ),
+          0,
+        ),
+      0,
+    ) ?? 0;
+
+  const check24ManualCandidates =
+    report?.scopes.reduce(
+      (scopeTotal, scope) =>
+        scopeTotal +
+        scope.windows.reduce(
+          (windowTotal, window) =>
+            windowTotal +
+            (window.alternativeOffers ?? []).filter(
+              (offer) =>
+                offer.providerKey === "check24" &&
+                offer.matchReason.startsWith(
+                  "Manuel oda eşleşme incelemesi gerekiyor.",
+                ),
+            ).length,
+          0,
+        ),
+      0,
+    ) ?? 0;
+
+  const check24PriceCount =
+    check24MatchedCount + check24ManualCandidates;
+
+
   const portfolio =
     PORTFOLIOS.find(
       (option) => option.scopes.join(",") === selectedScopes.join(","),
@@ -1031,6 +1089,28 @@ export function BenchmarkDashboard({
                   <p>Eksik veya doğrulanamayan fiyat</p>
                 </article>
               </div>
+
+
+{report && check24PriceCount > 0 && (
+  <div
+    className="reportNotice"
+    aria-label="CHECK24 oda eşleşme adayları"
+  >
+    <strong>CHECK24 oda adayları:</strong>{" "}
+    {check24PriceCount} fiyat bulundu ·{" "}
+    <strong>{check24MatchedCount} eşleşen fiyat</strong>
+    {" · "}
+    {check24ManualCandidates} manuel inceleme
+    <p>
+      Bu fiyatlar gerçek CHECK24 aramasından alınmıştır.
+      Oda adı, manzara, tarih, kişi sayısı, pansiyon ve
+      toplam fiyat kontrollerini geçen teklifler oda
+      tablosuna dahil edilir. Belirsiz oda eşdeğerlikleri
+      alternatif teklif olarak manuel incelemede kalır.
+    </p>
+  </div>
+)}
+
 
               {!report ? (
                 <div className="emptyReport">
