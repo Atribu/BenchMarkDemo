@@ -58,8 +58,8 @@ const MAPPINGS: Partial<
       name: "DZ Superior Corner",
       roomId: "corner",
       category: "variant",
-      view: "unknown",
-      confirmed: false,
+      view: "land",
+      confirmed: true,
     },
 
     DGYB: {

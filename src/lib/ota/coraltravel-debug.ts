@@ -106,8 +106,8 @@ async function selectCoralTravelDate(page: Page, value: string) {
 }
 
 async function fillCoralTravelSearch(page: Page) {
-  const checkIn = "2026-11-20";
-  const checkOut = "2026-11-24";
+  const checkIn = "2027-05-10";
+const checkOut = "2027-05-15";
 
   // 1. Nur Hotel sekmesine geç.
   await page.getByText("Nur Hotel", { exact: true }).click();
@@ -140,18 +140,35 @@ async function fillCoralTravelSearch(page: Page) {
     'input[type="text"]:visible, input:not([type]):visible',
   ).last();
 
-  await hotelInput.fill("Miramare Beach", {
+  await hotelInput.fill("Miramare", {
     timeout: 10_000,
   });
 
   console.log("[CORALTRAVEL] Hotel name entered.");
 
-  // 5. Miramare Beach Hotel önerisini seç.
-const hotelSuggestion = page
-  .getByText("Miramare Beach Hotel", {
-    exact: true,
-  })
-  .last();
+  // 5. Miramare Queen Hotel önerisini seç.
+const hotelSuggestion = page.getByText(
+  "Miramare Queen Hotel",
+  { exact: true },
+).last();
+
+const isAvailable = await hotelSuggestion
+  .isVisible()
+  .catch(() => false);
+
+if (!isAvailable) {
+  console.log(
+    "[CORALTRAVEL QUEEN] Queen arama önerilerinde bulunamadı.",
+  );
+
+  return;
+}
+
+await hotelSuggestion.click();
+
+console.log(
+  "[CORALTRAVEL QUEEN] Hotel selected.",
+);
 
 await hotelSuggestion.waitFor({
   state: "visible",
@@ -161,7 +178,7 @@ await hotelSuggestion.waitFor({
 await hotelSuggestion.click();
 
 console.log("[CORALTRAVEL] Hotel selected:", {
-  hotel: "Miramare Beach Hotel",
+  hotel: "Miramare Queen Hotel",
 });
 
 // 6. Tarih alanını aç.
@@ -244,12 +261,31 @@ export async function debugCoralTravel() {
   let capturedResponses = 0;
   let capturedOffers = 0;
   let capturedHotelResponses = 0;
+  let capturedOfferShape = false;
 
   // Bütün context üzerindeki response olaylarını izle.
   context.on("response", async (response) => {
     const url = response.url();
     const request = response.request();
+if (
+  response.request().method() === "POST" &&
+  new URL(response.url()).pathname ===
+    "/api/trafics/completions" &&
+  response.status() === 200
+) {
+  try {
+    const data: unknown = await response.json();
 
+    console.log("[CORALTRAVEL QUEEN] Completions:", {
+      data: JSON.stringify(data).slice(0, 6000),
+    });
+  } catch (error) {
+    console.log(
+      "[CORALTRAVEL QUEEN] Completions error:",
+      error,
+    );
+  }
+} 
     if (
       !url.includes("coraltravel.de") &&
       !url.includes("traffics")
@@ -278,19 +314,41 @@ if (
   });
 }
 
-   if (
+if (
   method === "POST" &&
   status === 200 &&
   (
     new URL(url).pathname === "/api/trafics/hotels" ||
     new URL(url).pathname === "/api/trafics/hotels/giataId"
-  ) &&
-  capturedHotelResponses < 3
+  )
 ) {
   capturedHotelResponses++;
 
   try {
     const data: unknown = await response.json();
+
+    const result = data as {
+  totalResultCount?: string | number;
+  hotelList?: Array<{
+    code?: string;
+    name?: string;
+    giata?: {
+      hotelId?: string | number;
+    };
+  }>;
+};
+
+const queenHotels = (result.hotelList ?? []).filter(
+  (hotel) =>
+    /miramare\s*queen/i.test(hotel.name ?? "") ||
+    String(hotel.giata?.hotelId ?? "") === "4894",
+);
+
+console.log("[CORALTRAVEL QUEEN] Hotel discovery:", {
+  totalResultCount: result.totalResultCount,
+  hotelsInResponse: result.hotelList?.length ?? 0,
+  queenHotels,
+});
 
     console.log("[CORALTRAVEL] Hotels response:", {
       endpoint: new URL(url).pathname,
@@ -367,14 +425,29 @@ if (
         }>;
       };
 
+      if (!capturedOfferShape && result.offerList?.length) {
+        capturedOfferShape = true;
+        const sample = result.offerList[0] as Record<string, unknown>;
+        const hotelOffer = sample.hotelOffer as
+          | Record<string, unknown>
+          | undefined;
+        console.log("[CORALTRAVEL] Offer shape:", {
+          offerKeys: Object.keys(sample).sort(),
+          hotelOfferKeys: hotelOffer ? Object.keys(hotelOffer).sort() : [],
+          occupancyKeys: Object.keys(sample)
+            .filter((key) => /adult|child|guest|occup|pax|person|room/i.test(key))
+            .sort(),
+        });
+      }
+
       const offers = (result.offerList ?? []).filter(
         (offer) =>
           offer.productType === "hotelonly" &&
           offer.flightOffer == null &&
           offer.tourOperator?.code === "COR" &&
-          String(
-            offer.hotelOffer?.hotel?.giata?.hotelId,
-          ) === "4893",
+         String(
+  offer.hotelOffer?.hotel?.giata?.hotelId,
+) === "4894",
       );
 
       capturedOffers += offers.length;
@@ -382,11 +455,12 @@ if (
       console.log("[CORALTRAVEL] Offers:", {
         totalResultCount: result.totalResultCount,
         responseOffers: result.offerList?.length ?? 0,
-        miramareBeachOffers: offers.length,
+        miramareQueenOffers: offers.length,
       });
 
       console.table(
         offers.map((offer) => ({
+          hotelId: offer.hotelOffer?.hotel?.giata?.hotelId,
           from: offer.travelDate?.fromDate,
           to: offer.travelDate?.toDate,
           nights: offer.travelDate?.duration,
@@ -406,13 +480,13 @@ if (
   });
 
   try {
-    const navigation = await page.goto(
-      "https://coraltravel.de/",
-      {
-        waitUntil: "domcontentloaded",
-        timeout: 60_000,
-      },
-    );
+const navigation = await page.goto(
+  "https://coraltravel.de/",
+  {
+    waitUntil: "domcontentloaded",
+    timeout: 60_000,
+  },
+);
 
     console.log("[CORALTRAVEL] Navigation:", {
       status: navigation?.status(),
@@ -439,7 +513,7 @@ try {
 }
 
 try {
-  await fillCoralTravelSearch(page);
+  // await fillCoralTravelSearch(page);
 } catch (error) {
   console.error(
     "[CORALTRAVEL] Search form automation failed:",
@@ -448,7 +522,7 @@ try {
 }
 
     console.log(
-      "[CORALTRAVEL] Chrome'da Miramare Beach " +
+      "[CORALTRAVEL] Chrome'da Miramare Queen " +
         "Nur Hotel aramasını gerçekleştir.",
     );
 
@@ -459,7 +533,10 @@ try {
     );
 
     if (process.argv.includes("--auto-close")) {
-      await page.waitForTimeout(2_000);
+      for (let attempt = 0; attempt < 4; attempt++) {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(750);
+      }
     } else {
       await new Promise<void>((resolve) => {
         process.stdin.resume();
