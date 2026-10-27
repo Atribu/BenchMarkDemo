@@ -6,7 +6,7 @@ export interface PatchrightBrowserHandle {
   close: () => Promise<void>;
 }
 
-interface PatchrightBrowserOptions {
+export interface PatchrightBrowserOptions {
   profilePath?: string;
   headless?: boolean;
   browserChannel?: "chrome" | "chromium";
@@ -57,34 +57,42 @@ export async function createPatchrightBrowserPage(
     ? MARKET_PRESETS[options.market]
     : undefined;
 
-  console.log("[Patchright] Browser launch configuration:", {
-  profilePath: options.profilePath,
-  browserChannel: options.browserChannel ?? "chrome",
-  headless: options.headless ?? false,
-  market: options.market ?? "default",
-  locale: preset?.locale ?? "browser default",
-  timezoneId: preset?.timezoneId ?? "browser default",
-  proxyConfigured: Boolean(options.proxyUrl),
-  customUserAgentConfigured: Boolean(options.userAgent),
-});
-
-  const context = await chromium.launchPersistentContext(
-    options.profilePath ??
-      "./.benchmark-state/expedia-browser-profile",
-    {
-      channel:
-        options.browserChannel === "chromium"
-          ? undefined
-          : "chrome",
+  if (process.env.OTA_DEBUG === "true")
+    console.log("[Patchright] Browser launch configuration:", {
+      profilePath: options.profilePath,
+      browserChannel: options.browserChannel ?? "chrome",
       headless: options.headless ?? false,
-      viewport: null,
-      ...(preset ?? {}),
-      ...(options.userAgent
-        ? { userAgent: options.userAgent }
-        : {}),
-      proxy: parseProxyUrl(options.proxyUrl),
-    },
-  );
+      market: options.market ?? "default",
+      locale: preset?.locale ?? "browser default",
+      timezoneId: preset?.timezoneId ?? "browser default",
+      proxyConfigured: Boolean(options.proxyUrl),
+      customUserAgentConfigured: Boolean(options.userAgent),
+    });
+
+  const profilePath =
+    options.profilePath ?? "./.benchmark-state/expedia-browser-profile";
+  const launchOptions = {
+    channel:
+      options.browserChannel === "chromium" ? undefined : ("chrome" as const),
+    headless: options.headless ?? false,
+    viewport: null,
+    ...(preset ?? {}),
+    ...(options.userAgent ? { userAgent: options.userAgent } : {}),
+    proxy: parseProxyUrl(options.proxyUrl),
+  };
+  const context = await chromium
+    .launchPersistentContext(profilePath, launchOptions)
+    .catch((error) => {
+      if (launchOptions.channel !== "chrome") throw error;
+
+      console.warn(
+        "[Patchright] Chrome channel could not be started; retrying with bundled Chromium.",
+      );
+      return chromium.launchPersistentContext(profilePath, {
+        ...launchOptions,
+        channel: undefined,
+      });
+    });
 
   try {
     const page = context.pages()[0] ?? (await context.newPage());

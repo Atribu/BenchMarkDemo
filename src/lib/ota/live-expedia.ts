@@ -6,14 +6,19 @@ import type {
   ReportScopeDefinition,
 } from "../benchmark/types";
 import type { Page } from "patchright";
+import path from "node:path";
 import { EXPEDIA_HOTEL_CONFIG } from "./live-config";
 import {
   normalizeInlineText,
   parsePriceFromText,
+  resolveProviderLiveConfig,
 } from "./live-helpers";
 import { namedRoomRank } from "./live-onthebeach";
 import { assertPricePageAccessible } from "./browser-diagnostics";
-import { createPatchrightBrowserPage } from "./patchright-browser";
+import {
+  createPatchrightBrowserPage,
+  type PatchrightBrowserOptions,
+} from "./patchright-browser";
 
 export interface ExpediaRoomCard {
   name: string;
@@ -71,18 +76,18 @@ export function buildExpediaUrl(
   checkOut: string,
 ) {
   const url = new URL(baseUrl);
-  
-if (scope.currency === "EUR") {
-  url.hostname = "euro.expedia.net";
-  url.pathname = `/${url.pathname
-    .replace(/^\/en\//, "")
-    .replace(/^\//, "")}`;
-} else {
-  url.hostname = "www.expedia.co.uk";
-  url.pathname = `/en/${url.pathname
-    .replace(/^\/en\//, "")
-    .replace(/^\//, "")}`;
-}
+
+  if (scope.currency === "EUR") {
+    url.hostname = "www.expedia.de";
+    url.pathname = `/en/${url.pathname
+      .replace(/^\/en\//, "")
+      .replace(/^\//, "")}`;
+  } else {
+    url.hostname = "www.expedia.co.uk";
+    url.pathname = `/en/${url.pathname
+      .replace(/^\/en\//, "")
+      .replace(/^\//, "")}`;
+  }
   url.search = new URLSearchParams({
     chkin: checkIn,
     chkout: checkOut,
@@ -110,14 +115,15 @@ export function parseExpediaQuotes(
   window: BenchmarkWindowDefinition,
   snapshot: ExpediaSnapshot,
 ): ProviderQuote[] {
+  const debug = process.env.OTA_DEBUG === "true";
   const requested = new URL(EXPEDIA_HOTEL_CONFIG[scope.hotelKey]!.pageUrl);
   const actual = new URL(snapshot.url);
   const hotelId = requested.pathname.match(/\.h(\d+)\./)?.[1];
 
-  const expectedHost =
+  const expectedHosts =
     scope.currency === "EUR"
-      ? "euro.expedia.net"
-      : "www.expedia.co.uk";
+      ? ["www.expedia.de", "euro.expedia.net"]
+      : ["www.expedia.co.uk"];
 
   const expectedStart =
     `Start date, ${dateLabel(window.checkIn)}`;
@@ -146,9 +152,9 @@ export function parseExpediaQuotes(
     );
   }
 
-  if (actual.hostname !== expectedHost) {
+  if (!expectedHosts.includes(actual.hostname)) {
     validationErrors.push(
-      `hostname: expected=${expectedHost}, actual=${actual.hostname}`,
+      `hostname: expected=${expectedHosts.join("|")}, actual=${actual.hostname}`,
     );
   }
 
@@ -233,7 +239,7 @@ export function parseExpediaQuotes(
 
 
   return scope.rooms.map((room) => {
-    console.log("[Expedia] Room matching:", {
+    if (debug) console.log("[Expedia] Room matching:", {
   expectedRoomId: room.id,
   availableCardNames: snapshot.cards.map((card) => card.name),
 });
@@ -247,7 +253,7 @@ export function parseExpediaQuotes(
       return rank !== null ? [{ ...card, rank }] : [];
     });
 
-    console.log("[Expedia] Matched cards:", {
+    if (debug) console.log("[Expedia] Matched cards:", {
   roomId: room.id,
   matched: matched.map((card) => ({
     name: card.name,
@@ -272,7 +278,7 @@ export function parseExpediaQuotes(
         ? parsePriceFromText(current, scope.currency)
         : null;
 
-    console.log("[Expedia] Price parsing:", {
+    if (debug) console.log("[Expedia] Price parsing:", {
       roomId: room.id,
       cardName: card.name,
       priceText: card.priceText,
@@ -296,7 +302,7 @@ export function parseExpediaQuotes(
       matched.length > 0 &&
       matched.every((card) => /We are sold out/i.test(card.text));
 
-      console.log("[Expedia] Final room result:", {
+      if (debug) console.log("[Expedia] Final room result:", {
   roomId: room.id,
   matchedCount: matched.length,
   availableCount: available.length,
@@ -347,6 +353,38 @@ export function parseExpediaQuotes(
   });
 }
 
+function environmentFlag(value: string | undefined, fallback: boolean) {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return fallback;
+}
+
+export function resolveExpediaBrowserConfig(
+  scope: ReportScopeDefinition,
+): PatchrightBrowserOptions {
+  const providerConfig = resolveProviderLiveConfig("expedia", scope.currency);
+  const stateRoot =
+    process.env.BENCHMARK_STATE_DIR?.trim() ||
+    path.join(process.cwd(), ".benchmark-state");
+  const headless = environmentFlag(
+    process.env.EXPEDIA_HEADLESS?.trim() || process.env.OTA_HEADLESS?.trim(),
+    process.env.NODE_ENV === "production",
+  );
+
+  return {
+    profilePath: path.join(
+      stateRoot,
+      `expedia-browser-profile-${scope.id}`,
+    ),
+    browserChannel: providerConfig.browserChannel,
+    market: scope.currency === "EUR" ? "de" : "uk",
+    proxyUrl: providerConfig.proxyUrl,
+    userAgent: providerConfig.userAgent,
+    headless,
+  };
+}
+
 export async function collectExpediaLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
@@ -354,9 +392,9 @@ export async function collectExpediaLiveQuotes(
   const quotes: ProviderQuote[] = [];
   const warnings: string[] = [];
   for (const window of scope.windows) {
-
-    let handle: Awaited<ReturnType<typeof createPatchrightBrowserPage>> | undefined;
-    
+    let handle:
+      | Awaited<ReturnType<typeof createPatchrightBrowserPage>>
+      | undefined;
     const base = EXPEDIA_HOTEL_CONFIG[scope.hotelKey]?.pageUrl;
 
     const sourceHint = base
@@ -365,65 +403,39 @@ export async function collectExpediaLiveQuotes(
     try {
       if (!sourceHint) throw new Error("Expedia otel eşleştirmesi eksik.");
 
+      const debug = process.env.OTA_DEBUG === "true";
+      if (debug)
+        console.log("\n========== EXPEDIA DEBUG START ==========");
 
+      const browserConfig = resolveExpediaBrowserConfig(scope);
+      if (debug)
+        console.log("[Expedia] Browser config:", {
+          market: browserConfig.market,
+          browserChannel: browserConfig.browserChannel,
+          headless: browserConfig.headless,
+          proxyEnabled: Boolean(browserConfig.proxyUrl),
+        });
 
+      handle = await createPatchrightBrowserPage(browserConfig);
+      const page = handle.page;
+      page.setDefaultTimeout(15000);
 
-console.log("\n========== EXPEDIA DEBUG START ==========");
+      const response = await page.goto(sourceHint, {
+        waitUntil: "domcontentloaded",
+        timeout: 45000,
+      });
 
+      if (debug) {
+        console.log("[Expedia] HTTP status:", response?.status());
+        console.log("[Expedia] Final URL:", page.url());
+        console.log(
+          "[Expedia] Page title:",
+          await page.title().catch(() => ""),
+        );
+      }
 
-handle = await createPatchrightBrowserPage({
-  profilePath: `./.benchmark-state/expedia-browser-profile-${scope.id}`,
-  headless: false,
-});
-
-const page = handle.page;
-
-page.setDefaultTimeout(15000);
-
-
-const response = await page.goto(sourceHint, {
-  waitUntil: "domcontentloaded",
-  timeout: 45000,
-});
-
-console.log("[Expedia] HTTP status:", response?.status());
-console.log("[Expedia] Final URL:", page.url());
-
-console.log(
-  "[Expedia] Page title:",
-  await page.title().catch(() => ""),
-);
-
-await assertNoExpediaBotChallenge(page);
-
-await assertPricePageAccessible(
-  page,
-  response?.status(),
-);
-
-
-const browserInfo = await page
-  .evaluate(() => ({
-    language: navigator.language,
-    languages: navigator.languages,
-    userAgent: navigator.userAgent,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }))
-  .catch(() => null);
-
-
-const bodyText = await page
-  .locator("body")
-  .innerText({ timeout: 3000 })
-  .catch(() => "");
-
-
-
-const frames = page.frames().map((frame) => ({
-  url: frame.url(),
-  name: frame.name(),
-}));
-
+      await assertNoExpediaBotChallenge(page);
+      await assertPricePageAccessible(page, response?.status());
 
 
 await page
@@ -438,10 +450,10 @@ await page
 // Sayfa yüklenirken challenge sonradan çıkmış olabilir
 await assertNoExpediaBotChallenge(page);
 
-console.log("[Expedia] Access check: OK");
-console.log(
-  "========== EXPEDIA DEBUG END ==========\n",
-);
+if (debug) {
+  console.log("[Expedia] Access check: OK");
+  console.log("========== EXPEDIA DEBUG END ==========\n");
+}
 
 const roomCards = page.locator(
   '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
@@ -452,7 +464,7 @@ let previousCount = 0;
 for (let attempt = 0; attempt < 6; attempt += 1) {
   const count = await roomCards.count();
 
-  console.log("[Expedia] Room card load:", {
+  if (debug) console.log("[Expedia] Room card load:", {
     attempt,
     count,
   });
@@ -475,10 +487,11 @@ for (let attempt = 0; attempt < 6; attempt += 1) {
   previousCount = count;
 }
 
-console.log(
-  "[Expedia] Final room card count:",
-  await roomCards.count(),
-);
+if (debug)
+  console.log(
+    "[Expedia] Final room card count:",
+    await roomCards.count(),
+  );
 
 const snapshot = await page.evaluate(() => ({
 
@@ -549,7 +562,7 @@ const snapshot = await page.evaluate(() => ({
         })),
       }));
 
-      console.log("[Expedia] Snapshot validation:", {
+      if (debug) console.log("[Expedia] Snapshot validation:", {
   expected: {
     hotelName: scope.hotelName,
     checkIn: window.checkIn,

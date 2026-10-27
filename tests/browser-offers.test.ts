@@ -9,6 +9,7 @@ import {
 import {
   buildExpediaUrl,
   parseExpediaQuotes,
+  resolveExpediaBrowserConfig,
   type ExpediaSnapshot,
 } from "../src/lib/ota/live-expedia";
 import { REPORT_SCOPES } from "../src/lib/benchmark/sample-data";
@@ -370,12 +371,64 @@ test("Expedia uses regional sites and dates without reusing US currency defaults
   assert.equal(de.searchParams.get("chkin"), window.checkIn);
 });
 
+test("Expedia production browser uses the requested market, persistent state and proxy", (t) => {
+  const environment = process.env as Record<string, string | undefined>;
+  const keys = [
+    "BENCHMARK_STATE_DIR",
+    "EXPEDIA_PROXY_URL",
+    "EXPEDIA_HEADLESS",
+    "OTA_HEADLESS",
+    "NODE_ENV",
+  ];
+  const original = keys.map((key) => environment[key]);
+  t.after(() =>
+    keys.forEach((key, index) => {
+      if (original[index] === undefined) delete environment[key];
+      else environment[key] = original[index];
+    }),
+  );
+
+  environment.BENCHMARK_STATE_DIR = "/tmp/benchmark-expedia-test";
+  environment.EXPEDIA_PROXY_URL = "http://user:secret@proxy.test:8080";
+  environment.NODE_ENV = "production";
+  delete environment.EXPEDIA_HEADLESS;
+  delete environment.OTA_HEADLESS;
+
+  const config = resolveExpediaBrowserConfig(eu);
+  assert.equal(config.market, "de");
+  assert.equal(config.headless, true);
+  assert.equal(config.proxyUrl, "http://user:secret@proxy.test:8080");
+  assert.equal(
+    config.profilePath,
+    "/tmp/benchmark-expedia-test/expedia-browser-profile-beach-eu",
+  );
+
+  environment.EXPEDIA_HEADLESS = "false";
+  assert.equal(resolveExpediaBrowserConfig(eu).headless, false);
+  assert.equal(resolveExpediaBrowserConfig(uk).market, "uk");
+});
+
 test("Expedia reads current stay total, never previous or nightly price, and records sold-out rooms", () => {
   const quotes = parseExpediaQuotes(expedia, eu, window, exSnapshot);
-  assert.equal(quotes[0].price, null);
-  assert.equal(quotes[0].status, "sold_out");
-  assert.equal(quotes[1].price, 1883);
-  assert.equal(quotes[1].captureMethod, "automated");
+  const land = quotes.find((quote) => quote.roomId === "superior-land")!;
+  const sea = quotes.find((quote) => quote.roomId === "superior-sea")!;
+  assert.equal(land.price, null);
+  assert.equal(land.status, "sold_out");
+  assert.equal(sea.price, 1883);
+  assert.equal(sea.captureMethod, "automated");
+});
+
+test("Expedia accepts its secure EUR regional hostname redirect", () => {
+  const redirected = {
+    ...exSnapshot,
+    url: exSnapshot.url.replace("www.expedia.de", "euro.expedia.net"),
+  };
+  assert.equal(
+    parseExpediaQuotes(expedia, eu, window, redirected).find(
+      (quote) => quote.roomId === "superior-sea",
+    )?.price,
+    1883,
+  );
 });
 
 test("Expedia refuses redirected dates, wrong hotel, party and currency", () => {
