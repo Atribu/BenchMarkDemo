@@ -17,10 +17,9 @@ export function browserSessionPath(
     `${createHash("sha256").update(key).digest("hex").slice(0, 24)}.json`,
   );
 
-  console.log("[Session] Mapping:", {
-    key,
-    filePath,
-  });
+  if (process.env.OTA_DEBUG === "true") {
+    console.log("[Session] File:", { filePath });
+  }
 
   return filePath;
 }
@@ -31,14 +30,16 @@ export async function readBrowserSession(
   try {
     const info = await stat(file);
 
-    console.log("[Session] Read attempt:", {
-      file,
-      size: info.size,
-      ageMs: Date.now() - info.mtimeMs,
-    });
+    if (process.env.OTA_DEBUG === "true")
+      console.log("[Session] Read attempt:", {
+        file,
+        size: info.size,
+        ageMs: Date.now() - info.mtimeMs,
+      });
 
     if (info.size > 5_000_000 || Date.now() - info.mtimeMs > MAX_AGE_MS) {
-      console.log("[Session] Rejected: expired or too large");
+      if (process.env.OTA_DEBUG === "true")
+        console.log("[Session] Rejected: expired or too large");
       return;
     }
 
@@ -71,20 +72,23 @@ export async function readBrowserSession(
           origin.localStorage.every(namedValue),
       )
     ) {
-      console.log("[Session] Loaded:", {
-        cookieCount: state.cookies.length,
-        originCount: state.origins.length,
-      });
+      if (process.env.OTA_DEBUG === "true")
+        console.log("[Session] Loaded:", {
+          cookieCount: state.cookies.length,
+          originCount: state.origins.length,
+        });
 
       return state;
     }
 
-    console.log("[Session] Rejected: invalid structure");
+    if (process.env.OTA_DEBUG === "true")
+      console.log("[Session] Rejected: invalid structure");
   } catch (error) {
-    console.log(
-      "[Session] Read failed:",
-      error instanceof Error ? error.message : error,
-    );
+    if (process.env.OTA_DEBUG === "true")
+      console.log(
+        "[Session] Read failed:",
+        error instanceof Error ? error.message : error,
+      );
   }
 }
 

@@ -225,27 +225,35 @@ export function resolveProviderLiveConfig(
   currency?: CurrencyCode,
 ) {
   const prefix = providerKey.toUpperCase();
+  const providerDefaultMarket =
+    providerKey === "booking"
+      ? currency === "GBP"
+        ? "uk"
+        : "de"
+      : PROVIDER_DEFAULT_MARKETS[providerKey];
   const market = normalizeMarket(
     process.env[`${prefix}_MARKET`]?.trim() ||
       process.env.OTA_MARKET?.trim() ||
-      PROVIDER_DEFAULT_MARKETS[providerKey],
+      providerDefaultMarket,
   );
   const browserChannel = normalizeBrowserChannel(
     process.env[`${prefix}_BROWSER_CHANNEL`]?.trim() ||
       process.env.OTA_BROWSER_CHANNEL?.trim() ||
-      (providerKey === "expedia" ||
-      providerKey === "holidaycheck" ||
-      providerKey === "loveholidays" ||
-      providerKey === "onthebeach"
+      (providerKey === "booking" ||
+        providerKey === "expedia" ||
+        providerKey === "holidaycheck" ||
+        providerKey === "loveholidays" ||
+        providerKey === "onthebeach"
         ? "chrome"
         : "chromium"),
   );
   const userAgent =
     process.env[`${prefix}_USER_AGENT`]?.trim() ||
     process.env.OTA_USER_AGENT?.trim() ||
-    (providerKey === "expedia" ||
-    providerKey === "loveholidays" ||
-    providerKey === "onthebeach"
+    (providerKey === "booking" ||
+      providerKey === "expedia" ||
+      providerKey === "loveholidays" ||
+      providerKey === "onthebeach"
       ? undefined
       : DEFAULT_USER_AGENT);
   const stealthOverride =
@@ -254,7 +262,9 @@ export function resolveProviderLiveConfig(
   const useStealth =
     stealthOverride !== undefined
       ? stealthOverride === "true"
-      : ["holidaycheck", "loveholidays", "onthebeach"].includes(providerKey);
+      : ["booking", "holidaycheck", "loveholidays", "onthebeach"].includes(
+          providerKey,
+        );
   const proxyUrl =
     process.env[`${prefix}_PROXY_URL`]?.trim() ||
     process.env.OTA_PROXY_URL?.trim() ||

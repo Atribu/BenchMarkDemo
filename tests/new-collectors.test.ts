@@ -10,6 +10,7 @@ import {
   type LoveholidaysSnapshot,
 } from "../src/lib/ota/live-loveholidays";
 import {
+  assertBookingPropertyPage,
   buildBookingUrl,
   parseBookingQuotes,
   type BookingSnapshot,
@@ -394,6 +395,19 @@ test("Booking reads selectable room totals, not hotel starting prices", () => {
   const queenUrl = new URL(buildBookingUrl(queen, window));
   assert.match(queenUrl.pathname, /miramare-queen\.en-gb\.html$/);
   assert.equal(queenUrl.searchParams.get("group_children"), "0");
+});
+
+test("Booking rejects redirects away from the exact property page", () => {
+  const expected = buildBookingUrl(eu, window);
+  assert.doesNotThrow(() => assertBookingPropertyPage(expected, expected));
+  assert.throws(
+    () =>
+      assertBookingPropertyPage(
+        expected,
+        "https://www.booking.com/index.en-gb.html",
+      ),
+    /ana sayfaya yonlendirdi/,
+  );
 });
 
 test("Booking requires independent date, party, property, currency and total verification", () => {

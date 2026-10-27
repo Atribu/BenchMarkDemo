@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { collectInBatches } from "../src/lib/ota/collection-queue";
 import { pricePageAccessError } from "../src/lib/ota/browser-diagnostics";
+import { resolveProviderLiveConfig } from "../src/lib/ota/live-helpers";
 import {
   browserSessionPath,
   readBrowserSession,
@@ -61,6 +62,10 @@ test("Anonymous session keys isolate provider, currency, market and proxy withou
 
 test("Access diagnostics distinguish geo redirects, verification, HTTP errors and normal pages", () => {
   assert.match(
+    pricePageAccessError("https://www.booking.com/hotel/test", 202, "", false)!,
+    /dogrulamasi/,
+  );
+  assert.match(
     pricePageAccessError(
       "https://www.booking.com/?tr_redirected=1",
       200,
@@ -98,6 +103,44 @@ test("Access diagnostics distinguish geo redirects, verification, HTTP errors an
       false,
     ),
     null,
+  );
+});
+
+test("Booking defaults match the requested market and remain proxy configurable", (t) => {
+  const keys = [
+    "BOOKING_MARKET",
+    "BOOKING_PROXY_URL",
+    "BOOKING_BROWSER_CHANNEL",
+    "BOOKING_USER_AGENT",
+    "BOOKING_USE_STEALTH",
+    "OTA_MARKET",
+    "OTA_PROXY_URL",
+    "OTA_BROWSER_CHANNEL",
+    "OTA_USER_AGENT",
+    "OTA_USE_STEALTH",
+  ];
+  const original = keys.map((key) => process.env[key]);
+  for (const key of keys) delete process.env[key];
+  t.after(() =>
+    keys.forEach((key, index) => {
+      if (original[index] === undefined) delete process.env[key];
+      else process.env[key] = original[index];
+    }),
+  );
+
+  const eur = resolveProviderLiveConfig("booking", "EUR");
+  assert.equal(eur.market, "de");
+  assert.equal(eur.browserChannel, "chrome");
+  assert.equal(eur.userAgent, undefined);
+  assert.equal(eur.useStealth, true);
+
+  const gbp = resolveProviderLiveConfig("booking", "GBP");
+  assert.equal(gbp.market, "uk");
+
+  process.env.BOOKING_PROXY_URL = "socks5://user:secret@example.test:1080";
+  assert.equal(
+    resolveProviderLiveConfig("booking", "EUR").proxyUrl,
+    "socks5://user:secret@example.test:1080",
   );
 });
 

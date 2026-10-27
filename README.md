@@ -169,10 +169,14 @@ Tarayici collector'lari icin opsiyonel proxy:
 OTA_PROXY_URL=http://username:password@host:port
 BOOKING_MARKET=de
 BOOKING_PROXY_URL=http://username:password@host:port
+BOOKING_BROWSER_CHANNEL=chrome
+BOOKING_USE_STEALTH=true
 EXPEDIA_MARKET=uk
 ```
 
-Saglayiciya ozel dolu deger genel degeri ezer. Bos deger genel proxy'yi iptal etmez. Market secimi sadece dil/saat dilimini degistirir; IP ulkesini degistirmez. Proxy erisim saglasa da oda-toplam fiyat collector'i ayrica tamamlanmalidir. TUI dogrudan sunucu HTTP istegi kullandigi icin tarayici proxy ayarlari bu akis icin gecerli degildir.
+Saglayiciya ozel dolu deger genel degeri ezer. Bos deger genel proxy'yi iptal etmez. Market secimi sadece dil/saat dilimini degistirir; IP ulkesini degistirmez. Proxy erisimi tek basina fiyat garantisi degildir; otel, tarih, kisi, oda ve toplam fiyat kontrollerinin tumu yine gecmelidir. TUI dogrudan sunucu HTTP istegi kullandigi icin tarayici proxy ayarlari bu akis icin gecerli degildir.
+
+Booking icin EUR sorgulari varsayilan olarak Almanya, GBP sorgulari Birlesik Krallik tarayici yereliyle acilir. Collector gercek Chrome'u (yoksa Chromium'u), stealth ayarini ve proxy'ye ozel anonim oturumu kullanir. Yabanci sunucu veya proxy gercek cikis IP'sini degistirmelidir; yalnizca `BOOKING_MARKET` ayarlamak yeterli degildir. Veri merkezi IP'leri Booking tarafindan yine dogrulamaya alinabilir; sabit ve hedef pazara ait izinli/residential cikis daha guvenilirdir. Proxy parolalarini yalnizca sunucu secret yonetiminde tutun.
 
 ## Kontroller
 

@@ -80,6 +80,14 @@ export function pricePageAccessError(
   }
 
   if (
+    /(^|\.)booking\.com$/.test(url.hostname) &&
+    status === 202 &&
+    body.trim() === ""
+  ) {
+    return "Booking erisim dogrulamasi uyguladi; otomatik islem durduruldu. Bu bir doluluk sonucu degil.";
+  }
+
+  if (
     status === 403 ||
     status === 429 ||
     visibleChallenge ||
