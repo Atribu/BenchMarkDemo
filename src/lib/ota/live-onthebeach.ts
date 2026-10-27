@@ -640,6 +640,22 @@ console.log("[OnTheBeach] Calendar inspection:", {
 
 onStep("Hotel Only giriş tarihini seçme");
 
+const requestedMonth = window.checkIn.slice(0, 7);
+const hotelOnlyCheckInMonth = page.locator(
+  `input[name="departure-date"][value="${requestedMonth}"]`,
+);
+
+await hotelOnlyCheckInMonth.waitFor({
+  state: "attached",
+  timeout: 15000,
+});
+
+if (!(await hotelOnlyCheckInMonth.isChecked())) {
+  await page
+    .locator(`label[for="departure-date_${requestedMonth}"]`)
+    .click();
+}
+
 const hotelOnlyCheckInDay = page.locator(
   `button.datepicker__button[value="${window.checkIn}"]`,
 );
