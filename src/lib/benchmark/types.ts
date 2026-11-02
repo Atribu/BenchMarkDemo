@@ -20,6 +20,7 @@ export type OtaKey =
   | "loveholidays"
   | "onthebeach"
   | "restplatzboerse"
+  | "stayforlong"
   | "tui"
   | "schauinsland";
 

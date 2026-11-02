@@ -125,6 +125,21 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     searchTemplate: "https://www.restplatzboerse.at/hotels/",
   },
   {
+    key: "stayforlong",
+    name: "Stayforlong",
+    shortName: "Stayforlong",
+    collectionType: "api",
+    liveSupported: true,
+    readiness: "api-contract",
+    notes:
+      "Miramare Beach, Miramare Queen ve Port Nature için Stayforlong Almanya hotel-only availability tekliflerini okur. " +
+      "Kesin tarih, 1 oda / 2 yetişkin, EUR, All Inclusive, oda kodu ve vergiler " +
+      "doğrulanır; son toplam bookingRules servisiyle yeniden kontrol edilir.",
+    supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
+    searchTemplate:
+      "https://www.stayforlong.de/de-de/hotel/tr/port-nature-luxury-resort_serik",
+  },
+  {
     key: "tui",
     name: "TUI",
     shortName: "TUI",

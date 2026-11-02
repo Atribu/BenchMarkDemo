@@ -36,6 +36,7 @@ import { collectAnexTourLiveQuotes } from "@/src/lib/ota/live-anextour";
 import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
 import { collectCheck24LiveQuotes } from "./live-check24-provider";
 import { collectRestplatzboerseLiveQuotes } from "./live-restplatzboerse";
+import { collectStayforlongLiveQuotes } from "./live-stayforlong";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
 import {
@@ -102,6 +103,13 @@ const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
     canUndercut: true,
   },
   restplatzboerse: {
+    baseMarkup: 0.1,
+    volatility: 0.08,
+    missingModulo: 13,
+    soldOutModulo: 19,
+    canUndercut: true,
+  },
+  stayforlong: {
     baseMarkup: 0.1,
     volatility: 0.08,
     missingModulo: 13,
@@ -341,6 +349,8 @@ async function collectLiveProviderQuotes(
       return collectOnTheBeachLiveQuotes(provider, scope);
     case "restplatzboerse":
       return collectRestplatzboerseLiveQuotes(provider, scope);
+    case "stayforlong":
+      return collectStayforlongLiveQuotes(provider, scope);
     case "tui":
       return collectTuiLiveQuotes(provider, scope);
     case "coraltravel":

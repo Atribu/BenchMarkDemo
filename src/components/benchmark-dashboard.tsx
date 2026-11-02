@@ -158,6 +158,14 @@ const CHANNEL_INFO: Record<
       "yerine güncel iki yetişkin konaklama toplamı gösterilir.",
     type: "beta",
   },
+  stayforlong: {
+    label: "Hotel-only · Canlı API",
+    detail:
+      "Miramare Beach, Miramare Queen ve Port Nature için Stayforlong Almanya tekliflerini okur. Kesin tarih, " +
+      "1 oda / 2 yetişkin, EUR, All Inclusive ve vergiler doğrulanır; " +
+      "güncel konaklama toplamı bookingRules ile yeniden kontrol edilir.",
+    type: "beta",
+  },
 check24: {
   label: "Hotel-only · Beta",
   detail:
