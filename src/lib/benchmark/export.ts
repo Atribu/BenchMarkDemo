@@ -161,7 +161,11 @@ export function benchmarkCsv(report: BenchmarkRunResult): string {
       report.generatedAt,
       "TARAYICI AKTARIMI / KULLANICI BAŞLATIMLI / SUNUCUDAN DOĞRULANMADI",
       offer.hotelName,
-      offer.currency === "EUR" ? "Avrupa" : "Birleşik Krallık",
+      offer.currency === "EUR"
+        ? "Avrupa"
+        : offer.currency === "GBP"
+          ? "Birleşik Krallık"
+          : "Rusya",
       offer.checkIn,
       offer.checkOut,
       offer.nights,

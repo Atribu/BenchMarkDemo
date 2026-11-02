@@ -32,6 +32,8 @@ const priceCases: [string, CurrencyCode, number | null][] = [
   ["$1,466", "EUR", null],
   ["£1,466", "EUR", null],
   ["1.466 €", "GBP", null],
+  ["163 889,38 ₽", "RUB", 163889.38],
+  ["RUB 249,471.82", "RUB", 249471.82],
 ];
 for (const [input, currency, expected] of priceCases)
   test(`price: ${input} / ${currency}`, () =>

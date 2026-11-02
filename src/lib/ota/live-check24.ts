@@ -28,6 +28,19 @@ type Check24BeachResult = {
   >;
 };
 
+export interface Check24HotelSearchConfig {
+  hotelId: string;
+  hotelName: string;
+}
+
+export type Check24HotelResult = {
+  apiVersion: "old";
+  url: string;
+  nights: number;
+  totalOffers: number;
+  offers: Check24ParsedOffer[];
+};
+
 function getNights(
   checkIn: string,
   checkOut: string,
@@ -56,6 +69,93 @@ function getNights(
   }
 
   return nights;
+}
+
+export function buildCheck24HotelSearchUrl(
+  config: Check24HotelSearchConfig,
+  checkIn: string,
+  checkOut: string,
+): string {
+  getNights(checkIn, checkOut);
+
+  return (
+    "https://hotel.check24.de/search/" +
+    `${encodeURIComponent(config.hotelName)}-${config.hotelId}/` +
+    `${checkIn}/${checkOut}/%5BA%7CA%5D/hotel.html`
+  );
+}
+
+/**
+ * Collects CHECK24's completed hotel-only search for any catalogued property.
+ * The legacy search route is intentional: unlike the newer accommodation route,
+ * it uses the public numeric hotel id that is available for every configured
+ * hotel and still returns the same clustered offer payload.
+ */
+export async function collectCheck24Hotel(
+  page: Page,
+  config: Check24HotelSearchConfig,
+  checkIn: string,
+  checkOut: string,
+): Promise<Check24HotelResult> {
+  const nights = getNights(checkIn, checkOut);
+  const searchUrl = buildCheck24HotelSearchUrl(config, checkIn, checkOut);
+
+  const finishedResponse = page.waitForResponse(
+    async (response) => {
+      if (response.status() !== 200) return false;
+
+      const responseUrl = new URL(response.url());
+      if (
+        responseUrl.hostname !== "hotel.check24.de" ||
+        !/^\/api-hotel\/proxy\/portale\/hotels\/searches\/[^/]+\/clustered_offers\.json$/.test(
+          responseUrl.pathname,
+        )
+      ) {
+        return false;
+      }
+
+      try {
+        const data = await response.json();
+        return (
+          data?.status?.state === "finished" &&
+          data?.status?.isExpired === false &&
+          data?.status?.searchRoomConfiguration === "[A|A]"
+        );
+      } catch {
+        return false;
+      }
+    },
+    { timeout: 60_000 },
+  );
+
+  await page.goto(searchUrl, {
+    waitUntil: "domcontentloaded",
+    timeout: 60_000,
+  });
+
+  const response = await finishedResponse;
+  const currentUrl = new URL(page.url());
+  const expectedUrl = new URL(searchUrl);
+
+  if (
+    currentUrl.hostname !== expectedUrl.hostname ||
+    currentUrl.pathname !== expectedUrl.pathname
+  ) {
+    throw new Error("CHECK24 old API search context mismatch");
+  }
+
+  const offers = parseCheck24OldAllOffers(await response.json(), nights);
+  if (!offers.length) {
+    throw new Error("CHECK24 old API returned no valid offers");
+  }
+
+  return {
+    apiVersion: "old",
+    url: page.url(),
+    nights,
+    totalOffers: offers.length,
+    offers,
+  };
 }
 
 export async function collectCheck24BeachNew(

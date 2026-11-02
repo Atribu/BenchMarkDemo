@@ -1,6 +1,6 @@
 # DGTLFACE Hotel Benchmark
 
-Miramare Beach ve Miramare Queen icin tarih bazli, ucaksiz OTA fiyat sorgusu. Kapsam yalnizca otel/tarih/kanal secip fiyatlari gormektir; referans fiyat, yuzde farki, Sheets senkronizasyonu ve operasyon yol haritasi panelden cikarilmistir. Next.js / React / TypeScript; tarayici collector'lari Playwright kullanir.
+Miramare Beach, Miramare Queen ve Port Nature Luxury Resort icin tarih bazli, ucaksiz OTA fiyat sorgusu. Kapsam yalnizca otel/tarih/kanal secip fiyatlari gormektir; referans fiyat, yuzde farki, Sheets senkronizasyonu ve operasyon yol haritasi panelden cikarilmistir. Next.js / React / TypeScript; tarayici collector'lari Playwright kullanir.
 
 ## Calistirma
 
@@ -62,12 +62,20 @@ Orijinal SVG logo ve renkler [DGTLFACE](https://dgtlface.com/tr/) sitesinden ali
 
 | Kanal | Mevcut akis | Kalan gereksinim |
 | --- | --- | --- |
+| ANEX Tour | Miramare Beach ve Port Nature icin kesin tarihli Nur Hotel teklifleri; 1 oda/2 yetiskin, EUR toplam, ANEX operatoru, oda ve All Inclusive kontrolu | Son fiyat ve iptal/vergi kosullari rezervasyon adiminda yeniden kontrol edilmeli |
+| CHECK24 | Miramare Beach ve Port Nature icin tarihli Hotel Only aramasi; 1 oda/2 yetiskin, EUR toplam, All Inclusive ve otel bazli oda eslestirmesi | Tum alternatif tarifeler API ozetine girmeyebilir; iptal/vergi kosullari ayri gosterilir |
 | TUI | Ucaksiz rooms-panel servisi; toplam fiyat, otel/tarih/kisi/para birimi kontrolu; oda/balkon ayrimi; pansiyon, iptal ve sehir vergisi bilgisi | Kosullarin diger kanallarla tam esdegerligi ve duzenli erisim garantisi yok |
 | HolidayCheck | Exact-date hotel-only; otel kimligi, 1 oda/2 yetiskin, para birimi; kati oda eslesmesi ve alternatif teklifler; operator, pansiyon, iptal, cashback | Vergi dokumu ve tum iptal kosullari her teklifte mevcut degil; son fiyat/musaitlik yeniden kontrol edilmeli |
 | Booking | Dogrudan otel oda tablosu okuyucusu; tarih/kisi/para birimi ve secilebilir oda toplami kontrolu | Bu ortamda Turkiye ana sayfasina yonleniyor. Oda tablosu birim testli, otomatik canli fiyat henuz dogrulanmadi |
 | Expedia | Almanya/UK otel sayfasinda oda karti, mevcut konaklama toplami, tarih/kisi/para birimi kontrolu | 2 Ekim 2026 otomatik testinde bot dogrulamasi engelledi; canli basari dogrulanmadi |
 | Loveholidays | Beach (371656) ve Queen (371430) icin dogrulanmis Hotel Only otel kimlikleri; GBP/EUR oda toplami, tarih ve kisi kontrolu | 2 Ekim 2026 otomatik testinde erisim dogrulamasi engelledi. Queen 16-21 Ekim Hotel Only sayfasindaki kara ve kismi deniz manzarali oda kartlari okuyucu testlerine eklendi; tarayicida gorulmesi otomatik basari sayilmaz |
 | On the Beach | Hotel Only formu, 2-28 gece, 1 oda/2 yetiskin; otel filtresi, Total Hotel Price, tum oda secenekleri | Tekil collector testinde 16-21 Ekim 2026 Beach icin otomatik 1429.01 / 1524.87 GBP alindi. Sonraki panel/API denemeleri CAPTCHA ile engellendi; duzenli otomasyon henuz dogrulanmadi |
+
+27 Ekim 2026 Port Nature canli kontrolu (31 Ekim-5 Kasim, 5 gece,
+1 oda/2 yetiskin): HolidayCheck kara 1256 EUR, yan deniz 1292 EUR, deniz
+1414 EUR ve aile 1922 EUR; CHECK24 kara 1168 EUR, aile 1200 EUR ve King
+Suite 3250 EUR toplam verdi. Fiyatlar anliktir. Booking bu cikis IP'sinde ana
+sayfaya yonlendigi icin fiyat dogrulanmadi; bu durum doluluk sayilmaz.
 
 Canli collector bulunmasi baglantinin her zaman calisacagi anlamina gelmez. Hucreler bolgesel erisim engeli, site dogrulamasi, eksik API ayari, eksik otel eslestirmesi, sorgu zaman asimi ve oda fiyati eslesmesini ayri etiketlerle gosterir. Siniflandirilamayan hata **Kontrol bekliyor** olarak kalir; dogrulanmis fiyat gibi gosterilmez. Oda manzarasi acik degilse generic isimden kara manzarasi varsayilmaz. Bos veya hatali HTTP 200 cevabi tek basina musaitlik yok kabul edilmez.
 
@@ -194,3 +202,25 @@ Yeni testler Booking/Loveholidays oda fiyat ayristirma, ucakli-gecelik fiyat ayr
 Son eklenen kontroller pazar yonlendirmesini, secilen kanallarin korunmasini, yinelenen islerin engellenmesini, Queen GBP referans guvenligini ve hata etiketlerini kapsar. Toplam 70 test ve TypeScript denetimi gecti. 2 Ekim 2026 tarihinde secili kanallarin iki otelde 16-21 Ekim canli API testinde 6 oda/kanal hucresinde otomatik fiyat ve 0 elle kayit elde edildi. TUI Beach 1502/1610 EUR; HolidayCheck Beach 1458/1566 EUR, Queen 1612.80/1279.88 EUR. TUI Queen teklif dondurmedi; Booking bolgesel yonlendirme, Expedia/Loveholidays dogrulama, On the Beach CAPTCHA/form zaman asimi verdi. Google ek kaynagi bu calistirmada dogrulanmis fiyat vermedi. Arayuzden tekrarlanan canli sorgu da 6 fiyat verdi; Queen HolidayCheck deniz manzarasi o sorguda 1278 EUR idi. Secim hatasi giderildi; tum kanallardan otomatik fiyat alma henuz tamamlanmadi.
 
 Uygulama calisirken `npm run benchmark:live-smoke` bugunden 7 gun sonrasi icin TUI ve HolidayCheck'i iki otelde test eder. Ozel sorgu: `npm run benchmark:live-smoke -- 2026-10-16 2026-10-21 onthebeach beach-uk` (gelecek tarih secin). Test sunucusunu `BENCHMARK_BASE_URL` ile degistirebilirsiniz. Script her hucrede fiyat/durum/neden, kaynak yontemi ve kontrol zamanini, alternatif sayisini ve her pencerenin ilk 6 alternatifini, ayrica HolidayCheck ek kaynak tekliflerini yazar. Otomatik oda fiyati, dogrulanmis alternatif ve ek kaynak teklifi ucu de yoksa cikis kodu 1 olur; elle girilmis kayitlar basari sayilmaz. Cikis kodu 0 tum kanallarin basarili veya dogrudan erisilebilir oldugu anlamina gelmez.
+
+## Yeni Otel Ekleme
+
+Otel, pazar, oda ve oda eslestirme politikalarinin tek kaynagi
+`src/lib/hotels/catalog.ts` dosyasidir. Yeni bir otel eklerken once bu dosyaya:
+
+- benzersiz `key`, gorunen ad ve kisa kod,
+- EUR/GBP kapsam kimlikleri,
+- resmi oda listesi ve manzara turleri,
+- beklenen ana oda kategorisi ve balkon kurali
+
+eklenir. `REPORT_SCOPES`, paneldeki otel listesi ve TypeScript `HotelKey` /
+`ScopeKey` tipleri bu katalogdan uretilir.
+
+Saglayici kimlikleri ve oda adlari `src/lib/ota/live-config.ts` icinde ilgili
+kanalin konfigurasyonuna eklenir. Collector dosyalarina otel adina gore ozel
+kosul yazilmamalidir. Bir kanal, otel kimligi, tarih, doluluk, para birimi ve
+toplam fiyat canli olarak dogrulanmadan `src/lib/ota/registry.ts` icindeki
+`supportedScopes` listesine eklenmez.
+
+Her yeni otel icin `tests/hotel-catalog.test.ts` kapsaminda en az katalog,
+oda eslestirme, saglayici kimligi ve etkin kanal testleri eklenmelidir.

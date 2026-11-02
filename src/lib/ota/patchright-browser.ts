@@ -10,7 +10,7 @@ export interface PatchrightBrowserOptions {
   profilePath?: string;
   headless?: boolean;
   browserChannel?: "chrome" | "chromium";
-  market?: "default" | "uk" | "de" | "us";
+  market?: "default" | "uk" | "de" | "ru" | "us";
   proxyUrl?: string;
   userAgent?: string;
 }
@@ -27,6 +27,10 @@ const MARKET_PRESETS = {
   de: {
     locale: "de-DE",
     timezoneId: "Europe/Berlin",
+  },
+  ru: {
+    locale: "ru-RU",
+    timezoneId: "Europe/Moscow",
   },
   us: {
     locale: "en-US",

@@ -16,6 +16,7 @@ test("unavailable rates distinguish configuration, access, mapping and query fai
       "Site doğrulaması gerekli",
     ],
     ["Site doğrulaması gerekiyor (CAPTCHA).", "Site doğrulaması gerekli"],
+    ["Expedia HTTP 429 döndürdü.", "Site doğrulaması gerekli"],
     ["locator.click: Timeout 15000ms exceeded.", "Sorgu zaman aşımı"],
     [
       "TUI oda servisine ulaşılamadı veya yanıt doğrulanamadı.",

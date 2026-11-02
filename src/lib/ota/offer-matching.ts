@@ -7,6 +7,7 @@ import type {
   ReportScopeDefinition,
   RoomFeatures,
 } from "../benchmark/types";
+import { getHotelDefinition } from "../hotels/catalog";
 
 function normalize(text: string) {
   return text
@@ -96,26 +97,27 @@ export function matchOfferRoom(
   scope: ReportScopeDefinition,
   features: RoomFeatures,
 ) {
+  const policy = getHotelDefinition(scope.hotelKey).matchingPolicy;
   if (features.category === "variant")
     return { matchReason: "Ekonomi, aile veya farklı oda kategorisi." };
-  if (features.view === "partial-sea")
+  if (features.view === "partial-sea" && !policy.roomByView["partial-sea"])
     return {
       matchReason:
         "Yan/kısmi deniz manzarası; tam deniz manzarası ile eşdeğer değil.",
     };
   if (features.view === "unknown")
     return { matchReason: "Odanın manzarası doğrulanamadı." };
-  if (features.balcony === "no")
+  if (features.balcony === "no" && policy.requireBalcony)
     return {
       matchReason: "Balkonsuz oda; normal oda satırına dahil edilmedi.",
     };
-  const expectedCategory =
-    scope.hotelKey === "miramare-beach" ? "superior" : "standard";
-  if (features.category !== expectedCategory)
+  if (features.category !== policy.category)
     return { matchReason: "İstenen oda kategorisi doğrulanamadı." };
-  if (scope.hotelKey === "miramare-beach" && features.balcony !== "yes")
-    return { matchReason: "Superior odanın balkon bilgisi doğrulanamadı." };
-  const roomId = `${expectedCategory}-${features.view === "sea" ? "sea" : "land"}`;
+  if (policy.requireBalcony && features.balcony !== "yes")
+    return { matchReason: "Odanın balkon bilgisi doğrulanamadı." };
+  const roomId = policy.roomByView[features.view];
+  if (!roomId)
+    return { matchReason: "Bu manzara için doğrulanmış oda eşleştirmesi yok." };
   return scope.rooms.some((room) => room.id === roomId)
     ? {
         matchedRoomId: roomId,

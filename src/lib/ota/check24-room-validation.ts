@@ -9,7 +9,10 @@ import type {
 
 import {
   matchCheck24BeachRoom,
+  matchCheck24PortNatureRoom,
 } from "./check24-room-mapping";
+
+import type { HotelKey } from "@/src/lib/hotels/catalog";
 
 import {
   extractCheck24RoomFeatures,
@@ -241,4 +244,62 @@ export function validateCheck24BeachOffer(
       "Tarife koşulları oda eşleşmesinden bağımsız olarak gösterilir.",
     ],
   };
+}
+
+export function validateCheck24PortNatureOffer(
+  offer: Check24ParsedOffer,
+  expectedNights: number,
+): Check24RoomValidationResult {
+  const features = extractCheck24RoomFeatures(
+    offer.roomName,
+    offer.sourceRoomDescription ?? offer.roomCategoryName,
+  );
+  const roomId = matchCheck24PortNatureRoom(offer);
+  const reject = (reason: string): Check24RoomValidationResult => ({
+    status: "rejected",
+    roomId,
+    features,
+    reasons: [reason],
+  });
+
+  if (offer.roomOccupancy !== "[A|A]") {
+    return reject("Beklenen kişi sayısı 2 yetişkin değil.");
+  }
+  if (offer.currency !== "EUR") {
+    return reject("Para birimi EUR değil.");
+  }
+  if (!Number.isFinite(offer.totalPrice) || offer.totalPrice <= 0) {
+    return reject("Geçerli bir toplam fiyat bulunamadı.");
+  }
+  if (offer.nights !== expectedNights) {
+    return reject("Konaklama süresi uyuşmuyor.");
+  }
+  if (
+    !["all_inclusive", "MEAL_TYPE_ALL_INCLUSIVE"].includes(offer.mealType)
+  ) {
+    return reject("Pansiyon All Inclusive değil.");
+  }
+  if (!roomId) {
+    return reject("Oda adı Port Nature benchmark kategorileriyle eşleşmedi.");
+  }
+
+  return {
+    status: "matched",
+    roomId,
+    features,
+    reasons: [
+      "Port Nature oda adı açık manzara veya oda tipi ifadesiyle eşleşti.",
+      "Tarife koşulları oda eşleşmesinden bağımsız olarak gösterilir.",
+    ],
+  };
+}
+
+export function validateCheck24Offer(
+  offer: Check24ParsedOffer,
+  expectedNights: number,
+  hotelKey: HotelKey,
+): Check24RoomValidationResult {
+  return hotelKey === "port-nature"
+    ? validateCheck24PortNatureOffer(offer, expectedNights)
+    : validateCheck24BeachOffer(offer, expectedNights);
 }

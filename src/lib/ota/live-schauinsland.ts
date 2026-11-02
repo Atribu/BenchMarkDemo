@@ -38,7 +38,7 @@ export interface SchauinslandOffer {
 
 
 export interface SchauinslandSearchCriteria {
-  hotelId: "4893" | "4894";
+  hotelId: string;
   checkIn: string;
   checkOut: string;
   nights: number;

@@ -36,10 +36,12 @@ export function buildCollectionPlan(
       const scope = alternate
         ? { ...alternate, windows: requestedScope.windows }
         : requestedScope;
-      const key = `${scope.id}:${provider.key}`;
+      const supported = direct || !!alternate;
+      const key = supported
+        ? `${scope.id}:${provider.key}`
+        : `${scope.hotelKey}:unsupported:${provider.key}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const supported = direct || !!alternate;
       const reason = supported
         ? undefined
         : `${provider.name}: ${scope.hotelName} için otel/pazar eşleştirmesi eksik. Bu kanala sorgu gönderilmedi.`;

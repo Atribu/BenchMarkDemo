@@ -11,7 +11,8 @@ export function PriceSummary({ report }: { report: BenchmarkRunResult }) {
       <p>
         1 oda / 2 yetişkin için uçaksız konaklama toplamları. Her kanalda
         bulunan en düşük teklif gösterilir; oda ve pansiyonlar farklı olabilir.
-        EUR ve GBP çevrilmez.
+        RUB fiyatları TCMB resmi günlük döviz satış kuru ile EUR'a çevrilir;
+        kaynak RUB tutarı hemen altında gösterilir. GBP çevrilmez.
       </p>
       {hotels.map((hotel) => (
         <div key={hotel} className="priceOverviewHotel">
@@ -26,11 +27,27 @@ export function PriceSummary({ report }: { report: BenchmarkRunResult }) {
                 >
                   <span>{item.providerName}</span>
                   <small>{item.marketLabel}</small>
-                  <strong>
-                    {item.price === null
-                      ? "Fiyat alınamadı"
-                      : formatCurrency(item.price, item.currency)}
-                  </strong>
+                  {item.price === null ? (
+                    <strong>Fiyat alınamadı</strong>
+                  ) : item.conversion ? (
+                    <div className="convertedPriceBlock">
+                      <strong>
+                        {formatCurrency(
+                          item.conversion.convertedAmount,
+                          item.conversion.convertedCurrency,
+                        )}
+                      </strong>
+                      <small className="originalCurrencyPrice">
+                        {formatCurrency(
+                          item.conversion.originalAmount,
+                          item.conversion.originalCurrency,
+                        )}{" "}
+                        · TCMB {item.conversion.rateDate}
+                      </small>
+                    </div>
+                  ) : (
+                    <strong>{formatCurrency(item.price, item.currency)}</strong>
+                  )}
                   <small>
                     {item.checkIn} → {item.checkOut} · {item.nights} gece
                   </small>

@@ -1,4 +1,5 @@
 import type { BenchmarkRunResult, CurrencyCode, OtaKey } from "./types";
+import type { CurrencyConversion } from "./currency/tcmb";
 import { benchmarkStatusLabel } from "./status";
 
 export interface PriceSummaryItem {
@@ -16,6 +17,7 @@ export interface PriceSummaryItem {
   source: string;
   description: string;
   observedAt?: string;
+  conversion?: CurrencyConversion;
 }
 
 export function buildPriceSummary(
@@ -51,6 +53,7 @@ export function buildPriceSummary(
               price: cell.scrapedPrice!,
               description: cell.offerDescription || "Oda teklifi",
               observedAt: cell.observedAt,
+              conversion: cell.conversion,
             })),
           ...(window.alternativeOffers ?? [])
             .filter((offer) => offer.providerKey === provider.key)
@@ -58,6 +61,7 @@ export function buildPriceSummary(
               price: offer.price,
               description: `${offer.roomName} · ${offer.terms.board}`,
               observedAt: offer.observedAt,
+              conversion: offer.conversion,
             })),
         ]
           .filter((value) => Number.isFinite(value.price) && value.price > 0)

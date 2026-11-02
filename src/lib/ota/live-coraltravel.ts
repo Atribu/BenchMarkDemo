@@ -11,9 +11,397 @@ import { deduplicateOffers, selectOfferQuotes } from "./offer-matching";
 import { matchCoralTravelRoom } from "./coraltravel-rooms";
 import { searchCoralTravel } from "./coraltravel-search";
 import { createHash } from "node:crypto";
+import { CORALTRAVEL_HOTEL_CONFIG } from "./live-config";
 
 const HOME = "https://coraltravel.de/";
-const HOTEL_IDS = { "miramare-beach": "4893" } as const;
+const HOME_RU = "https://www.coral.ru/";
+
+type CoralRuSearchCriteria = {
+  beginDates: string[];
+  arrivalLocations: Array<{
+    id: string;
+    type: number;
+    name: string;
+    friendlyUrl: string;
+    parent: { id: string; type: number; name: string; countryId: string };
+  }>;
+  nights: Array<{ value: number }>;
+  roomCriterias: Array<{
+    passengers: Array<{ age: number; passengerType: number }>;
+  }>;
+  reservationType: number;
+  paging: { pageNumber: number; pageSize: number; sortType: number };
+  additionalFilters: unknown[];
+  imageSizes: number[];
+};
+
+type CoralRuPayload = {
+  result?: {
+    searchCriterias?: {
+      reservationType?: number;
+      beginDates?: string[];
+      nights?: Array<{ value?: number }>;
+      arrivalLocations?: Array<{ id?: string; name?: string }>;
+      roomCriterias?: Array<{
+        passengers?: Array<{ passengerType?: number }>;
+      }>;
+    };
+    rooms?: Record<string, { name?: string }>;
+    meals?: Record<string, { name?: string }>;
+    products?: Array<{
+      hotel?: { id?: string | number; name?: string };
+      offers?: Array<{
+        checkInDate?: string;
+        checkOutDate?: string;
+        stayNights?: number;
+        flight?: unknown;
+        price?: { amount?: string | number; currency?: string };
+        rooms?: Array<{
+          roomKey?: string;
+          mealKey?: string;
+          passengers?: Array<{ passengerType?: number }>;
+        }>;
+      }>;
+    }>;
+  };
+};
+
+function coralRuIsoDate(value: string): string {
+  return `${value}T00:00:00Z`;
+}
+
+function buildCoralRuSearchCriteria(
+  scope: ReportScopeDefinition,
+  window: ReportScopeDefinition["windows"][number],
+): CoralRuSearchCriteria {
+  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const location = config?.ruLocation;
+  if (!config || !location) {
+    throw new Error("Coral Travel Rusya otel konum kimliği eksik.");
+  }
+  return {
+    beginDates: [coralRuIsoDate(window.checkIn), coralRuIsoDate(window.checkOut)],
+    arrivalLocations: [
+      {
+        id: location.requestId,
+        type: 7,
+        name: config.hotelName,
+        friendlyUrl: location.friendlyUrl,
+        parent: {
+          id: location.parentId,
+          type: 6,
+          name: location.parentName,
+          countryId: "1-0",
+        },
+      },
+    ],
+    nights: [{ value: window.nights }],
+    roomCriterias: [
+      {
+        passengers: [
+          { age: 20, passengerType: 0 },
+          { age: 20, passengerType: 0 },
+        ],
+      },
+    ],
+    reservationType: 2,
+    paging: { pageNumber: 1, pageSize: 20, sortType: 0 },
+    additionalFilters: [],
+    imageSizes: [0],
+  };
+}
+
+function validateCoralRuDecryptedSearch(
+  response: unknown,
+  scope: ReportScopeDefinition,
+  window: ReportScopeDefinition["windows"][number],
+): boolean {
+  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const result = response as {
+    result?: {
+      searchCriterias?: {
+        reservationType?: number;
+        beginDates?: string[];
+        nights?: Array<{ value?: number }>;
+        arrivalLocations?: Array<{ id?: string }>;
+        roomCriterias?: Array<{ passengers?: Array<{ passengerType?: number }> }>;
+      };
+    };
+  };
+  const criteria = result.result?.searchCriterias;
+  const passengers = criteria?.roomCriterias?.[0]?.passengers ?? [];
+  return Boolean(
+    config?.ruLocation &&
+      criteria?.reservationType === 1 &&
+      criteria.beginDates?.[0] === window.checkIn &&
+      criteria.beginDates?.[1] === window.checkOut &&
+      criteria.nights?.[0]?.value === window.nights &&
+      criteria.arrivalLocations?.[0]?.id === config.ruLocation.id &&
+      passengers.length === 2 &&
+      passengers.every((passenger) => passenger.passengerType === 0),
+  );
+}
+
+function normalizeCoralRuName(value: unknown): string {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function parseCoralRuOffers(
+  response: unknown,
+  provider: ProviderDescriptor,
+  scope: ReportScopeDefinition,
+  window: ReportScopeDefinition["windows"][number],
+  sourceHint: string,
+): CollectedOffer[] {
+  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const result = (response as CoralRuPayload)?.result;
+  if (!config?.ruLocation || !result?.products) return [];
+  const expectedHotel = normalizeCoralRuName(config.hotelName);
+  const observedAt = new Date().toISOString();
+  const offers: CollectedOffer[] = [];
+
+  for (const [productIndex, product] of result.products.entries()) {
+    if (normalizeCoralRuName(product.hotel?.name) !== expectedHotel) continue;
+    for (const [offerIndex, offer] of (product.offers ?? []).entries()) {
+      if (offer.flight != null) continue;
+      if (offer.checkInDate?.slice(0, 10) !== window.checkIn) continue;
+      if (offer.checkOutDate?.slice(0, 10) !== window.checkOut) continue;
+      if (offer.stayNights !== window.nights) continue;
+      if (offer.price?.currency !== "RUB") continue;
+      const price = Number(offer.price.amount);
+      if (!Number.isFinite(price) || price <= 0 || price > 100_000_000) continue;
+      if (offer.rooms?.length !== 1) continue;
+      const sourceRoom = offer.rooms[0];
+      const passengers = sourceRoom.passengers ?? [];
+      if (
+        passengers.length !== 2 ||
+        passengers.some((passenger) => passenger.passengerType !== 0)
+      ) {
+        continue;
+      }
+      const roomName = result.rooms?.[sourceRoom.roomKey ?? ""]?.name?.trim();
+      const board = result.meals?.[sourceRoom.mealKey ?? ""]?.name?.trim();
+      if (!roomName || !board) continue;
+      if (!/all[\s-]*inclusive|все\s+включено|ультра|премиум/i.test(board)) {
+        continue;
+      }
+      const match = matchCoralTravelRoom(scope, sourceRoom.roomKey ?? "", roomName);
+      offers.push({
+        id: `coraltravel-ru:${scope.id}:${window.id}:${productIndex}:${offerIndex}`,
+        sourceProductCode: sourceRoom.roomKey,
+        sourceBoardCode: sourceRoom.mealKey,
+        providerKey: provider.key,
+        scopeKey: scope.id,
+        windowId: window.id,
+        checkIn: window.checkIn,
+        checkOut: window.checkOut,
+        nights: window.nights,
+        rooms: 1,
+        adults: 2,
+        price,
+        currency: "RUB",
+        roomName,
+        roomFeatures: match.features,
+        terms: {
+          board,
+          cancellation: "Kaynakta doğrulanmalı",
+          taxes: "Kaynakta doğrulanmalı",
+          operator: "Coral Travel Russia",
+          availability:
+            "Coral Travel Rusya hotel-only fiyat servisinde listelendi",
+        },
+        sourceHint,
+        observedAt,
+        matchedRoomId: match.matchedRoomId,
+        matchReason: match.reason,
+      });
+    }
+  }
+  return offers;
+}
+
+async function collectCoralRuLiveQuotes(
+  provider: ProviderDescriptor,
+  scope: ReportScopeDefinition,
+): Promise<ProviderCollectionResult> {
+  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  if (!config?.ruLocation || scope.currency !== "RUB") {
+    return buildManualReviewQuotes(
+      provider,
+      scope,
+      config?.pageUrl ?? HOME_RU,
+      "Coral Travel Rusya otel kimliği veya RUB kapsamı doğrulanmadı.",
+    );
+  }
+
+  const quotes: ProviderQuote[] = [];
+  const offers: CollectedOffer[] = [];
+  const warnings: string[] = [];
+  for (const window of scope.windows) {
+    let handle: Awaited<ReturnType<typeof createPatchrightBrowserPage>> | undefined;
+    let sourceHint = config.pageUrl;
+    try {
+      handle = await createPatchrightBrowserPage({
+        profilePath: `./.benchmark-state/coraltravel-ru-${scope.id}-${process.pid}`,
+        headless: false,
+        market: "ru",
+        proxyUrl: process.env.CORALTRAVEL_RU_PROXY_URL || undefined,
+      });
+      const { page, context } = handle;
+      const navigation = await page.goto(HOME_RU, {
+        waitUntil: "domcontentloaded",
+        timeout: 60_000,
+      });
+      if (!navigation || (navigation.status() !== 200 && navigation.status() !== 503)) {
+        throw new Error(`Coral Travel Rusya ana sayfa HTTP ${navigation?.status() ?? "unknown"}`);
+      }
+
+      const encrypted = await context.request.post(
+        `${HOME_RU}endpoints/OnlyHotelProduct/PriceSearchEncrypt`,
+        {
+          data: buildCoralRuSearchCriteria(scope, window),
+          headers: {
+            Accept: "*/*",
+            "Content-Type": "application/json",
+            Origin: "https://www.coral.ru",
+            Referer: HOME_RU,
+          },
+          timeout: 60_000,
+        },
+      );
+      if (!encrypted.ok()) {
+        throw new Error(`Coral Travel Rusya arama servisi HTTP ${encrypted.status()}`);
+      }
+      const encryptedBody = (await encrypted.json()) as {
+        result?: {
+          redirectionUrlWithQueryParam?: string;
+          queryParam?: string;
+        };
+      };
+      const redirect = encryptedBody.result?.redirectionUrlWithQueryParam;
+      const encodedQueryParam = encryptedBody.result?.queryParam?.replace(
+        /^qp=/,
+        "",
+      );
+      if (!redirect?.includes("/hotels/") || !encodedQueryParam) {
+        throw new Error("Coral Travel Rusya hotel-only yönlendirmesi alınamadı.");
+      }
+      sourceHint = new URL(redirect, HOME_RU).toString();
+
+      const decryptedResponse = await context.request.post(
+        `${HOME_RU}endpoints/PackageTourHotelProduct/PriceSearchDecrypt`,
+        {
+          data: { queryParam: encodedQueryParam },
+          headers: {
+            Accept: "*/*",
+            "Content-Type": "application/json",
+            Origin: "https://www.coral.ru",
+            Referer: sourceHint,
+          },
+          timeout: 60_000,
+        },
+      );
+      if (!decryptedResponse.ok()) {
+        throw new Error(
+          `Coral Travel Rusya kriter doğrulama servisi HTTP ${decryptedResponse.status()}`,
+        );
+      }
+      const decryptedBody = await decryptedResponse.json();
+      if (
+        !validateCoralRuDecryptedSearch(
+          decryptedBody,
+          scope,
+          window,
+        )
+      ) {
+        throw new Error(
+          "Coral Travel Rusya sonuç kriterleri otel, tarih, gece veya 2 yetişkin koşuluyla eşleşmiyor.",
+        );
+      }
+
+      const decryptedCriteria = (decryptedBody as CoralRuPayload).result
+        ?.searchCriterias;
+      const priceResponse = await context.request.post(
+        `${HOME_RU}endpoints/OnlyHotelProduct/PriceSearchList`,
+        {
+          data: { searchSource: 1, searchCriterias: decryptedCriteria },
+          headers: {
+            Accept: "*/*",
+            "Content-Type": "application/json",
+            Origin: "https://www.coral.ru",
+            Referer: sourceHint,
+          },
+          timeout: 60_000,
+        },
+      );
+      if (!priceResponse.ok()) {
+        throw new Error(
+          `Coral Travel Rusya fiyat servisi HTTP ${priceResponse.status()}`,
+        );
+      }
+      const priceBody = (await priceResponse.json()) as CoralRuPayload;
+      const observedAt = new Date().toISOString();
+      const products = priceBody.result?.products ?? [];
+      const windowOffers = deduplicateOffers(
+        parseCoralRuOffers(priceBody, provider, scope, window, sourceHint),
+      );
+      if (!products.length) {
+        quotes.push(
+          ...scope.rooms.map((room): ProviderQuote => ({
+            providerKey: provider.key,
+            scopeKey: scope.id,
+            windowId: window.id,
+            roomId: room.id,
+            price: null,
+            currency: "RUB",
+            status: "sold_out",
+            dataMode: "live",
+            captureMethod: "automated",
+            observedAt,
+            sourceHint,
+            reason:
+              "Coral Travel Rusya doğrulanmış hotel-only aramasında seçilen tarihler için teklif döndürmedi.",
+          })),
+        );
+        continue;
+      }
+      if (!windowOffers.length) {
+        throw new Error(
+          "Coral Travel Rusya ürün döndürdü ancak doğrulanmış RUB hotel-only oda teklifi ayrıştırılamadı.",
+        );
+      }
+      offers.push(...windowOffers);
+      quotes.push(
+        ...selectOfferQuotes(provider, scope, window, windowOffers, sourceHint),
+      );
+    } catch (error) {
+      const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+      warnings.push(`Coral Travel Rusya / ${scope.hotelName} / ${window.checkIn}: ${reason}`);
+      quotes.push(
+        ...scope.rooms.map((room): ProviderQuote => ({
+          providerKey: provider.key,
+          scopeKey: scope.id,
+          windowId: window.id,
+          roomId: room.id,
+          price: null,
+          currency: "RUB",
+          status: "manual-review",
+          dataMode: "live",
+          sourceHint,
+          reason,
+        })),
+      );
+    } finally {
+      await handle?.close().catch(() => undefined);
+    }
+  }
+  return { quotes, offers, warnings };
+}
 
 type ApiOffer = {
   productType?: string;
@@ -53,7 +441,8 @@ function parseOffers(
   )
     return [];
   const result = data as ApiPayload;
-  const expectedHotel = HOTEL_IDS["miramare-beach"];
+  const expectedHotel = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey]?.giataId;
+  if (!expectedHotel) return [];
   const resultOffers: CollectedOffer[] = [];
   for (const [index, offer] of (result.offerList ?? []).entries()) {
     if (
@@ -127,15 +516,27 @@ function parseOffers(
   return resultOffers;
 }
 
-export const __coralTravelInternal = { parseOffers };
+export const __coralTravelInternal = {
+  parseOffers,
+  buildCoralRuSearchCriteria,
+  validateCoralRuDecryptedSearch,
+  parseCoralRuOffers,
+};
 
 export async function collectCoralTravelLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
-  // Queen is intentionally disabled until its GIATA ID, room codes, and form
-  // selection are confirmed in a real capture.
-  if (scope.hotelKey !== "miramare-beach" || scope.currency !== "EUR") {
+  const hotelConfig = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  if (hotelConfig?.market === "ru") {
+    return collectCoralRuLiveQuotes(provider, scope);
+  }
+  if (
+    scope.currency !== "EUR" ||
+    !hotelConfig?.giataId ||
+    !hotelConfig.searchQuery ||
+    !hotelConfig.suggestion
+  ) {
     return buildManualReviewQuotes(
       provider,
       scope,
@@ -355,6 +756,33 @@ export async function collectCoralTravelLiveQuotes(
           responseTime: item.responseTime,
         })),
       );
+
+      if (
+        offersResponseCount > 0 &&
+        totalResultCount === 0 &&
+        rawOffers.length === 0
+      ) {
+        quotes.push(
+          ...scope.rooms.map(
+            (room): ProviderQuote => ({
+              providerKey: provider.key,
+              scopeKey: scope.id,
+              windowId: window.id,
+              roomId: room.id,
+              price: null,
+              currency: scope.currency,
+              status: "sold_out",
+              dataMode: "live",
+              captureMethod: "automated",
+              observedAt: new Date().toISOString(),
+              sourceHint,
+              reason:
+                "CoralTravel doğrulanmış otel-only aramasında seçilen tarihler için teklif döndürmedi.",
+            }),
+          ),
+        );
+        continue;
+      }
 
       const windowOffers = deduplicateOffers(
         payloads.flatMap((payload) =>

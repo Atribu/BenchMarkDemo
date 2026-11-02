@@ -37,6 +37,10 @@ const queen = {
   ...REPORT_SCOPES.find((scope) => scope.id === "queen-eu")!,
   windows: [window],
 };
+const portNature = {
+  ...REPORT_SCOPES.find((scope) => scope.id === "port-nature-eu")!,
+  windows: [window],
+};
 const hc = OTA_PROVIDERS.find((provider) => provider.key === "holidaycheck")!;
 const url =
   "https://www.holidaycheck.de/ho/angebote-hotel-miramare-beach/976607ee-0f98-365d-bdbf-f96af4b03a6d/hotelonly?_offer=departureDate:2026-10-23,duration:exactly,returnDate:2026-10-28,rooms:a-a";
@@ -167,6 +171,38 @@ test("HolidayCheck maps the verified Beach economy name without relaxing generic
     (quote) => quote.roomId === "economy",
   );
   assert.equal(economy?.price, 1296);
+});
+
+test("HolidayCheck maps Port Nature live room labels through exact aliases", () => {
+  const portUrl = buildHolidayCheckHotelOnlyUrl(
+    "https://www.holidaycheck.de/hi/port-nature-luxury-resort-spa/6a10924b-2286-3a46-b5db-ad9802b8d226",
+    window.checkIn,
+    window.checkOut,
+  )!;
+  const roomCases = [
+    ["Doppelzimmer", "standard-land", 1246],
+    ["DZ seitl. Meerblick", "standard-side-sea", 1282],
+    ["Doppelzimmer Meerblick", "standard-sea", 1406],
+    ["FZ seitl. Meerblick", "family", 1918],
+  ] as const;
+  const offers = parseHolidayCheckOffers(
+    hc,
+    portNature,
+    window,
+    roomCases.map(([name, , amount]) =>
+      raw({
+        hotelId: "6a10924b-2286-3a46-b5db-ad9802b8d226",
+        room: { name },
+        totalPrice: { amount, currency: "EUR" },
+      }),
+    ),
+    portUrl,
+  );
+
+  assert.deepEqual(
+    offers.map((offer) => [offer.roomName, offer.matchedRoomId, offer.price]),
+    roomCases,
+  );
 });
 
 test("Queen accepts explicit standard/double views but not superior or partial-sea upgrades", () => {

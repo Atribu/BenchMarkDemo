@@ -10,6 +10,7 @@ import type {
   BenchmarkRunResult,
   CollectionMode,
   CollectedOffer,
+  CurrencyCode,
   RoomFeatures,
   SecondaryOffer,
   BrowserImportedOffer,
@@ -24,6 +25,10 @@ import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
 import { benchmarkStatusLabel } from "@/src/lib/benchmark/status";
 import { offerConditions } from "@/src/lib/ota/offer-matching";
 import { formatCurrency, formatDateTime } from "@/src/lib/utils/format";
+import {
+  HOTEL_CATALOG,
+  getHotelDefinition,
+} from "@/src/lib/hotels/catalog";
 
 interface BenchmarkDashboardProps {
   today: string;
@@ -104,10 +109,10 @@ const CHANNEL_INFO: Record<
 },
 
   anextour: {
-  label: "Entegrasyon hazırlanıyor",
+  label: "Hotel-only · Beta",
   detail:
-    "ANEX Tour Nur Hotel (uçaksız konaklama). Yalnızca ANEX operatörünün EUR toplam fiyatları kabul edilecek. Canlı fiyat toplama henüz bağlı değil.",
-  type: "setup",
+    "ANEX Tour Nur Hotel akışından yalnızca ANEX operatörünün kesin tarihli, 1 oda / 2 yetişkin EUR toplam fiyatları alınır. Otel ve oda kimliği doğrulanmayan teklifler karşılaştırmaya girmez.",
+  type: "beta",
 },
   tui: {
     label: "Hotel-only · Beta",
@@ -156,40 +161,47 @@ check24: {
   type: "beta",
 },
   coraltravel: {
-    label: "Entegrasyon hazırlanıyor",
+    label: "Hotel-only · Beta",
     detail:
-      "Coral Travel Almanya Nur Hotel akışında otel ve tarih seçimi " +
-      "doğrulanıyor. Uçuşlu paketler karşılaştırmaya alınmayacak; " +
-      "canlı fiyat collector henüz aktif değil.",
-    type: "setup",
+      "Miramare Beach Almanya / EUR akışında, Port Nature ise " +
+      "Rusya / RUB kaynağında tutulur. RUB kaynak fiyatı korunur ve panelde " +
+      "TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir; " +
+      "yalnızca doğrulanmış hotel-only teklifler kabul edilir.",
+    type: "beta",
   },
 
 };
 
-const PORTFOLIOS: { value: string; label: string; scopes: ScopeKey[] }[] = [
-  {
-    value: "both-eu",
-    label: "İki otel · Avrupa",
-    scopes: ["beach-eu", "queen-eu"],
-  },
-  { value: "beach-eu", label: "Miramare Beach · Avrupa", scopes: ["beach-eu"] },
-  { value: "queen-eu", label: "Miramare Queen · Avrupa", scopes: ["queen-eu"] },
-  {
-    value: "beach-uk",
-    label: "Miramare Beach · Birleşik Krallık",
-    scopes: ["beach-uk"],
-  },
-  {
-    value: "queen-uk",
-    label: "Miramare Queen · Birleşik Krallık",
-    scopes: ["queen-uk"],
-  },
-  {
-    value: "both-uk",
-    label: "İki otel · Birleşik Krallık",
-    scopes: ["beach-uk", "queen-uk"],
-  },
-];
+function buildPortfolios(scopeCatalog: ReportScopeDefinition[]) {
+  const hotelCount = new Set(scopeCatalog.map((scope) => scope.hotelKey)).size;
+  const options: { value: string; label: string; scopes: ScopeKey[] }[] = [
+    {
+      value: "all",
+      label: `${hotelCount} otel · Tüm pazarlar`,
+      scopes: scopeCatalog.map((scope) => scope.id),
+    },
+  ];
+
+  for (const currency of ["EUR", "GBP", "RUB"] as const) {
+    const scopes = scopeCatalog.filter((scope) => scope.currency === currency);
+    if (scopes.length > 1) {
+      options.push({
+        value: `all-${currency.toLowerCase()}`,
+        label: `${new Set(scopes.map((scope) => scope.hotelKey)).size} otel · ${scopes[0].marketLabel}`,
+        scopes: scopes.map((scope) => scope.id),
+      });
+    }
+  }
+
+  options.push(
+    ...scopeCatalog.map((scope) => ({
+      value: scope.id,
+      label: `${scope.hotelName} · ${scope.marketLabel}`,
+      scopes: [scope.id],
+    })),
+  );
+  return options;
+}
 
 function shortDate(date: string) {
   return new Intl.DateTimeFormat("tr-TR", {
@@ -242,7 +254,25 @@ function AlternativeOfferCard({
               ?.name ??
             offer.providerKey}
         </span>
-        <strong>{formatCurrency(offer.price, offer.currency)}</strong>
+        {offer.conversion ? (
+          <div className="convertedPriceBlock">
+            <strong>
+              {formatCurrency(
+                offer.conversion.convertedAmount,
+                offer.conversion.convertedCurrency,
+              )}
+            </strong>
+            <small className="originalCurrencyPrice">
+              {formatCurrency(
+                offer.conversion.originalAmount,
+                offer.conversion.originalCurrency,
+              )}{" "}
+              · TCMB {offer.conversion.rateDate}
+            </small>
+          </div>
+        ) : (
+          <strong>{formatCurrency(offer.price, offer.currency)}</strong>
+        )}
       </div>
       {advertisedName && (
         <p className="secondarySourceBadge">
@@ -451,7 +481,7 @@ function RateCell({
   secondaryOfferCount = 0,
 }: {
   cell: BenchmarkCell;
-  currency: "EUR" | "GBP";
+  currency: CurrencyCode;
   secondaryOfferCount?: number;
 }) {
   const url = cell.dataMode === "live" ? sourceUrl(cell.sourceHint) : null;
@@ -464,9 +494,27 @@ function RateCell({
         <span className="statusDot" />
         {benchmarkStatusLabel(cell)}
       </span>
-      <strong className={available ? "rateValue" : "rateValue unconfirmed"}>
-        {formatCurrency(cell.scrapedPrice, currency)}
-      </strong>
+      {cell.conversion ? (
+        <div className="convertedRateValue">
+          <strong className={available ? "rateValue" : "rateValue unconfirmed"}>
+            {formatCurrency(
+              cell.conversion.convertedAmount,
+              cell.conversion.convertedCurrency,
+            )}
+          </strong>
+          <small className="originalCurrencyPrice">
+            {formatCurrency(
+              cell.conversion.originalAmount,
+              cell.conversion.originalCurrency,
+            )}{" "}
+            · TCMB {cell.conversion.rateDate}
+          </small>
+        </div>
+      ) : (
+        <strong className={available ? "rateValue" : "rateValue unconfirmed"}>
+          {formatCurrency(cell.scrapedPrice, currency)}
+        </strong>
+      )}
       {!available && (
         <span className="rateNote">
           {cell.scrapedPrice !== null
@@ -533,6 +581,10 @@ export function BenchmarkDashboard({
   scopeCatalog,
   managedSourceReady = false,
 }: BenchmarkDashboardProps) {
+  const portfolios = buildPortfolios(scopeCatalog);
+  const visibleHotels = HOTEL_CATALOG.filter((hotel) =>
+    scopeCatalog.some((scope) => scope.hotelKey === hotel.key),
+  );
   const [section, setSection] = useState<Section>("benchmark");
   const [report, setReport] = useState<BenchmarkRunResult | null>(null);
   const [selectedProviders, setSelectedProviders] = useState(
@@ -639,12 +691,12 @@ export function BenchmarkDashboard({
 
 
   const portfolio =
-    PORTFOLIOS.find(
+    portfolios.find(
       (option) => option.scopes.join(",") === selectedScopes.join(","),
-    )?.value ?? "both-eu";
+    )?.value ?? portfolios[0].value;
 
   function selectPortfolio(value: string) {
-    const scopes = PORTFOLIOS.find((option) => option.value === value)!.scopes;
+    const scopes = portfolios.find((option) => option.value === value)!.scopes;
     setSelectedScopes(scopes);
   }
 
@@ -740,18 +792,17 @@ export function BenchmarkDashboard({
         </nav>
         <div className="portfolioCard">
           <span className="eyebrow">OTEL PORTFÖYÜ</span>
-          <div>
-            <span className="hotelMonogram">MB</span>
-            <p>
-              Miramare Beach<small>Avrupa & Birleşik Krallık</small>
-            </p>
-          </div>
-          <div>
-            <span className="hotelMonogram">MQ</span>
-            <p>
-              Miramare Queen<small>Avrupa & Birleşik Krallık</small>
-            </p>
-          </div>
+          {visibleHotels.map((hotel) => (
+            <div key={hotel.key}>
+              <span className="hotelMonogram">{hotel.shortCode}</span>
+              <p>
+                {hotel.name}
+                <small>
+                  {hotel.scopes.map((scope) => scope.marketLabel).join(" & ")}
+                </small>
+              </p>
+            </div>
+          ))}
         </div>
         <div className="sidebarFoot">
           <span className="brandGradientLine" />
@@ -767,7 +818,7 @@ export function BenchmarkDashboard({
       <main className="workspace">
         <header className="topbar">
           <div>
-            <span className="breadcrumb">Miramare Collection</span>
+            <span className="breadcrumb">Otel Portföyü</span>
             <span className="crumbDivider">/</span>
             <strong>
               {navItems.find((item) => item.id === section)?.label}
@@ -789,7 +840,7 @@ export function BenchmarkDashboard({
                   <span>Farkı yönetin.</span>
                 </h1>
                 <p className="heroLead">
-                  İki otel. Tek bakış. Seçtiğiniz tarihlerdeki
+                  {visibleHotels.length} otel. Tek bakış. Seçtiğiniz tarihlerdeki
                   <br className="desktopBreak" /> uçaksız OTA fiyatlarını aynı
                   raporda karşılaştırın.
                 </p>
@@ -830,7 +881,7 @@ export function BenchmarkDashboard({
                       value={portfolio}
                       onChange={(event) => selectPortfolio(event.target.value)}
                     >
-                      {PORTFOLIOS.map((item) => (
+                      {portfolios.map((item) => (
                         <option key={item.value} value={item.value}>
                           {item.label}
                         </option>
@@ -1197,7 +1248,7 @@ export function BenchmarkDashboard({
                       <header className="scopeHeading">
                         <div>
                           <span className="hotelIndex">
-                            {scope.hotelKey === "miramare-beach" ? "MB" : "MQ"}
+                            {getHotelDefinition(scope.hotelKey).shortCode}
                           </span>
                           <div>
                             <h3>{scope.hotelName}</h3>
@@ -1457,12 +1508,22 @@ export function BenchmarkDashboard({
                     <h2>{provider.name}</h2>
                     <p>{info.detail}</p>
                     <div className="channelMarkets">
-                      {provider.supportedScopes.includes("beach-eu")
-                        ? "Avrupa / EUR"
-                        : ""}
-                      {provider.supportedScopes.includes("beach-uk")
-                        ? `${provider.supportedScopes.includes("beach-eu") ? " · " : ""}Birleşik Krallık / GBP`
-                        : ""}
+                      {scopeCatalog
+                        .filter((scope) =>
+                          provider.supportedScopes.includes(scope.id),
+                        )
+                        .filter(
+                          (scope, index, scopes) =>
+                            scopes.findIndex(
+                              (candidate) =>
+                                candidate.marketLabel === scope.marketLabel &&
+                                candidate.currency === scope.currency,
+                            ) === index,
+                        )
+                        .map(
+                          (scope) => `${scope.marketLabel} / ${scope.currency}`,
+                        )
+                        .join(" · ")}
                     </div>
                     <footer>
                       {cells.length
@@ -1504,7 +1565,7 @@ export function BenchmarkDashboard({
             DGTLFACE <b>HOTEL BENCHMARK</b>
           </span>
           <span>
-            {scopeCatalog.length} otel / pazar tanımı · EUR & GBP
+            {scopeCatalog.length} otel / pazar tanımı · EUR, GBP & RUB
             <span className="footerDot">·</span>Uçaksız fiyat odağı
           </span>
         </footer>

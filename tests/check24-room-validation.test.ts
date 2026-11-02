@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Check24ParsedOffer } from "../src/lib/ota/check24-parser";
-import { validateCheck24BeachOffer } from "../src/lib/ota/check24-room-validation";
+import {
+  validateCheck24BeachOffer,
+  validateCheck24PortNatureOffer,
+} from "../src/lib/ota/check24-room-validation";
+import { buildCheck24HotelSearchUrl } from "../src/lib/ota/live-check24";
 
 function offer(
   roomName: string,
@@ -73,5 +77,46 @@ test("CHECK24 rejects mismatched stay and board details", () => {
       5,
     ).status,
     "rejected",
+  );
+});
+
+test("CHECK24 maps verified Port Nature room labels", () => {
+  const cases = [
+    ["Doppelzimmer mit Landblick", "standard-land"],
+    ["Doppelzimmer Standard seitl. Meerblick", "standard-side-sea"],
+    ["Doppelzimmer Standard Meerblick", "standard-sea"],
+    ["Familienzimmer seitl. MB", "family"],
+    ["King Suite", "king-suite"],
+  ] as const;
+
+  for (const [roomName, roomId] of cases) {
+    const result = validateCheck24PortNatureOffer(offer(roomName), 5);
+    assert.equal(result.status, "matched", roomName);
+    assert.equal(result.roomId, roomId, roomName);
+  }
+});
+
+test("CHECK24 Port Nature keeps generic and invalid-board rooms outside coverage", () => {
+  assert.equal(
+    validateCheck24PortNatureOffer(offer("Doppelzimmer"), 5).status,
+    "rejected",
+  );
+  assert.equal(
+    validateCheck24PortNatureOffer(
+      offer("Doppelzimmer mit Landblick", { mealType: "breakfast" }),
+      5,
+    ).status,
+    "rejected",
+  );
+});
+
+test("CHECK24 builds a dated Port Nature hotel-only search", () => {
+  assert.equal(
+    buildCheck24HotelSearchUrl(
+      { hotelId: "8393120", hotelName: "Port Nature Luxury Resort" },
+      "2026-10-31",
+      "2026-11-05",
+    ),
+    "https://hotel.check24.de/search/Port%20Nature%20Luxury%20Resort-8393120/2026-10-31/2026-11-05/%5BA%7CA%5D/hotel.html",
   );
 });

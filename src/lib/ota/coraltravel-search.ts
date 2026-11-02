@@ -1,6 +1,7 @@
 
 import type { Page } from "patchright";
 import type { HotelKey } from "@/src/lib/benchmark/types";
+import { CORALTRAVEL_HOTEL_CONFIG } from "./live-config";
 
 const GERMAN_MONTHS = [
   "Januar",
@@ -16,20 +17,6 @@ const GERMAN_MONTHS = [
   "November",
   "Dezember",
 ] as const;
-
-const HOTEL_NAMES: Record<
-  HotelKey,
-  { query: string; suggestion: string }
-> = {
-  "miramare-beach": {
-    query: "Miramare Beach",
-    suggestion: "Miramare Beach Hotel",
-  },
-  "miramare-queen": {
-    query: "Miramare Queen",
-    suggestion: "Miramare Queen Hotel",
-  },
-};
 
 function parseIsoDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -169,7 +156,11 @@ export async function searchCoralTravel(
   checkIn: string,
   checkOut: string,
 ): Promise<void> {
-  const hotel = HOTEL_NAMES[hotelKey];
+  const hotel = CORALTRAVEL_HOTEL_CONFIG[hotelKey];
+
+  if (!hotel?.searchQuery || !hotel.suggestion) {
+    throw new Error(`Coral Travel otel arama eşleştirmesi eksik: ${hotelKey}`);
+  }
 
   // 1. Yalnızca konaklama modu
   await page
@@ -188,11 +179,11 @@ export async function searchCoralTravel(
   // 3. Otel ismini yaz
   await page
     .locator('input[placeholder="Wohin?"]:visible')
-    .fill(hotel.query);
+    .fill(hotel.searchQuery);
 
   console.log(
     "[CORALTRAVEL] Hotel name entered:",
-    hotel.query,
+    hotel.searchQuery,
   );
 
   // 4. Doğru oteli önerilerden seç

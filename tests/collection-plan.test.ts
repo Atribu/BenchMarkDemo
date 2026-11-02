@@ -19,7 +19,7 @@ const window = {
 };
 
 test("EUR selection routes On the Beach to GBP for the same hotel and dates", () => {
-  for (const id of ["beach-eu", "queen-eu"] as const) {
+  for (const id of ["beach-eu", "queen-eu", "port-nature-eu"] as const) {
     const requested = { ...scope(id), windows: [window] };
     const plan = buildCollectionPlan(
       [requested],
@@ -35,17 +35,21 @@ test("EUR selection routes On the Beach to GBP for the same hotel and dates", ()
   }
 });
 
-test("GBP selection retains EUR-only channels without changing currency labels", () => {
+test("GBP selection keeps native GBP channels and routes EUR-only channels separately", () => {
   const plan = buildCollectionPlan(
     [scope("queen-uk")],
     [provider("tui"), provider("holidaycheck")],
     REPORT_SCOPES,
   );
   assert.deepEqual(plan.providersByScope, {
-    "queen-eu": ["tui", "holidaycheck"],
+    "queen-uk": ["tui"],
+    "queen-eu": ["holidaycheck"],
   });
-  assert.ok(
-    plan.tasks.every((task) => task.scope.currency === "EUR" && task.supported),
+  assert.ok(plan.tasks.every((task) => task.supported));
+  assert.equal(plan.tasks.find((task) => task.provider.key === "tui")!.scope.currency, "GBP");
+  assert.equal(
+    plan.tasks.find((task) => task.provider.key === "holidaycheck")!.scope.currency,
+    "EUR",
   );
 });
 
@@ -55,7 +59,7 @@ test("every selected channel is represented once per hotel without duplicate col
     OTA_PROVIDERS,
     REPORT_SCOPES,
   );
-  assert.equal(plan.tasks.length, 14);
+  assert.equal(plan.tasks.length, 2 * OTA_PROVIDERS.length);
   for (const hotel of ["miramare-beach", "miramare-queen"]) {
     const keys = plan.tasks
       .filter((task) => task.scope.hotelKey === hotel)
@@ -63,7 +67,7 @@ test("every selected channel is represented once per hotel without duplicate col
     assert.deepEqual(keys.sort(), OTA_PROVIDERS.map((item) => item.key).sort());
   }
   assert.deepEqual(plan.providersByScope["beach-uk"], ["onthebeach"]);
-  assert.deepEqual(plan.providersByScope["queen-uk"], ["onthebeach"]);
+  assert.deepEqual(plan.providersByScope["queen-uk"], ["onthebeach", "tui"]);
   const report = buildBenchmarkResult({
     mode: "live",
     warnings: plan.warnings,
@@ -76,7 +80,7 @@ test("every selected channel is represented once per hotel without duplicate col
     report.scopes
       .find((item) => item.id === "queen-uk")!
       .providers.map((item) => item.key),
-    ["onthebeach"],
+    ["onthebeach", "tui"],
   );
 });
 
@@ -89,7 +93,14 @@ test("explicit multiple markets deduplicate fallback jobs", () => {
   );
   assert.equal(
     plan.tasks.filter((task) => task.provider.key === "tui").length,
-    2,
+    3,
+  );
+  assert.equal(
+    plan.tasks.find(
+      (task) =>
+        task.provider.key === "tui" && task.scope.hotelKey === "port-nature",
+    )?.supported,
+    false,
   );
 });
 
@@ -119,15 +130,15 @@ test("Queen GBP scope never inherits EUR reference amounts", () => {
   );
 });
 
-test("full benchmark flow keeps all seven channels for both hotels", async () => {
+test("full benchmark flow keeps every configured channel for both hotels", async () => {
   const report = await runBenchmarkJob({
     mode: "mock",
     scopeKeys: ["beach-eu", "queen-eu"],
     providerKeys: OTA_PROVIDERS.map((item) => item.key),
     customWindow: { checkIn: window.checkIn, checkOut: window.checkOut },
   });
-  assert.equal(report.summary.providerCount, 7);
-  assert.equal(report.summary.expectedRateCount, 28);
+  assert.equal(report.summary.providerCount, OTA_PROVIDERS.length);
+  assert.equal(report.summary.expectedRateCount, 60);
   assert.equal(report.scopes.length, 4);
   for (const market of report.scopes) {
     assert.equal(market.windows[0].checkIn, window.checkIn);
@@ -137,10 +148,17 @@ test("full benchmark flow keeps all seven channels for both hotels", async () =>
         (row) => row.entries.length === market.providers.length,
       ),
     );
-    if (market.currency === "GBP")
-      assert.deepEqual(
-        market.providers.map((item) => item.key),
-        ["onthebeach"],
-      );
   }
+  assert.deepEqual(
+    report.scopes
+      .find((item) => item.id === "beach-uk")!
+      .providers.map((item) => item.key),
+    ["onthebeach"],
+  );
+  assert.deepEqual(
+    report.scopes
+      .find((item) => item.id === "queen-uk")!
+      .providers.map((item) => item.key),
+    ["onthebeach", "tui"],
+  );
 });

@@ -141,7 +141,7 @@ export function BrowserImportPanel({
         </p>
       </details>
       <p className="dateHelp">
-        Yalnızca son 30 dakikada okunan dosyalar kabul edilir. EUR ve GBP
+        Yalnızca son 30 dakikada okunan dosyalar kabul edilir. EUR, GBP ve RUB
         çevrilmez. Kayıtlar sunucudan OTA doğrulaması değildir; ayrı gösterilir
         ve otomatik oda kapsamasını artırmaz. Sayfa yenilenince rapor silinir;
         saklamak için CSV indir.

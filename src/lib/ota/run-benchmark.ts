@@ -37,6 +37,10 @@ import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
 import { collectCheck24LiveQuotes } from "./live-check24-provider";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
+import {
+  convertRubToEur,
+  getRubEurRate,
+} from "@/src/lib/benchmark/currency/tcmb";
 
 interface ProviderProfile {
   baseMarkup: number;
@@ -424,8 +428,47 @@ export async function runBenchmarkJob(
     ),
   );
 
-  const quotes = collectionResults.flatMap((result) => result.quotes);
+  let quotes = collectionResults.flatMap((result) => result.quotes);
+  let collectedOffers = collectionResults.flatMap(
+    (result) => result.offers ?? [],
+  );
   warnings.push(...collectionResults.flatMap((result) => result.warnings));
+
+  const hasRubPrices =
+    quotes.some(
+      (quote) =>
+        quote.currency === "RUB" &&
+        quote.price !== null &&
+        Number.isFinite(quote.price) &&
+        quote.price > 0,
+    ) ||
+    collectedOffers.some(
+      (offer) =>
+        offer.currency === "RUB" &&
+        Number.isFinite(offer.price) &&
+        offer.price > 0,
+    );
+  if (resolvedRequest.mode === "live" && hasRubPrices) {
+    try {
+      const tcmbRate = await getRubEurRate();
+      quotes = quotes.map((quote) =>
+        quote.currency === "RUB" && quote.price !== null
+          ? { ...quote, conversion: convertRubToEur(quote.price, tcmbRate) }
+          : quote,
+      );
+      collectedOffers = collectedOffers.map((offer) =>
+        offer.currency === "RUB"
+          ? { ...offer, conversion: convertRubToEur(offer.price, tcmbRate) }
+          : offer,
+      );
+    } catch (error) {
+      warnings.push(
+        `TCMB RUB/EUR kuru alınamadı: ${
+          error instanceof Error ? error.message : String(error)
+        }. RUB kaynak fiyatı korunarak gösterildi.`,
+      );
+    }
+  }
 
   const existingHolidayCheck: Partial<
     Record<ScopeKey, ProviderCollectionResult>
@@ -508,7 +551,7 @@ export async function runBenchmarkJob(
     scopes: selectedScopes,
     providers: selectedProviders,
     quotes,
-    offers: collectionResults.flatMap((result) => result.offers ?? []),
+    offers: collectedOffers,
     providersByScope: plan.providersByScope,
   });
   return {

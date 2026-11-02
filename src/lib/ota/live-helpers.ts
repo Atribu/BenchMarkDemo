@@ -312,7 +312,12 @@ export function parsePriceFromText(
   text: string,
   currency: CurrencyCode,
 ): number | null {
-  const currencyTokens = currency === "GBP" ? ["£", "GBP"] : ["€", "EUR"];
+  const currencyTokens =
+    currency === "GBP"
+      ? ["£", "GBP"]
+      : currency === "RUB"
+        ? ["₽", "RUB", "руб"]
+        : ["€", "EUR"];
 
   for (const token of currencyTokens) {
     const escaped = token.replace("$", "\\$");

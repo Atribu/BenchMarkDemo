@@ -1,7 +1,14 @@
+import type {
+  HotelKey,
+  ScopeKey,
+} from "@/src/lib/hotels/catalog";
+
+import type { CurrencyConversion } from "./currency/tcmb";
+
+export type { HotelKey, ScopeKey } from "@/src/lib/hotels/catalog";
+
 export type CollectionMode = "mock" | "live";
-export type CurrencyCode = "EUR" | "GBP";
-export type HotelKey = "miramare-beach" | "miramare-queen";
-export type ScopeKey = "beach-eu" | "beach-uk" | "queen-eu" | "queen-uk";
+export type CurrencyCode = "EUR" | "GBP" | "RUB";
 export type ScopeProviderSelection = Partial<Record<ScopeKey, OtaKey[]>>;
 export type OtaKey =
   | "anextour"
@@ -78,6 +85,7 @@ export interface ProviderQuote {
   offerId?: string;
   roomFeatures?: RoomFeatures;
   terms?: OfferTerms;
+  conversion?: CurrencyConversion;
 }
 
 export interface RoomFeatures {
@@ -120,6 +128,7 @@ sourceProductCode?: string;
 sourceTravelType?: string | null;
 sourceSystemCode?: string;
 sourceBoardCode?: string;
+conversion?: CurrencyConversion;
 }
 
 export interface ProviderCollectionResult {
@@ -152,6 +161,7 @@ export interface BenchmarkCell {
   providerName: string;
   providerShortName: string;
   scrapedPrice: number | null;
+  conversion?: CurrencyConversion;
   referencePrice: number | null;
   differencePct: number | null;
   status: ProviderQuote["status"];

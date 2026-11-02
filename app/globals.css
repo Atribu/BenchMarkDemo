@@ -1150,6 +1150,21 @@ tbody th small {
   color: #a99bb5;
   font-size: 18px;
 }
+.convertedRateValue,
+.convertedPriceBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.originalCurrencyPrice {
+  color: #766f82;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
 .rateDifference,
 .rateNote {
   display: block;
@@ -2036,6 +2051,10 @@ tbody th small {
   font-size: 25px;
   white-space: nowrap;
 }
+.alternativeOfferPrice .convertedPriceBlock {
+  align-items: flex-end;
+  text-align: right;
+}
 .alternativeOfferCard h4 {
   margin: 15px 0 8px;
   font-size: 14px;
@@ -2107,6 +2126,7 @@ tbody th small {
 .priceOverviewCard { display: flex; flex-direction: column; gap: 10px; padding: 18px; background: #fff; border: 1px solid #dfdce5; border-top: 3px solid #54b9cf; border-radius: 10px; overflow-wrap: anywhere; }
 .priceOverviewCard > span { font-weight: 700; }
 .priceOverviewCard > strong { font-size: 25px; color: #140f25; }
+.priceOverviewCard > .convertedPriceBlock > strong { font-size: 25px; color: #140f25; }
 .priceOverviewCard > p { margin: 0; flex: 1; font-size: 13px; line-height: 1.5; }
 .priceOverviewCard > small, .priceOverviewCard > b { font-size: 11px; line-height: 1.5; color: #635d72; }
 .priceOverviewCard.unavailable { border-top-color: #bab5c4; }

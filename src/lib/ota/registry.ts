@@ -6,12 +6,12 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   name: "ANEX Tour",
   shortName: "ANEX",
   collectionType: "browser",
-  liveSupported: false,
+  liveSupported: true,
   readiness: "selector-mapping",
   notes:
-    "ANEX Tour teklifleri. Yalnizca ANEX operatorune ait, secilen tarih ve 2 yetiskin icin EUR toplam konaklama fiyatlari kabul edilir. Canli collector henuz baglanmadi.",
-  supportedScopes: ["beach-eu", "queen-eu"],
-  searchTemplate: "https://nurhotel.anextour.de/",
+    "Miramare Beach Almanya EUR, Port Nature ise ANEX Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
+  supportedScopes: ["beach-eu", "port-nature-ru"],
+  searchTemplate: "https://anextour.ru/hotels/",
 },
   {
     key: "booking",
@@ -22,7 +22,13 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Dogrudan otel oda tablosunu okur; tarih, kisi, para birimi ve konaklama toplamini dogrular. Ana sayfaya yonlendirme veya erisim engeli doluluk olarak isaretlenmez.",
-    supportedScopes: ["beach-eu", "beach-uk", "queen-eu", "queen-uk"],
+    supportedScopes: [
+      "beach-eu",
+      "beach-uk",
+      "queen-eu",
+      "queen-uk",
+      "port-nature-eu",
+    ],
     searchTemplate:
       "https://www.booking.com/searchresults.html?ss={hotelName}&checkin={checkIn}&checkout={checkOut}",
   },
@@ -36,14 +42,14 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   readiness: "selector-mapping",
   notes:
     "CHECK24 Almanya canlı otel fiyatları. " +
-    "Miramare Beach için eski ve yeni API desteklenir. " +
+    "Miramare Beach için eski ve yeni API, Port Nature için tarihli otel araması desteklenir. " +
     "Seçilen tarih, 1 oda / 2 yetişkin, EUR ve " +
     "All Inclusive fiyat adayları toplanır. " +
     "Oda eşdeğerliği ile iptal/vergi koşulları " +
     "henüz kesinleştirilmediği için teklifler " +
     "otomatik parite hesabına dahil edilmez. " +
     "Miramare Queen henüz desteklenmiyor.",
-  supportedScopes: ["beach-eu"],
+  supportedScopes: ["beach-eu", "port-nature-eu"],
   searchTemplate: "https://hotels.check24.de/",
 },
 
@@ -56,7 +62,13 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Bolgesel Expedia otel sayfasinda oda kartlarinin mevcut konaklama toplamini okur; tarih/kisi/para birimi dogrulanmayan veya erisim engelli sonuc manual-review kalir.",
-    supportedScopes: ["beach-eu", "beach-uk", "queen-eu", "queen-uk"],
+    supportedScopes: [
+      "beach-eu",
+      "beach-uk",
+      "queen-eu",
+      "queen-uk",
+      "port-nature-eu",
+    ],
     searchTemplate:
       "https://www.expedia.com/Hotel-Search?destination={hotelName}&startDate={checkIn}&endDate={checkOut}",
   },
@@ -69,7 +81,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Live beta aktif. Exact-date hotel-only offer sayfasi acilip all-offers-service cevabindan oda ve fiyat okunuyor.",
-    supportedScopes: ["beach-eu", "queen-eu"],
+    supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
     searchTemplate:
       "https://www.holidaycheck.de/suche?search={hotelName}&from={checkIn}&to={checkOut}",
   },
@@ -95,7 +107,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Hotel Only formu: secilen tarih, 2-28 gece, 1 oda/2 yetiskin; otel adi ve Total Hotel Price / per party dogrulanir. GBP toplam oda fiyatini okur.",
-    supportedScopes: ["beach-uk", "queen-uk"],
+    supportedScopes: ["beach-uk", "queen-uk", "port-nature-uk"],
     searchTemplate: "https://www.onthebeach.co.uk/_p/hotels",
   },
   {
@@ -140,11 +152,11 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   liveSupported: true,
   readiness: "selector-mapping",
   notes:
-    "CoralTravel Almanya Nur Hotel. " +
-    "Miramare Beach için gerçek fiyat API'si test edildi. " +
+    "Miramare Beach Coral Travel Almanya EUR, Port Nature Coral Travel Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir. " +
+    "Her iki otel için gerçek otel kimliğiyle fiyat API'si test edildi. " +
     "Miramare Queen henüz doğrulanmadı.",
-  supportedScopes: ["beach-eu"],
-  searchTemplate: "https://coraltravel.de/",
+  supportedScopes: ["beach-eu", "port-nature-ru"],
+  searchTemplate: "https://www.coral.ru/",
 },
 
 ];

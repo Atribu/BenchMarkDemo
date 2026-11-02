@@ -583,6 +583,7 @@ const snapshot = await page.evaluate(() => ({
 
       quotes.push(...parseExpediaQuotes(provider, scope, window, snapshot));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "";
       console.error(
   "[Expedia] Collection FAILED:",
   error instanceof Error
@@ -601,6 +602,7 @@ const snapshot = await page.evaluate(() => ({
      const blocked =
   (error instanceof Error &&
     error.message === "EXPEDIA_BOT_CHALLENGE") ||
+  /HTTP\s+(?:403|429)/i.test(errorMessage) ||
   /human or a bot|bot or not|verify.*human|captcha|are you a human|security check/i.test(
     body,
   );
@@ -620,6 +622,8 @@ const snapshot = await page.evaluate(() => ({
           currency: scope.currency,
           status: "manual-review",
           dataMode: "live",
+          captureMethod: "automated",
+          observedAt: new Date().toISOString(),
           sourceHint,
           reason,
         })),

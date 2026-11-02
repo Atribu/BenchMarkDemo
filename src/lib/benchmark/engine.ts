@@ -194,6 +194,7 @@ export function buildBenchmarkResult({
             providerName: provider.name,
             providerShortName: provider.shortName,
             scrapedPrice: quote.price,
+            conversion: quote.conversion,
             referencePrice,
             differencePct,
             status: quote.status,

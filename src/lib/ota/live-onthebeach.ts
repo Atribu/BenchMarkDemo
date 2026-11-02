@@ -1028,8 +1028,16 @@ let currentPage = Number(
 let targetHotelFound = false;
 
 const visitedPages = new Set<number>();
+const resultPageNumbers = await page
+  .locator('button.pagination__page-number[data-page-number]')
+  .evaluateAll((buttons) =>
+    buttons
+      .map((button) => Number(button.getAttribute("data-page-number")))
+      .filter((value) => Number.isInteger(value) && value > 0),
+  );
+const lastResultPage = Math.max(currentPage, ...resultPageNumbers);
 
-while (currentPage <= 3) {
+while (currentPage <= lastResultPage) {
   if (visitedPages.has(currentPage)) {
     throw new Error(`Sayfalama döngüsü algılandı: ${currentPage}`);
   }
@@ -1040,6 +1048,7 @@ while (currentPage <= 3) {
 
   console.log("[OnTheBeach] Hotel search page:", {
     page: currentPage,
+    lastResultPage,
     url: page.url(),
     targetHotel: targetHotelName,
     matches: hotelMatches,

@@ -2,4 +2,5 @@
 export const GOOGLE_HOTEL_IDS = {
   "miramare-beach": "ChcIz6rGwtL4l41FGgsvZy8xdG0ydmpqbBAB",
   "miramare-queen": "ChgI-oearau86MGjARoLL2cvMXRnbGNxeTgQAQ",
+  "port-nature": "CgsI8rbHj9SO5K6aARAB",
 } as const;

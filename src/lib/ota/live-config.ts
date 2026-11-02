@@ -1,4 +1,4 @@
-import type { HotelKey } from "@/src/lib/benchmark/types";
+import type { CurrencyCode, HotelKey } from "@/src/lib/benchmark/types";
 
 interface OtaHotelConfig {
   pageUrl: string;
@@ -21,18 +21,85 @@ interface TuiHotelConfig {
   offerPageUrl: string;
 
   markets: Partial<
-    Record<"EUR" | "GBP", TuiMarketConfig>
+    Record<CurrencyCode, TuiMarketConfig>
   >;
 
   roomAliases: Record<string, string[]>;
 }
 
 interface SchauinslandHotelConfig {
-  giataId: "4893" | "4894";
+  giataId: string;
   pageUrl: string;
   market: "de";
   currency: "EUR";
 }
+
+interface AnexHotelConfig {
+  accommodationId: string;
+  ruHotelId?: string;
+  ruHotelSlug?: string;
+  roomMatchers: {
+    roomId: string;
+    patterns: RegExp[];
+  }[];
+}
+
+export const ANEX_HOTEL_CONFIG: Partial<
+  Record<HotelKey, AnexHotelConfig>
+> = {
+  "miramare-beach": {
+    accommodationId: "1708",
+    roomMatchers: [
+      {
+        roomId: "economy",
+        patterns: [/\b(economy|ekonomi|ekonom|sparzimmer)\b/],
+      },
+      { roomId: "corner", patterns: [/\b(corner|eckzimmer|kose)\b/] },
+      {
+        roomId: "superior-land",
+        patterns: [
+          /(?=.*\b(superior)\b)(?=.*\b(land|kara|garden|garten)\b)/,
+        ],
+      },
+      {
+        roomId: "superior-sea",
+        patterns: [
+          /(?=.*\b(superior)\b)(?=.*\b(meerblick|sea view|deniz)\b)(?!.*\b(seitl|seitlich|side sea|partial sea|teilmeerblick)\b)/,
+        ],
+      },
+    ],
+  },
+  "port-nature": {
+    accommodationId: "136301",
+    ruHotelId: "8356",
+    ruHotelSlug: "port-nature-luxury-resort-hotelspa",
+    roomMatchers: [
+      {
+        roomId: "family",
+        patterns: [/\b(familienzimmer|family room|fz)\b/],
+      },
+      { roomId: "king-suite", patterns: [/\b(king suite|konigssuite)\b/] },
+      {
+        roomId: "standard-side-sea",
+        patterns: [
+          /(?=.*\b(standard|doppelzimmer|double room)\b)(?=.*\b(seitl|seitlich|side sea|partial sea|teilmeerblick)\b)/,
+        ],
+      },
+      {
+        roomId: "standard-land",
+        patterns: [
+          /(?=.*\b(standard|doppelzimmer|double room)\b)(?=.*\b(landblick|land view|garden view|gartenblick)\b)/,
+        ],
+      },
+      {
+        roomId: "standard-sea",
+        patterns: [
+          /(?=.*\b(standard|doppelzimmer|double room)\b)(?=.*\b(meerblick|sea view|ocean view)\b)(?!.*\b(seitl|seitlich|side sea|partial sea|teilmeerblick)\b)/,
+        ],
+      },
+    ],
+  },
+};
 
 export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
   "miramare-beach": {
@@ -70,6 +137,16 @@ export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
         "Sea View"
       ]
     }
+  },
+  "port-nature": {
+    pageUrl:
+      "https://www.booking.com/hotel/tr/port-nature-luxury-resort-amp-spa.html",
+    searchQuery: "Port Nature Luxury Resort Hotel & Spa",
+    cardName: "Port Nature Luxury Resort",
+    roomAliases: {
+      "standard-sea": ["Triple Room with Sea View"],
+      family: ["Family Room with Side Sea View"],
+    },
   }
 };
 
@@ -112,7 +189,28 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
       "standard-land": ["Standard Room"],
       "standard-sea": ["Standard Room, Sea View", "Sea View"]
     }
-  }
+  },
+  "port-nature": {
+    pageUrl:
+      "https://www.expedia.com/Belek-Hotels-Port-Nature-Luxury-Resort-Spa-All-Inclusive.h8108100.Hotel-Information",
+    roomAliases: {
+      "standard-land": [
+        "Standard Room, Land View",
+        "Standard Room, Garden View",
+        "Standard Room, Garden or Land View",
+      ],
+      "standard-side-sea": [
+        "Standard Room, Side Sea View",
+        "Standard Room, Partial Sea View",
+      ],
+      "standard-sea": ["Standard Room, Sea View"],
+      family: [
+        "Family Room, Side Sea View",
+        "Family Room, Partial Sea View",
+      ],
+      "king-suite": ["King Suite, Sea View", "King Suite"],
+    },
+  },
 };
 
 export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
@@ -190,7 +288,26 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "Corner Room",
       ],
     }
-  }
+  },
+  "port-nature": {
+    pageUrl:
+      "https://www.holidaycheck.de/hi/port-nature-luxury-resort-spa/6a10924b-2286-3a46-b5db-ad9802b8d226",
+    roomAliases: {
+      "standard-land": [
+        "Doppelzimmer",
+        "Doppelzimmer Landblick",
+        "Doppelzimmer mit Landblick",
+      ],
+      "standard-side-sea": [
+        "DZ seitl. Meerblick",
+        "Doppelzimmer seitl. Meerblick",
+        "Doppelzimmer mit seitlichem Meerblick",
+      ],
+      "standard-sea": ["Doppelzimmer Meerblick", "Doppelzimmer mit Meerblick"],
+      family: ["Familienzimmer", "FZ seitl. Meerblick"],
+      "king-suite": ["King Suite", "Königssuite"],
+    },
+  },
 };
 
 export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
@@ -309,6 +426,30 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
         "Corner Room",
       ],
     }
+  },
+  "port-nature": {
+    pageUrl:
+      "https://www.onthebeach.co.uk/hotels/turkey/antalya/belek/port-nature-luxury-resort-hotel-spa",
+    roomAliases: {
+      "standard-land": [
+        "Standard Room Land View",
+        "Standard Land View",
+        "Double Or Twin Standard Land View",
+      ],
+      "standard-side-sea": [
+        "Standard Room Side Sea View",
+        "Standard Side Sea View",
+        "Double Or Twin Standard Side Sea View",
+        "Standard Room Partial Sea View",
+      ],
+      "standard-sea": [
+        "Standard Room Sea View",
+        "Standard Sea View",
+        "Double Or Twin Standard Sea View",
+      ],
+      family: ["Family Room Side Sea View", "Family Room"],
+      "king-suite": ["King Suite Sea View", "King Suite"],
+    },
   }
 };
 
@@ -388,7 +529,7 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
       "Standardzimmer mit seitlichem Meerblick"
     ]
     }
-  }
+  },
 };
 
 
@@ -428,14 +569,31 @@ export const CHECK24_HOTEL_CONFIG = {
     market: "de",
     currency: "EUR",
   },
+  "port-nature": {
+    hotelId: "8393120",
+    hotelName: "Port Nature Luxury Resort",
+    pageUrl: "https://hotel.check24.de/hotel/turkey/8393120",
+    market: "de",
+    currency: "EUR",
+  },
 } as const;
 
 
 interface CoralTravelHotelConfig {
   pageUrl: string;
   hotelName: string;
-  market: "de";
-  currency: "EUR";
+  market: "de" | "ru";
+  currency: "EUR" | "RUB";
+  giataId?: string;
+  searchQuery?: string;
+  suggestion?: string;
+  ruLocation?: {
+    id: string;
+    requestId: string;
+    friendlyUrl: string;
+    parentId: string;
+    parentName: string;
+  };
 }
 
 export const CORALTRAVEL_HOTEL_CONFIG: Partial<
@@ -447,6 +605,9 @@ export const CORALTRAVEL_HOTEL_CONFIG: Partial<
     hotelName: "Miramare Beach Hotel",
     market: "de",
     currency: "EUR",
+    giataId: "4893",
+    searchQuery: "Miramare Beach",
+    suggestion: "Miramare Beach Hotel",
   },
 
   "miramare-queen": {
@@ -455,5 +616,22 @@ export const CORALTRAVEL_HOTEL_CONFIG: Partial<
     hotelName: "Miramare Queen Hotel",
     market: "de",
     currency: "EUR",
+  },
+  "port-nature": {
+    pageUrl:
+      "https://www.coral.ru/hotels/turkey/port-nature-luxury-resort-hotel-spa-belek/",
+    hotelName: "PORT NATURE LUXURY RESORT HOTEL & SPA",
+    market: "ru",
+    currency: "RUB",
+    giataId: "365454",
+    searchQuery: "Port Nature",
+    suggestion: "Port Nature Luxury Resort Hotel & Spa",
+    ruLocation: {
+      id: "10197-7",
+      requestId: "10197-7-100-6",
+      friendlyUrl: "turkey/port-nature-luxury-resort-hotel-spa-belek",
+      parentId: "100",
+      parentName: "Боазкент (Bogazkent), Белек (Belek), Турция",
+    },
   },
 };

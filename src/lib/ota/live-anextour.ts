@@ -5,98 +5,35 @@ import type {
   ProviderDescriptor,
   ProviderQuote,
   ReportScopeDefinition,
-  RoomDefinition,
-  RoomFeatures,
 } from "@/src/lib/benchmark/types";
 
 import { createPatchrightBrowserPage } from "./patchright-browser";
 import { parseAnexTourOffers } from "./anextour-parser";
 import { buildManualReviewQuotes } from "./live-helpers";
-
-const ANEX_HOTELS: Partial<Record<ReportScopeDefinition["hotelKey"], string>> = {
-  "miramare-beach": "1708",
-  // Miramare Queen aid doğrulandığında buraya eklenecek.
-};
-
-type AnexRoomKind =
-  | "economy"
-  | "corner"
-  | "partial-sea"
-  | "land"
-  | "sea";
+import { ANEX_HOTEL_CONFIG } from "./live-config";
+import { classifyRoom } from "./offer-matching";
 
 function normalizeRoomName(value: string): string {
   return value
     .toLocaleLowerCase("tr-TR")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/ı/g, "i");
+    .replace(/ı/g, "i")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
-function getRoomKind(value: string): AnexRoomKind | null {
-  const text = normalizeRoomName(value);
-
-  if (/economy|ekonomi|ekonom|sparzimmer/.test(text)) {
-    return "economy";
-  }
-
-  if (/corner|eckzimmer|kose/.test(text)) {
-    return "corner";
-  }
-
-  if (
-    /partial.sea|side.sea|seitl|teilmeer|kismi.deniz|yan.deniz/.test(text)
-  ) {
-    return "partial-sea";
-  }
-
-  if (/land|kara|garden|garten/.test(text)) {
-    return "land";
-  }
-
-  if (/meer|sea|deniz/.test(text)) {
-    return "sea";
-  }
-
-  return null;
-}
-
-function findMatchingRoom(
-  rooms: RoomDefinition[],
+export function matchAnexRoom(
+  scope: ReportScopeDefinition,
   roomName: string,
-): RoomDefinition | undefined {
-  const offerKind = getRoomKind(roomName);
-
-  if (!offerKind) return undefined;
-
-  return rooms.find((room) => {
-    const expectedKind =
-      getRoomKind(room.id) ?? getRoomKind(room.name);
-
-    return expectedKind === offerKind;
-  });
-}
-
-function getRoomFeatures(roomName: string): RoomFeatures {
-  const kind = getRoomKind(roomName);
-
-  return {
-    category:
-      kind === "economy" || kind === "corner"
-        ? "variant"
-        : /superior/i.test(roomName)
-          ? "superior"
-          : "unknown",
-    view:
-      kind === "partial-sea"
-        ? "partial-sea"
-        : kind === "sea"
-          ? "sea"
-          : kind === "land"
-            ? "land"
-            : "unknown",
-    balcony: "unknown",
-  };
+): ReportScopeDefinition["rooms"][number] | undefined {
+  const config = ANEX_HOTEL_CONFIG[scope.hotelKey];
+  if (!config) return undefined;
+  const normalizedName = normalizeRoomName(roomName);
+  const rule = config.roomMatchers.find((candidate) =>
+    candidate.patterns.some((pattern) => pattern.test(normalizedName)),
+  );
+  return scope.rooms.find((room) => room.id === rule?.roomId);
 }
 
 function buildAnexUrl(
@@ -119,15 +56,284 @@ function buildAnexUrl(
   return url.toString();
 }
 
-export async function collectAnexTourLiveQuotes(
+function compactDate(value: unknown): string {
+  return String(value ?? "").replace(/\D/g, "").slice(0, 8);
+}
+
+interface AnexRuOffer {
+  roomName: string;
+  board: string;
+  price: number;
+}
+
+export function parseAnexRuOffers(
+  response: unknown,
+  expected: {
+    hotelId: string;
+    checkIn: string;
+    checkOut: string;
+    nights: number;
+  },
+): AnexRuOffer[] {
+  const candidates: Record<string, unknown>[] = [];
+  const visit = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const item = value as Record<string, unknown>;
+    if (
+      item.converted_price !== undefined &&
+      (item.roomName || item.roomLName)
+    ) {
+      candidates.push(item);
+      return;
+    }
+    Object.values(item).forEach(visit);
+  };
+  visit(response);
+
+  const seen = new Set<string>();
+  return candidates.flatMap((item) => {
+    const price = Number(item.converted_price);
+    const roomName = String(item.roomName ?? item.roomLName ?? "").trim();
+    const board = String(item.mealName ?? item.mealLName ?? "").trim();
+    const hotelId = String(item.hotelInc ?? item.hotelId ?? "");
+    const nights = Number(item.nights);
+    const adult = item.adult === undefined ? 2 : Number(item.adult);
+    const key = `${roomName}|${board}|${price}`;
+
+    if (
+      hotelId !== expected.hotelId ||
+      compactDate(item.checkIn) !== compactDate(expected.checkIn) ||
+      compactDate(item.checkOut) !== compactDate(expected.checkOut) ||
+      nights !== expected.nights ||
+      adult !== 2 ||
+      !roomName ||
+      !board ||
+      !Number.isFinite(price) ||
+      price <= 0 ||
+      seen.has(key)
+    ) {
+      return [];
+    }
+    seen.add(key);
+    return [{ roomName, board, price }];
+  });
+}
+
+function buildAnexRuUrl(
+  hotelId: string,
+  hotelSlug: string,
+  checkIn: string,
+  checkOut: string,
+): string {
+  const url = new URL(
+    `https://anextour.ru/hotels/turkey/${hotelSlug}`,
+  );
+  const params = {
+    ADULT: "2",
+    CHILD: "0",
+    CURRENCY: "1",
+    PRICE_PAGE: "1",
+    RECONPAGE: "500",
+    REGULAR: "True",
+    SORT_TYPE: "0",
+    STATEINC: "3",
+    THE_BEST_AT_TOP: "True",
+    TOWNFROM: "moskva",
+    CHARTER: "True",
+    FILTER: "1",
+    FREIGHT: "1",
+    HOTELLIST: hotelId,
+    CHECKIN_BEG: compactDate(checkIn),
+    CHECKIN_END: compactDate(checkOut),
+    STATEFROM: "2",
+    SEARCH_TYPE: "PACKET_ONLY_HOTELS",
+  };
+  Object.entries(params).forEach(([key, value]) =>
+    url.searchParams.set(key, value),
+  );
+  return url.toString();
+}
+
+async function collectAnexRuLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
+  const hotelConfig = ANEX_HOTEL_CONFIG[scope.hotelKey];
+  const hotelId = hotelConfig?.ruHotelId;
+  const hotelSlug = hotelConfig?.ruHotelSlug;
+  if (!hotelId || !hotelSlug) {
+    return buildManualReviewQuotes(
+      provider,
+      scope,
+      "https://anextour.ru/hotels/",
+      "ANEX Rusya otel kimliği doğrulanmadı.",
+    );
+  }
+
   const quotes: ProviderQuote[] = [];
   const offers: CollectedOffer[] = [];
   const warnings: string[] = [];
 
-  const accommodationId = ANEX_HOTELS[scope.hotelKey];
+  for (const window of scope.windows) {
+    const sourceHint = buildAnexRuUrl(
+      hotelId,
+      hotelSlug,
+      window.checkIn,
+      window.checkOut,
+    );
+    let handle: Awaited<ReturnType<typeof createPatchrightBrowserPage>> | undefined;
+    try {
+      handle = await createPatchrightBrowserPage({
+        profilePath: `./.benchmark-state/anextour-ru-${scope.id}-${process.pid}`,
+        headless: false,
+        market: "ru",
+        proxyUrl: process.env.ANEXTOUR_RU_PROXY_URL || undefined,
+      });
+      const { page } = handle;
+      const searchResponsePromise = page.waitForResponse(
+        (response) => {
+          const url = new URL(response.url());
+          return (
+            response.request().method() === "GET" &&
+            url.origin === "https://api.anextour.ru" &&
+            url.pathname === "/search"
+          );
+        },
+        { timeout: 60_000 },
+      );
+      const navigation = await page.goto(sourceHint, {
+        waitUntil: "domcontentloaded",
+        timeout: 60_000,
+      });
+      if (!navigation || navigation.status() !== 200) {
+        throw new Error(`ANEX Rusya ana sayfa HTTP ${navigation?.status() ?? "unknown"}`);
+      }
+      const response = await searchResponsePromise;
+      if (response.status() !== 200) {
+        throw new Error(`ANEX Rusya teklif servisi HTTP ${response.status()}`);
+      }
+      const requestUrl = new URL(response.url());
+      if (
+        requestUrl.searchParams.get("HOTELLIST") !== hotelId ||
+        requestUrl.searchParams.get("SEARCH_TYPE") !== "PACKET_ONLY_HOTELS" ||
+        requestUrl.searchParams.get("CURRENCY") !== "1" ||
+        requestUrl.searchParams.get("ADULT") !== "2" ||
+        requestUrl.searchParams.get("CHILD") !== "0" ||
+        requestUrl.searchParams.get("checkIn") !== compactDate(window.checkIn) ||
+        requestUrl.searchParams.get("checkOut") !== compactDate(window.checkOut)
+      ) {
+        throw new Error("ANEX Rusya API arama koşulları benchmark kriterleriyle eşleşmiyor.");
+      }
+      const parsed = parseAnexRuOffers(await response.json(), {
+        hotelId,
+        checkIn: window.checkIn,
+        checkOut: window.checkOut,
+        nights: window.nights,
+      });
+
+      const observedAt = new Date().toISOString();
+      const windowOffers = parsed.map((offer, index): CollectedOffer => {
+        const matchedRoom = matchAnexRoom(scope, offer.roomName);
+        return {
+          id: `anextour-ru:${scope.id}:${window.id}:${index}`,
+          providerKey: provider.key,
+          scopeKey: scope.id,
+          windowId: window.id,
+          checkIn: window.checkIn,
+          checkOut: window.checkOut,
+          nights: window.nights,
+          rooms: 1,
+          adults: 2,
+          price: offer.price,
+          currency: "RUB",
+          roomName: offer.roomName,
+          roomFeatures: classifyRoom(offer.roomName),
+          terms: {
+            board: offer.board,
+            cancellation: "Kaynakta doğrulanmalı",
+            taxes: "Kaynakta doğrulanmalı",
+            operator: "ANEX Tour Russia",
+            availability: "ANEX Rusya hotel-only API yanıtında listelendi",
+          },
+          sourceHint,
+          observedAt,
+          matchedRoomId: matchedRoom?.id,
+          matchReason: matchedRoom
+            ? "ANEX Rusya oda kategorisi eşleşti; tarife koşulları ayrıca kontrol edilmeli."
+            : "Oda kategorisi güvenle eşleştirilemedi.",
+        };
+      });
+      offers.push(...windowOffers);
+      for (const room of scope.rooms) {
+        const best = windowOffers
+          .filter((offer) => offer.matchedRoomId === room.id)
+          .sort((a, b) => a.price - b.price)[0];
+        quotes.push({
+          providerKey: provider.key,
+          scopeKey: scope.id,
+          roomId: room.id,
+          windowId: window.id,
+          price: best?.price ?? null,
+          currency: "RUB",
+          status: best ? "available" : parsed.length ? "manual-review" : "sold_out",
+          dataMode: "live",
+          captureMethod: "automated",
+          observedAt,
+          sourceHint,
+          offerDescription: best?.roomName,
+          roomFeatures: best?.roomFeatures,
+          terms: best?.terms,
+          offerConditions: best
+            ? `${best.terms.board}; ANEX Rusya; ${window.nights} gece; 1 oda / 2 yetişkin; RUB toplam fiyat.`
+            : undefined,
+          reason: best
+            ? undefined
+            : parsed.length
+              ? "ANEX Rusya teklifleri bulundu ancak bu oda kategorisi güvenle eşleştirilemedi."
+              : "ANEX Rusya tamamlanan hotel-only aramasında bu tarihler için teklif döndürmedi.",
+        });
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message.split("\n")[0] : String(error);
+      warnings.push(`ANEX Rusya / ${scope.hotelName} / ${window.checkIn}: ${reason}`);
+      quotes.push(
+        ...scope.rooms.map((room): ProviderQuote => ({
+          providerKey: provider.key,
+          scopeKey: scope.id,
+          roomId: room.id,
+          windowId: window.id,
+          price: null,
+          currency: "RUB",
+          status: "manual-review",
+          dataMode: "live",
+          sourceHint,
+          reason,
+        })),
+      );
+    } finally {
+      await handle?.close().catch(() => undefined);
+    }
+  }
+  return { quotes, offers, warnings };
+}
+
+export async function collectAnexTourLiveQuotes(
+  provider: ProviderDescriptor,
+  scope: ReportScopeDefinition,
+): Promise<ProviderCollectionResult> {
+  if (scope.currency === "RUB") {
+    return collectAnexRuLiveQuotes(provider, scope);
+  }
+  const quotes: ProviderQuote[] = [];
+  const offers: CollectedOffer[] = [];
+  const warnings: string[] = [];
+
+  const hotelConfig = ANEX_HOTEL_CONFIG[scope.hotelKey];
+  const accommodationId = hotelConfig?.accommodationId;
 
   if (!accommodationId || scope.currency !== "EUR") {
     return buildManualReviewQuotes(
@@ -160,21 +366,29 @@ export async function collectAnexTourLiveQuotes(
       const page = handle.page;
 
       // Dinleyiciyi navigasyondan önce başlatıyoruz.
-      const listResponsePromise = page.waitForResponse(
-        (response) => {
-          const request = response.request();
-          const pathname = new URL(response.url()).pathname;
+      // Convert listener rejection into a value immediately. If navigation
+      // itself fails and the browser closes, the pending listener must not
+      // become an unhandled rejection after the collector has returned.
+      const listResponsePromise = page
+        .waitForResponse(
+          (response) => {
+            const request = response.request();
+            const pathname = new URL(response.url()).pathname;
 
-          return (
-            response.url().startsWith(
-              "https://nurhotel.anextour.de/",
-            ) &&
-            pathname === "/api/search/offers/list" &&
-            request.method() === "POST"
-          );
-        },
-        { timeout: 45_000 },
-      );
+            return (
+              response.url().startsWith(
+                "https://nurhotel.anextour.de/",
+              ) &&
+              pathname === "/api/search/offers/list" &&
+              request.method() === "POST"
+            );
+          },
+          { timeout: 45_000 },
+        )
+        .then(
+          (response) => ({ response }),
+          (error: unknown) => ({ error }),
+        );
 
       const navigation = await page.goto(sourceHint, {
         waitUntil: "domcontentloaded",
@@ -187,7 +401,11 @@ export async function collectAnexTourLiveQuotes(
         );
       }
 
-      const listResponse = await listResponsePromise;
+      const listResponseResult = await listResponsePromise;
+      if ("error" in listResponseResult) {
+        throw listResponseResult.error;
+      }
+      const listResponse = listResponseResult.response;
 
       if (listResponse.status() !== 200) {
         throw new Error(
@@ -234,12 +452,10 @@ export async function collectAnexTourLiveQuotes(
       });
 
       const collectedAt = new Date().toISOString();
+      const confirmedEmpty = parsedOffers.length === 0;
 
       const matchedOffers = parsedOffers.map((offer, index) => {
-        const matchedRoom = findMatchingRoom(
-          scope.rooms,
-          offer.roomName,
-        );
+        const matchedRoom = matchAnexRoom(scope, offer.roomName);
 
         const collected: CollectedOffer = {
           id: `anextour:${scope.id}:${window.id}:${index}`,
@@ -254,7 +470,7 @@ export async function collectAnexTourLiveQuotes(
           price: offer.price,
           currency: "EUR",
           roomName: offer.roomName,
-          roomFeatures: getRoomFeatures(offer.roomName),
+          roomFeatures: classifyRoom(offer.roomName),
           terms: {
             board: offer.board,
             cancellation: "Kaynakta doğrulanmalı",
@@ -289,7 +505,11 @@ export async function collectAnexTourLiveQuotes(
           windowId: window.id,
           price: best?.price ?? null,
           currency: scope.currency,
-          status: best ? "available" : "manual-review",
+          status: best
+            ? "available"
+            : confirmedEmpty
+              ? "sold_out"
+              : "manual-review",
           dataMode: "live",
           captureMethod: "automated",
           observedAt: collectedAt,
@@ -302,8 +522,16 @@ export async function collectAnexTourLiveQuotes(
             : undefined,
           reason: best
             ? undefined
-            : "Bu oda kategorisinde kesin tarihli ANEX teklifi doğrulanamadı.",
+            : confirmedEmpty
+              ? "ANEX Tour tamamlanan aramada bu tarihler için doğrulanmış uçaksız teklif döndürmedi; bu, otelin diğer kanallarda kapalı olduğu anlamına gelmez."
+              : "ANEX Tour teklifleri bulundu ancak bu oda kategorisi güvenle eşleştirilemedi.",
         });
+      }
+
+      if (confirmedEmpty) {
+        warnings.push(
+          `ANEX Tour / ${scope.hotelName} / ${window.checkIn}: Tamamlanan aramada doğrulanmış ANEX uçaksız teklifi yok.`,
+        );
       }
     } catch (error) {
       const reason =

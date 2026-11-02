@@ -146,7 +146,7 @@ export function prepareBrowserImport(
   );
   if (!task)
     throw new Error(
-      "Dosyanın oteli veya para birimi seçiminizle eşleşmiyor. EUR ve GBP birbirine çevrilmez.",
+      "Dosyanın oteli veya para birimi seçiminizle eşleşmiyor. EUR, GBP ve RUB birbirine çevrilmez.",
     );
   if (providerKey === "onthebeach" && (window.nights < 2 || window.nights > 28))
     throw new Error("On the Beach aktarımı 2–28 gece destekler.");

@@ -12,11 +12,17 @@ import { validateCheck24RoomIdentity } from "./check24-room-identity";
 
 import { createPatchrightBrowserPage } from "./patchright-browser";
 import { buildManualReviewQuotes } from "./live-helpers";
-import { collectCheck24Beach } from "./live-check24";
+import {
+  buildCheck24HotelSearchUrl,
+  collectCheck24Beach,
+  collectCheck24Hotel,
+} from "./live-check24";
+
+import { CHECK24_HOTEL_CONFIG } from "./live-config";
 
 import { extractCheck24RoomFeatures } from "./check24-room-features";
 
-import { validateCheck24BeachOffer } from "./check24-room-validation";
+import { validateCheck24Offer } from "./check24-room-validation";
 
 export async function collectCheck24LiveQuotes(
   provider: ProviderDescriptor,
@@ -26,8 +32,10 @@ export async function collectCheck24LiveQuotes(
   const offers: CollectedOffer[] = [];
   const warnings: string[] = [];
 
-  // Şimdilik yalnızca doğruladığımız Miramare Beach.
-  if (scope.id !== "beach-eu" || scope.currency !== "EUR") {
+  const hotelConfig = CHECK24_HOTEL_CONFIG[scope.hotelKey];
+  const supportedHotel =
+    scope.hotelKey === "miramare-beach" || scope.hotelKey === "port-nature";
+  if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
     return buildManualReviewQuotes(
       provider,
       scope,
@@ -41,17 +49,11 @@ export async function collectCheck24LiveQuotes(
       | Awaited<ReturnType<typeof createPatchrightBrowserPage>>
       | undefined;
 
-    const sourceUrl = new URL(
-      "https://hotels.check24.de/accommodation/" +
-        "miramare-beach-hotel-ultra-all-inclusive-" +
-        "019ab52846f67e3fa61a67dc9422e9de",
+    let sourceHint = buildCheck24HotelSearchUrl(
+      hotelConfig,
+      window.checkIn,
+      window.checkOut,
     );
-
-    sourceUrl.searchParams.set("checkinDate", window.checkIn);
-    sourceUrl.searchParams.set("checkoutDate", window.checkOut);
-    sourceUrl.searchParams.set("occupancy", "[A|A]");
-
-    let sourceHint = sourceUrl.toString();
 
     try {
       handle = await createPatchrightBrowserPage({
@@ -60,11 +62,19 @@ export async function collectCheck24LiveQuotes(
         market: "de",
       });
 
-      const result = await collectCheck24Beach(
-        handle.page,
-        window.checkIn,
-        window.checkOut,
-      );
+      const result =
+        scope.hotelKey === "miramare-beach"
+          ? await collectCheck24Beach(
+              handle.page,
+              window.checkIn,
+              window.checkOut,
+            )
+          : await collectCheck24Hotel(
+              handle.page,
+              hotelConfig,
+              window.checkIn,
+              window.checkOut,
+            );
 
       if (result.nights !== window.nights) {
         throw new Error("CHECK24 konaklama süresi uyuşmuyor.");
@@ -81,19 +91,22 @@ export async function collectCheck24LiveQuotes(
         checkOut: window.checkOut,
         nights: result.nights,
         totalOffers: result.totalOffers,
-        roomCandidates: Object.keys(result.bestOffers).length,
       });
 
       const bestValidatedOffers = new Map<
         string,
         {
           offer: (typeof result.offers)[number];
-          validation: ReturnType<typeof validateCheck24BeachOffer>;
+          validation: ReturnType<typeof validateCheck24Offer>;
         }
       >();
 
       for (const offer of result.offers) {
-        const validation = validateCheck24BeachOffer(offer, window.nights);
+        const validation = validateCheck24Offer(
+          offer,
+          window.nights,
+          scope.hotelKey,
+        );
 
         if (validation.status === "rejected" || !validation.roomId) {
           continue;

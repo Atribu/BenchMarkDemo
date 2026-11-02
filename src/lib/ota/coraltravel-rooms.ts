@@ -71,6 +71,44 @@ const MAPPINGS: Partial<
   },
 };
 
+const PORT_NATURE_ROOM_NAMES: Record<string, Mapping> = {
+  "standard room land view": {
+    name: "Standard Room Land View",
+    roomId: "standard-land",
+    category: "standard",
+    view: "land",
+    confirmed: true,
+  },
+  "standard room side sea view": {
+    name: "Standard Room Side Sea View",
+    roomId: "standard-side-sea",
+    category: "standard",
+    view: "partial-sea",
+    confirmed: true,
+  },
+  "standard room sea view": {
+    name: "Standard Room Sea View",
+    roomId: "standard-sea",
+    category: "standard",
+    view: "sea",
+    confirmed: true,
+  },
+  "family room sea side view 2 bedrooms chd free": {
+    name: "Family Room Sea Side View 2 Bedrooms Chd Free",
+    roomId: "family",
+    category: "variant",
+    view: "partial-sea",
+    confirmed: true,
+  },
+  "king suite": {
+    name: "King Suite",
+    roomId: "king-suite",
+    category: "variant",
+    view: "sea",
+    confirmed: true,
+  },
+};
+
 function normalize(value: string): string {
   return value
     .normalize("NFD")
@@ -88,7 +126,10 @@ export function matchCoralTravelRoom(
   const code = roomCode.trim().toUpperCase();
 
   const mapping =
-    MAPPINGS[scope.hotelKey]?.[code];
+    MAPPINGS[scope.hotelKey]?.[code] ??
+    (scope.hotelKey === "port-nature"
+      ? PORT_NATURE_ROOM_NAMES[normalize(roomName)]
+      : undefined);
 
   const features: RoomFeatures = {
     category: mapping?.category ?? "unknown",
