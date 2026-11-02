@@ -111,6 +111,20 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     searchTemplate: "https://www.onthebeach.co.uk/_p/hotels",
   },
   {
+    key: "restplatzboerse",
+    name: "Restplatzbörse",
+    shortName: "Restplatz",
+    collectionType: "api",
+    liveSupported: true,
+    readiness: "api-contract",
+    notes:
+      "Miramare Beach, Miramare Queen ve Port Nature için Restplatzbörse/Flux hotel-only tekliflerini okur. " +
+      "Kesin tarih, 1 oda / 2 yetişkin, EUR, oda kodu ve All Inclusive pansiyon " +
+      "doğrulanır; kişi başı fiyat yerine verify-offer toplamı kullanılır.",
+    supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
+    searchTemplate: "https://www.restplatzboerse.at/hotels/",
+  },
+  {
     key: "tui",
     name: "TUI",
     shortName: "TUI",

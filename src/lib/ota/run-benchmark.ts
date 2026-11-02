@@ -35,6 +35,7 @@ import { collectSerpApiHotelPrices, serpApiEnabled } from "./live-serpapi";
 import { collectAnexTourLiveQuotes } from "@/src/lib/ota/live-anextour";
 import { collectSchauinslandLiveQuotes } from "./live-schauinsland";
 import { collectCheck24LiveQuotes } from "./live-check24-provider";
+import { collectRestplatzboerseLiveQuotes } from "./live-restplatzboerse";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
 import {
@@ -98,6 +99,13 @@ const PROVIDER_PROFILES: Record<OtaKey, ProviderProfile> = {
     volatility: 0.12,
     missingModulo: 14,
     soldOutModulo: 21,
+    canUndercut: true,
+  },
+  restplatzboerse: {
+    baseMarkup: 0.1,
+    volatility: 0.08,
+    missingModulo: 13,
+    soldOutModulo: 19,
     canUndercut: true,
   },
   tui: {
@@ -331,6 +339,8 @@ async function collectLiveProviderQuotes(
       return collectLoveholidaysLiveQuotes(provider, scope);
     case "onthebeach":
       return collectOnTheBeachLiveQuotes(provider, scope);
+    case "restplatzboerse":
+      return collectRestplatzboerseLiveQuotes(provider, scope);
     case "tui":
       return collectTuiLiveQuotes(provider, scope);
     case "coraltravel":

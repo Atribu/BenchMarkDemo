@@ -138,7 +138,7 @@ test("full benchmark flow keeps every configured channel for both hotels", async
     customWindow: { checkIn: window.checkIn, checkOut: window.checkOut },
   });
   assert.equal(report.summary.providerCount, OTA_PROVIDERS.length);
-  assert.equal(report.summary.expectedRateCount, 60);
+  assert.equal(report.summary.expectedRateCount, 6 * OTA_PROVIDERS.length);
   assert.equal(report.scopes.length, 4);
   for (const market of report.scopes) {
     assert.equal(market.windows[0].checkIn, window.checkIn);

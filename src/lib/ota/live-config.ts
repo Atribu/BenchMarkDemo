@@ -575,6 +575,8 @@ export const CHECK24_HOTEL_CONFIG = {
     pageUrl: "https://hotel.check24.de/hotel/turkey/8393120",
     market: "de",
     currency: "EUR",
+    accommodationId: "019ab528fa947e0c8466cf670e1024e9",
+    accommodationSlug: "port-nature-luxury-resort",
   },
 } as const;
 

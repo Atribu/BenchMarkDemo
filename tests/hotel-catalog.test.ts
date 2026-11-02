@@ -63,6 +63,7 @@ test("Port Nature routes ANEX and Coral to the Russian RUB scope", () => {
       "check24",
       "expedia",
       "holidaycheck",
+      "restplatzboerse",
     ],
   );
   assert.deepEqual(

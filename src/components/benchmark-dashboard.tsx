@@ -150,6 +150,14 @@ const CHANNEL_INFO: Record<
       "Birleşik Krallık pazarı. Hotel Only formunda 2–28 gece ve 1 oda / 2 yetişkin toplamını GBP olarak okur. CAPTCHA doğrulaması otomatik sorguyu engelleyebilir; uçaklı veya kişi başı fiyat kullanılmaz.",
     type: "beta",
   },
+  restplatzboerse: {
+    label: "Hotel-only · Canlı API",
+    detail:
+      "Miramare Beach, Miramare Queen ve Port Nature için Restplatzbörse tekliflerini okur. Kesin tarih, " +
+      "2 yetişkin, EUR ve All Inclusive pansiyon doğrulanır; kişi başı fiyat " +
+      "yerine güncel iki yetişkin konaklama toplamı gösterilir.",
+    type: "beta",
+  },
 check24: {
   label: "Hotel-only · Beta",
   detail:
