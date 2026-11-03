@@ -119,14 +119,30 @@ export function parseBookingQuotes(
       "Booking otel, tarih, kisi veya oda toplam fiyati dogrulanamadi.",
     );
   }
+  const hasDedicatedPartialSeaRoom = scope.rooms.some(
+    (room) =>
+      room.id.endsWith("side-sea") || room.id.endsWith("partial-sea"),
+  );
   return scope.rooms.map((room) => {
     const offers = snapshot.rows
       .flatMap((row) => {
-        const rank = namedRoomRank(
+        let rank = namedRoomRank(
           room.id,
           row.name,
           BOOKING_HOTEL_CONFIG[scope.hotelKey]?.roomAliases[room.id] ?? [],
         );
+        const partialSeaName =
+          /\b(side|partial|lateral|seitl|seitlich|seitlichem|seitlicher|teilmeerblick)\b/i.test(
+            normalizeInlineText(row.name),
+          );
+        if (
+          hasDedicatedPartialSeaRoom &&
+          room.id.endsWith("-sea") &&
+          !room.id.endsWith("side-sea") &&
+          !room.id.endsWith("partial-sea") &&
+          partialSeaName
+        )
+          rank = null;
         const text = normalizeInlineText(row.priceText);
         // Never use a search-card/calendar price or multiply a nightly estimate.
         const amount =

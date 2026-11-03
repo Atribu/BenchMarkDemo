@@ -150,6 +150,14 @@ const CHANNEL_INFO: Record<
       "Birleşik Krallık pazarı. Hotel Only formunda 2–28 gece ve 1 oda / 2 yetişkin toplamını GBP olarak okur. CAPTCHA doğrulaması otomatik sorguyu engelleyebilir; uçaklı veya kişi başı fiyat kullanılmaz.",
     type: "beta",
   },
+  pegastour: {
+    label: "Hotel-only · Beta",
+    detail:
+      "Port Nature için PEGAS Touristik Rusya tekliflerini okur. Kesin tarih, " +
+      "1 oda / 2 yetişkin, RUB ve All Inclusive toplamı doğrulanır; uçuşlu paket " +
+      "ve gecelik fiyatlar kullanılmaz. RUB kaynak fiyatı TCMB kuruyla EUR karşılığıyla gösterilir.",
+    type: "beta",
+  },
   restplatzboerse: {
     label: "Hotel-only · Canlı API",
     detail:

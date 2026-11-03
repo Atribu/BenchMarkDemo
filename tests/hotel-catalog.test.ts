@@ -18,6 +18,7 @@ import {
   parseAnexRuOffers,
 } from "../src/lib/ota/live-anextour";
 import { classifyRoom, matchOfferRoom } from "../src/lib/ota/offer-matching";
+import { PEGAS_HOTEL_CONFIG } from "../src/lib/ota/live-pegastour";
 
 const portNature = REPORT_SCOPES.find(
   (scope) => scope.id === "port-nature-eu",
@@ -52,13 +53,14 @@ test("hotel catalog generates unique report scopes and complete hotel metadata",
   );
 });
 
-test("Port Nature routes ANEX and Coral to the Russian RUB scope", () => {
+test("Port Nature routes Russian providers to the RUB scope", () => {
   const europeanProviders = OTA_PROVIDERS.filter((provider) =>
     provider.supportedScopes.includes("port-nature-eu"),
   );
   assert.deepEqual(
     europeanProviders.map((provider) => provider.key),
     [
+      "anextour",
       "booking",
       "check24",
       "expedia",
@@ -71,11 +73,12 @@ test("Port Nature routes ANEX and Coral to the Russian RUB scope", () => {
     OTA_PROVIDERS.filter((provider) =>
       provider.supportedScopes.includes("port-nature-ru"),
     ).map((provider) => provider.key),
-    ["anextour", "coraltravel"],
+    ["anextour", "pegastour", "coraltravel"],
   );
   assert.equal(ANEX_HOTEL_CONFIG["port-nature"]?.accommodationId, "136301");
   assert.equal(ANEX_HOTEL_CONFIG["port-nature"]?.ruHotelId, "8356");
   assert.equal(CORALTRAVEL_HOTEL_CONFIG["port-nature"]?.currency, "RUB");
+  assert.equal(PEGAS_HOTEL_CONFIG["port-nature"].hotelId, 6609069);
   assert.ok(
     OTA_PROVIDERS.find((provider) => provider.key === "onthebeach")
       ?.supportedScopes.includes("port-nature-uk"),

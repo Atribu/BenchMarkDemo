@@ -144,8 +144,30 @@ export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
     searchQuery: "Port Nature Luxury Resort Hotel & Spa",
     cardName: "Port Nature Luxury Resort",
     roomAliases: {
-      "standard-sea": ["Triple Room with Sea View"],
-      family: ["Family Room with Side Sea View"],
+      "standard-land": [
+        "Standard Double or Twin Room with Land View",
+        "Standard Room with Land View",
+        "Double or Twin Room with Land View",
+        "Triple Room with Land View",
+      ],
+      "standard-side-sea": [
+        "Standard Double or Twin Room with Side Sea View",
+        "Standard Room with Side Sea View",
+        "Double or Twin Room with Side Sea View",
+        "Triple Room with Side Sea View",
+      ],
+      "standard-sea": [
+        "Standard Double or Twin Room with Sea View",
+        "Standard Room with Sea View",
+        "Double or Twin Room with Sea View",
+        "Triple Room with Sea View",
+      ],
+      family: [
+        "Family Room with Side Sea View",
+        "Family Room with Sea View",
+        "Family Room",
+      ],
+      "king-suite": ["King Suite with Sea View", "King Suite"],
     },
   }
 };
@@ -568,6 +590,7 @@ export const CHECK24_HOTEL_CONFIG = {
     pageUrl: "https://hotel.check24.de/hotel/turkey/8571549",
     market: "de",
     currency: "EUR",
+    accommodationId: "019ab52936e17297ae2c11519fcc3f33",
   },
   "port-nature": {
     hotelId: "8393120",

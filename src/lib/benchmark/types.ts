@@ -19,6 +19,7 @@ export type OtaKey =
   | "holidaycheck"
   | "loveholidays"
   | "onthebeach"
+  | "pegastour"
   | "restplatzboerse"
   | "stayforlong"
   | "tui"

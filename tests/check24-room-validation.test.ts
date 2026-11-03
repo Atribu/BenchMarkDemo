@@ -4,6 +4,7 @@ import type { Check24ParsedOffer } from "../src/lib/ota/check24-parser";
 import {
   validateCheck24BeachOffer,
   validateCheck24PortNatureOffer,
+  validateCheck24QueenOffer,
 } from "../src/lib/ota/check24-room-validation";
 import { buildCheck24HotelSearchUrl } from "../src/lib/ota/live-check24";
 
@@ -118,5 +119,49 @@ test("CHECK24 builds a dated Port Nature hotel-only search", () => {
       "2026-11-05",
     ),
     "https://hotel.check24.de/search/Port%20Nature%20Luxury%20Resort-8393120/2026-10-31/2026-11-05/%5BA%7CA%5D/hotel.html",
+  );
+});
+
+test("CHECK24 Queen maps only explicit land and full-sea standard rooms", () => {
+  const land = validateCheck24QueenOffer(
+    offer("Doppelzimmer Standard Landblick"),
+    5,
+  );
+  const sea = validateCheck24QueenOffer(
+    offer("Standardzimmer, Meerblick", { totalPrice: 1044 }),
+    5,
+  );
+  assert.equal(land.status, "matched");
+  assert.equal(land.roomId, "standard-land");
+  assert.equal(sea.status, "matched");
+  assert.equal(sea.roomId, "standard-sea");
+
+  for (const roomName of [
+    "Standardzimmer",
+    "DZ=EZ seitl. Meerblick",
+    "Doppelzimmer Superior",
+    "Familienzimmer",
+    "Suite Room with Sea View",
+  ]) {
+    assert.equal(
+      validateCheck24QueenOffer(offer(roomName), 5).status,
+      "rejected",
+      roomName,
+    );
+  }
+});
+
+test("CHECK24 builds Queen's numeric entry route while validating its modern identity", () => {
+  assert.equal(
+    buildCheck24HotelSearchUrl(
+      {
+        hotelId: "8571549",
+        hotelName: "Miramare Queen Hotel - Ultra All Inclusive",
+        accommodationId: "019ab52936e17297ae2c11519fcc3f33",
+      },
+      "2027-05-10",
+      "2027-05-15",
+    ),
+    "https://hotel.check24.de/search/Miramare%20Queen%20Hotel%20-%20Ultra%20All%20Inclusive-8571549/2027-05-10/2027-05-15/%5BA%7CA%5D/hotel.html",
   );
 });

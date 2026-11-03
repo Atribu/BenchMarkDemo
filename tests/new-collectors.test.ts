@@ -24,6 +24,9 @@ import { buildBenchmarkResult } from "../src/lib/benchmark/engine";
 const eu = REPORT_SCOPES.find((scope) => scope.id === "beach-eu")!;
 const uk = REPORT_SCOPES.find((scope) => scope.id === "beach-uk")!;
 const queen = REPORT_SCOPES.find((scope) => scope.id === "queen-eu")!;
+const portNature = REPORT_SCOPES.find(
+  (scope) => scope.id === "port-nature-eu",
+)!;
 const love = OTA_PROVIDERS.find((provider) => provider.key === "loveholidays")!;
 const booking = OTA_PROVIDERS.find((provider) => provider.key === "booking")!;
 const tui = OTA_PROVIDERS.find((provider) => provider.key === "tui")!;
@@ -395,6 +398,84 @@ test("Booking reads selectable room totals, not hotel starting prices", () => {
   const queenUrl = new URL(buildBookingUrl(queen, window));
   assert.match(queenUrl.pathname, /miramare-queen\.en-gb\.html$/);
   assert.equal(queenUrl.searchParams.get("group_children"), "0");
+});
+
+test("Booking maps all five Port Nature rooms without mixing side and full sea views", () => {
+  const snapshot: BookingSnapshot = {
+    url: buildBookingUrl(portNature, window),
+    hotelName: "Port Nature Luxury Resort",
+    checkIn: window.checkIn,
+    checkOut: window.checkOut,
+    occupancy: "2 adults · 0 children · 1 room",
+    stayLabel: "Price for 5 nights",
+    rows: [
+      {
+        name: "Standard Double or Twin Room with Land View",
+        priceText: "€1,100",
+        conditions: "All inclusive",
+        selectable: true,
+      },
+      {
+        name: "Standard Double or Twin Room with Side Sea View",
+        priceText: "€1,200",
+        conditions: "All inclusive",
+        selectable: true,
+      },
+      {
+        name: "Triple Room with Sea View",
+        priceText: "€1,300",
+        conditions: "All inclusive",
+        selectable: true,
+      },
+      {
+        name: "Family Room with Side Sea View",
+        priceText: "€1,400",
+        conditions: "All inclusive",
+        selectable: true,
+      },
+      {
+        name: "King Suite with Sea View",
+        priceText: "€2,000",
+        conditions: "All inclusive",
+        selectable: true,
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    parseBookingQuotes(booking, portNature, window, snapshot).map((quote) => ({
+      roomId: quote.roomId,
+      price: quote.price,
+      roomName: quote.offerDescription,
+    })),
+    [
+      {
+        roomId: "standard-land",
+        price: 1100,
+        roomName: "Standard Double or Twin Room with Land View",
+      },
+      {
+        roomId: "standard-side-sea",
+        price: 1200,
+        roomName: "Standard Double or Twin Room with Side Sea View",
+      },
+      {
+        roomId: "standard-sea",
+        price: 1300,
+        roomName: "Triple Room with Sea View",
+      },
+      {
+        roomId: "family",
+        price: 1400,
+        roomName: "Family Room with Side Sea View",
+      },
+      {
+        roomId: "king-suite",
+        price: 2000,
+        roomName: "King Suite with Sea View",
+      },
+    ],
+  );
 });
 
 test("Booking rejects redirects away from the exact property page", () => {

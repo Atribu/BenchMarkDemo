@@ -9,8 +9,8 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   liveSupported: true,
   readiness: "selector-mapping",
   notes:
-    "Miramare Beach Almanya EUR, Port Nature ise ANEX Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
-  supportedScopes: ["beach-eu", "port-nature-ru"],
+    "Miramare Beach ve Port Nature Almanya EUR hotel-only akışından; Port Nature ayrıca ANEX Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
+  supportedScopes: ["beach-eu", "port-nature-eu", "port-nature-ru"],
   searchTemplate: "https://anextour.ru/hotels/",
 },
   {
@@ -42,14 +42,13 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   readiness: "selector-mapping",
   notes:
     "CHECK24 Almanya canlı otel fiyatları. " +
-    "Miramare Beach için eski ve yeni API, Port Nature için tarihli otel araması desteklenir. " +
+    "Miramare Beach için eski ve yeni API; Miramare Queen ve Port Nature için tarihli otel araması desteklenir. " +
     "Seçilen tarih, 1 oda / 2 yetişkin, EUR ve " +
     "All Inclusive fiyat adayları toplanır. " +
-    "Oda eşdeğerliği ile iptal/vergi koşulları " +
-    "henüz kesinleştirilmediği için teklifler " +
-    "otomatik parite hesabına dahil edilmez. " +
-    "Miramare Queen henüz desteklenmiyor.",
-  supportedScopes: ["beach-eu", "port-nature-eu"],
+    "Queen için yalnızca açık kara ve tam deniz manzaralı standart oda adları eşleştirilir; " +
+    "genel, yandan deniz, superior, aile ve suite odalar kapsam dışında kalır. " +
+    "İptal ve vergi koşulları ayrıca doğrulanmalıdır.",
+  supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
   searchTemplate: "https://hotels.check24.de/",
 },
 
@@ -109,6 +108,19 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
       "Hotel Only formu: secilen tarih, 2-28 gece, 1 oda/2 yetiskin; otel adi ve Total Hotel Price / per party dogrulanir. GBP toplam oda fiyatini okur.",
     supportedScopes: ["beach-uk", "queen-uk", "port-nature-uk"],
     searchTemplate: "https://www.onthebeach.co.uk/_p/hotels",
+  },
+  {
+    key: "pegastour",
+    name: "PEGAS Touristik",
+    shortName: "PEGAS",
+    collectionType: "browser",
+    liveSupported: true,
+    readiness: "api-contract",
+    notes:
+      "Port Nature için Pegas Rusya hotel-only tekliflerini okur. Kesin tarih, 1 oda / 2 yetişkin, RUB, All Inclusive ve konaklama toplamı doğrulanır; uçuşlu paket ve gecelik fiyatlar kullanılmaz.",
+    supportedScopes: ["port-nature-ru"],
+    searchTemplate:
+      "https://pegast.ru/hotel/turkey/antalya/belek/port-nature-luxury-resort-hotel-and-spa-6609069",
   },
   {
     key: "restplatzboerse",
@@ -183,7 +195,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   notes:
     "Miramare Beach Coral Travel Almanya EUR, Port Nature Coral Travel Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir. " +
     "Her iki otel için gerçek otel kimliğiyle fiyat API'si test edildi. " +
-    "Miramare Queen henüz doğrulanmadı.",
+    "Miramare Queen tanıtım sayfası kayıtlıdır; ancak Almanya rezervasyon motoru oteli canlı önerilerde döndürmediği için kimlik ve fiyat akışı henüz doğrulanmadı.",
   supportedScopes: ["beach-eu", "port-nature-ru"],
   searchTemplate: "https://www.coral.ru/",
 },

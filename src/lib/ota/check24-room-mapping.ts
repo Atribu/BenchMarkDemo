@@ -16,6 +16,8 @@ export type Check24PortNatureRoomId =
   | "family"
   | "king-suite";
 
+export type Check24QueenRoomId = "standard-land" | "standard-sea";
+
 function normalizeRoomName(name: string): string {
   return name
     .normalize("NFKD")
@@ -123,6 +125,33 @@ export function matchCheck24PortNatureRoom(
     return "standard-land";
   }
 
+  return null;
+}
+
+export function matchCheck24QueenRoom(
+  offer: Check24ParsedOffer,
+): Check24QueenRoomId | null {
+  const name = normalizeRoomName(
+    [offer.roomName, offer.sourceRoomDescription].filter(Boolean).join(" "),
+  );
+
+  if (!name) return null;
+  if (/\b(family|familien|suite|deluxe|superior|economy|sparzimmer)\b/.test(name))
+    return null;
+  if (
+    /\b(side sea|partial sea|lateral sea|seitl|seitlich|seitlicher|teilmeerblick)\b/.test(
+      name,
+    )
+  )
+    return null;
+  if (/\b(sea view|ocean view|meerblick)\b/.test(name))
+    return "standard-sea";
+  if (
+    /\b(land view|landblick|countryside view|garden view|gartenblick)\b/.test(
+      name,
+    )
+  )
+    return "standard-land";
   return null;
 }
 

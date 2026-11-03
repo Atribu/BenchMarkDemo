@@ -63,13 +63,13 @@ export function namedRoomRank(
   aliases: string[] = [],
 ): number | null {
   const normalizedName = normalizeInlineText(name);
+  const aliasRank = aliases.findIndex(
+    (alias) =>
+      normalizeInlineText(alias).toLowerCase() === normalizedName.toLowerCase(),
+  );
 
   // Economy sadece Economy Room ile eşleşsin.
   if (roomId === "economy") {
-    const aliasRank = aliases.findIndex(
-      (alias) =>
-        normalizeInlineText(alias).toLowerCase() === normalizedName.toLowerCase(),
-    );
     if (aliasRank >= 0) return aliasRank;
 
     if (/^Economy Room$/i.test(normalizedName)) {
@@ -82,6 +82,11 @@ export function namedRoomRank(
 
     return null;
   }
+
+  // Aile ve süit gibi varyantlar yalnızca sağlayıcıya özel açık oda adıyla
+  // eşleşir; genel "family"/"suite" metninden kategori tahmini yapılmaz.
+  if (roomId === "family" || roomId === "king-suite")
+    return aliasRank >= 0 ? aliasRank : null;
 
   // Corner sadece Corner Room ile eşleşsin.
   if (roomId === "corner") {
@@ -120,11 +125,7 @@ export function namedRoomRank(
   }
 
   return (
-    (/\b(side|partial|seitl|seitlichem|seitlicher|teilmeerblick)\b/i.test(
-      normalizedName,
-    )
-      ? 10
-      : 0) +
+    (aliasRank >= 0 ? aliasRank : 10) +
     (/promo|economy|no balcony|without balcony/i.test(
       normalizedName,
     )

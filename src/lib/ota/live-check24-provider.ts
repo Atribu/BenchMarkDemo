@@ -34,7 +34,9 @@ export async function collectCheck24LiveQuotes(
 
   const hotelConfig = CHECK24_HOTEL_CONFIG[scope.hotelKey];
   const supportedHotel =
-    scope.hotelKey === "miramare-beach" || scope.hotelKey === "port-nature";
+    scope.hotelKey === "miramare-beach" ||
+    scope.hotelKey === "miramare-queen" ||
+    scope.hotelKey === "port-nature";
   if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
     return buildManualReviewQuotes(
       provider,

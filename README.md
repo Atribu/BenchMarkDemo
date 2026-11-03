@@ -70,6 +70,7 @@ Orijinal SVG logo ve renkler [DGTLFACE](https://dgtlface.com/tr/) sitesinden ali
 | Expedia | Almanya/UK otel sayfasinda oda karti, mevcut konaklama toplami, tarih/kisi/para birimi kontrolu | 2 Ekim 2026 otomatik testinde bot dogrulamasi engelledi; canli basari dogrulanmadi |
 | Loveholidays | Beach (371656) ve Queen (371430) icin dogrulanmis Hotel Only otel kimlikleri; GBP/EUR oda toplami, tarih ve kisi kontrolu | 2 Ekim 2026 otomatik testinde erisim dogrulamasi engelledi. Queen 16-21 Ekim Hotel Only sayfasindaki kara ve kismi deniz manzarali oda kartlari okuyucu testlerine eklendi; tarayicida gorulmesi otomatik basari sayilmaz |
 | On the Beach | Hotel Only formu, 2-28 gece, 1 oda/2 yetiskin; otel filtresi, Total Hotel Price, tum oda secenekleri | Tekil collector testinde 16-21 Ekim 2026 Beach icin otomatik 1429.01 / 1524.87 GBP alindi. Sonraki panel/API denemeleri CAPTCHA ile engellendi; duzenli otomasyon henuz dogrulanmadi |
+| PEGAS Touristik | Port Nature (`hotelId=6609069`) icin Rusya hotel-only servisi; kesin tarih, 1 oda/2 yetiskin, RUB, All Inclusive ve `pricePerStay` konaklama toplami kontrolu; RUB tutari TCMB kuruyla EUR karsiligiyla da gosterilir | Otomatik erisim zaman zaman sinirlanabilir; iptal/vergi kosullari rezervasyon adiminda yeniden kontrol edilmeli. 10-15 Mayis 2027 canli kontrolunde otel dogrulandi ancak teklif bulunmadi |
 | Restplatzbörse | Miramare Beach (`HotelIffCode=1708`), Miramare Queen (`17048`) ve Port Nature (`136301`) icin Flux hotel-offers ve verify-offer servisleri; kesin tarih, 1 oda/2 yetiskin, EUR, All Inclusive pansiyon ve oda kodu kontrolu; kisi basi yerine dogrulanmis konaklama toplami | Iptal ve vergi kosullari teklif yanitinda bulunmadigi icin rezervasyon adiminda kontrol edilmeli; son fiyat verify-offer ile yeniden alinmali |
 | Stayforlong | Miramare Beach (`propertyId=67296`), Miramare Queen (`67402`) ve Port Nature (`40539`) icin Almanya availability ve bookingRules servisleri; kesin tarih, 1 oda/2 yetiskin, EUR, All Inclusive, oda/manzara ve toplam fiyat kontrolu | Teklifler RECHECK olabilir; bu nedenle availability fiyati bookingRules ile yeniden dogrulanmadan rapora alinmaz |
 
@@ -183,6 +184,7 @@ BOOKING_BROWSER_CHANNEL=chrome
 BOOKING_USE_STEALTH=true
 EXPEDIA_PROXY_URL=http://username:password@host:port
 EXPEDIA_HEADLESS=true
+PEGASTOUR_RU_PROXY_URL=http://username:password@host:port
 ```
 
 Saglayiciya ozel dolu deger genel degeri ezer. Bos deger genel proxy'yi iptal etmez. Market secimi sadece dil/saat dilimini degistirir; IP ulkesini degistirmez. Proxy erisimi tek basina fiyat garantisi degildir; otel, tarih, kisi, oda ve toplam fiyat kontrollerinin tumu yine gecmelidir. TUI dogrudan sunucu HTTP istegi kullandigi icin tarayici proxy ayarlari bu akis icin gecerli degildir.

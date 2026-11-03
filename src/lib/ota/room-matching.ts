@@ -13,6 +13,12 @@ export function hasCompatibleView(
     /\b(land|landseite|landblick|garden|gartenblick|gartenseite|inland)\b/.test(
       text,
     );
+  const partialSea =
+    /\b(side|partial|lateral|seitl|seitlich|seitlichem|seitlicher|teilmeerblick)\b/.test(
+      text,
+    );
+  if (roomId.endsWith("side-sea") || roomId.endsWith("partial-sea"))
+    return sea && partialSea && !land;
   if (roomId.endsWith("-sea")) return sea && !land;
   if (roomId.endsWith("-land")) return land && !sea;
   return true;

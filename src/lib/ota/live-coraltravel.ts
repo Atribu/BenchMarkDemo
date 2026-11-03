@@ -537,11 +537,16 @@ export async function collectCoralTravelLiveQuotes(
     !hotelConfig.searchQuery ||
     !hotelConfig.suggestion
   ) {
+    const reason =
+      scope.hotelKey === "miramare-queen"
+        ? "CoralTravel: tanıtım sayfası kayıtlı, ancak otel Almanya rezervasyon motorunun canlı önerilerinde bulunamadığı için kimlik ve fiyat akışı doğrulanmadı."
+        : "CoralTravel: bu otel için gerçek API otel kimliği ve oda kodları henüz doğrulanmadı.";
+
     return buildManualReviewQuotes(
       provider,
       scope,
-      HOME,
-      "CoralTravel: bu otel için gerçek API otel kimliği ve oda kodları henüz doğrulanmadı.",
+      hotelConfig?.pageUrl ?? HOME,
+      reason,
     );
   }
 
