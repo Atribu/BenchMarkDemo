@@ -41,6 +41,17 @@ const portNature = {
   ...REPORT_SCOPES.find((scope) => scope.id === "port-nature-eu")!,
   windows: [window],
 };
+const syWindow = {
+  id: "2027-05-10_2027-05-15",
+  label: "10–15 Mayıs 2027",
+  checkIn: "2027-05-10",
+  checkOut: "2027-05-15",
+  nights: 5,
+};
+const syHotels = {
+  ...REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-eu")!,
+  windows: [syWindow],
+};
 const hc = OTA_PROVIDERS.find((provider) => provider.key === "holidaycheck")!;
 const url =
   "https://www.holidaycheck.de/ho/angebote-hotel-miramare-beach/976607ee-0f98-365d-bdbf-f96af4b03a6d/hotelonly?_offer=departureDate:2026-10-23,duration:exactly,returnDate:2026-10-28,rooms:a-a";
@@ -202,6 +213,62 @@ test("HolidayCheck maps Port Nature live room labels through exact aliases", () 
   assert.deepEqual(
     offers.map((offer) => [offer.roomName, offer.matchedRoomId, offer.price]),
     roomCases,
+  );
+});
+
+test("HolidayCheck maps explicit SY Hotels supplier names without accepting generic rooms", () => {
+  const syUrl = buildHolidayCheckHotelOnlyUrl(
+    "https://www.holidaycheck.de/hi/sy-luxury-belek/3c0937bc-b1d6-42a8-9280-0644000c2a43",
+    syWindow.checkIn,
+    syWindow.checkOut,
+  )!;
+  const roomCases = [
+    [
+      "Doppelzimmer Deluxe Landseite Klimaanlage Dusche Balkon",
+      "deluxe-land",
+    ],
+    ["Double Standard Room Pool View", "deluxe-pool"],
+    ["Deluxe Shallow Pool Room - 1 Queen Bed", "deluxe-shallow-pool"],
+    ["Deluxe Room With Swim Up Pool And Terrace", "deluxe-swim-up"],
+    [
+      "Deluxe Family Room With Swim Up Pool And Terrace",
+      "deluxe-family-swim-up",
+    ],
+  ] as const;
+  const genericRooms = [
+    "DOUBLE DELUXE ROOM",
+    "Doppelzimmer",
+    "DELUXE DOPPEL ZIMMER MIT TERRASSE",
+    "Doppelzimmer Best Price Landseite Klimaanlage Dusche Balkon",
+  ];
+  const makeSyOffer = (name: string, amount: number): HolidayCheckOffer =>
+    raw({
+      hotelId: "3c0937bc-b1d6-42a8-9280-0644000c2a43",
+      departureDate: { day: 10, month: 5, year: 2027 },
+      returnDate: { formatted: "15.05.2027" },
+      room: { name },
+      totalPrice: { amount, currency: "EUR" },
+    });
+  const offers = parseHolidayCheckOffers(
+    hc,
+    syHotels,
+    syWindow,
+    [
+      ...roomCases.map(([name], index) => makeSyOffer(name, 900 + index)),
+      ...genericRooms.map((name, index) => makeSyOffer(name, 800 + index)),
+    ],
+    syUrl,
+  );
+
+  assert.deepEqual(
+    offers.slice(0, roomCases.length).map((offer) => [
+      offer.roomName,
+      offer.matchedRoomId,
+    ]),
+    roomCases,
+  );
+  assert.ok(
+    offers.slice(roomCases.length).every((offer) => !offer.matchedRoomId),
   );
 });
 

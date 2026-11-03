@@ -93,7 +93,7 @@ test("explicit multiple markets deduplicate fallback jobs", () => {
   );
   assert.equal(
     plan.tasks.filter((task) => task.provider.key === "tui").length,
-    3,
+    4,
   );
   assert.equal(
     plan.tasks.find(

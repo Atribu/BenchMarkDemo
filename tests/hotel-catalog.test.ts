@@ -31,8 +31,8 @@ const portNatureRu = REPORT_SCOPES.find(
 )!;
 
 test("hotel catalog generates unique report scopes and complete hotel metadata", () => {
-  assert.equal(new Set(HOTEL_CATALOG.map((hotel) => hotel.key)).size, 3);
-  assert.equal(new Set(REPORT_SCOPES.map((scope) => scope.id)).size, 7);
+  assert.equal(new Set(HOTEL_CATALOG.map((hotel) => hotel.key)).size, 4);
+  assert.equal(new Set(REPORT_SCOPES.map((scope) => scope.id)).size, 10);
   assert.equal(getHotelDefinition("port-nature").shortCode, "PN");
   assert.equal(portNature.hotelName, "Port Nature Luxury Resort Hotel & Spa");
   assert.equal(portNature.currency, "EUR");
@@ -49,6 +49,22 @@ test("hotel catalog generates unique report scopes and complete hotel metadata",
       "standard-sea",
       "family",
       "king-suite",
+    ],
+  );
+  assert.equal(getHotelDefinition("sy-hotels-belek").shortCode, "SY");
+  assert.deepEqual(
+    REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-eu")?.rooms.map(
+      (room) => room.id,
+    ),
+    [
+      "deluxe-land",
+      "deluxe-pool",
+      "deluxe-superior",
+      "deluxe-family",
+      "deluxe-duplex-family",
+      "deluxe-swim-up",
+      "deluxe-family-swim-up",
+      "deluxe-shallow-pool",
     ],
   );
 });
@@ -82,6 +98,39 @@ test("Port Nature routes Russian providers to the RUB scope", () => {
   assert.ok(
     OTA_PROVIDERS.find((provider) => provider.key === "onthebeach")
       ?.supportedScopes.includes("port-nature-uk"),
+  );
+});
+
+test("SY Hotels exposes only channels with a verified hotel identity", () => {
+  assert.deepEqual(
+    OTA_PROVIDERS.filter((provider) =>
+      provider.supportedScopes.includes("sy-hotels-eu"),
+    ).map((provider) => provider.key),
+    [
+      "booking",
+      "check24",
+      "expedia",
+      "holidaycheck",
+      "restplatzboerse",
+      "tui",
+      "schauinsland",
+    ],
+  );
+  assert.deepEqual(
+    OTA_PROVIDERS.filter((provider) =>
+      provider.supportedScopes.includes("sy-hotels-uk"),
+    ).map((provider) => provider.key),
+    ["booking", "expedia", "onthebeach"],
+  );
+  assert.deepEqual(
+    OTA_PROVIDERS.filter((provider) =>
+      provider.supportedScopes.includes("sy-hotels-ru"),
+    ).map((provider) => provider.key),
+    ["pegastour"],
+  );
+  assert.equal(
+    CHECK24_HOTEL_CONFIG["sy-hotels-belek"].accommodationId,
+    "019ab53308e673799d4d0b164fb80e79",
   );
 });
 

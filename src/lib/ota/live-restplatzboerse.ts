@@ -27,6 +27,10 @@ export const RESTPLATZBOERSE_HOTEL_CONFIG = {
     hotelIffCode: 136301,
     hotelName: "Port Nature Luxury Resort Hotel & Spa",
   },
+  "sy-hotels-belek": {
+    hotelIffCode: 297825,
+    hotelName: "SY Hotels Belek Boutique Luxury",
+  },
 } as const;
 
 type RestplatzboerseHotelKey = keyof typeof RESTPLATZBOERSE_HOTEL_CONFIG;
@@ -131,6 +135,20 @@ export function matchRestplatzboerseRoom(
       /^(doppelzimmer|standard room)$/.test(name)
     )
       return "standard-land";
+    return undefined;
+  }
+
+  if (hotelKey === "sy-hotels-belek") {
+    if (/\bfamily\b/.test(name) && /\b(swim up|swimup)\b/.test(name))
+      return "deluxe-family-swim-up";
+    if (/\b(duplex|dubleks)\b/.test(name) && /\bfamily\b/.test(name))
+      return "deluxe-duplex-family";
+    if (/\bfamily\b/.test(name)) return "deluxe-family";
+    if (/\bshallow pool\b/.test(name)) return "deluxe-shallow-pool";
+    if (/\bsuperior\b/.test(name)) return "deluxe-superior";
+    if (/\b(swim up|swimup)\b/.test(name)) return "deluxe-swim-up";
+    if (/\b(pool view|poolblick)\b/.test(name)) return "deluxe-pool";
+    if (/\b(land view|landblick|landseite)\b/.test(name)) return "deluxe-land";
     return undefined;
   }
 

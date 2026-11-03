@@ -18,6 +18,16 @@ export type Check24PortNatureRoomId =
 
 export type Check24QueenRoomId = "standard-land" | "standard-sea";
 
+export type Check24SyHotelsRoomId =
+  | "deluxe-land"
+  | "deluxe-pool"
+  | "deluxe-superior"
+  | "deluxe-family"
+  | "deluxe-duplex-family"
+  | "deluxe-swim-up"
+  | "deluxe-family-swim-up"
+  | "deluxe-shallow-pool";
+
 function normalizeRoomName(name: string): string {
   return name
     .normalize("NFKD")
@@ -152,6 +162,27 @@ export function matchCheck24QueenRoom(
     )
   )
     return "standard-land";
+  return null;
+}
+
+export function matchCheck24SyHotelsRoom(
+  offer: Check24ParsedOffer,
+): Check24SyHotelsRoomId | null {
+  const name = normalizeRoomName(
+    [offer.roomName, offer.sourceRoomDescription].filter(Boolean).join(" "),
+  );
+
+  if (!name || /\b(accessible|disabled|barrierefrei)\b/.test(name)) return null;
+  if (/\bfamily\b/.test(name) && /\b(swim up|swimup)\b/.test(name))
+    return "deluxe-family-swim-up";
+  if (/\b(duplex|dublex)\b/.test(name) && /\bfamily\b/.test(name))
+    return "deluxe-duplex-family";
+  if (/\bfamily\b/.test(name)) return "deluxe-family";
+  if (/\bshallow pool\b/.test(name)) return "deluxe-shallow-pool";
+  if (/\bsuperior\b/.test(name)) return "deluxe-superior";
+  if (/\b(swim up|swimup)\b/.test(name)) return "deluxe-swim-up";
+  if (/\b(pool view|poolblick)\b/.test(name)) return "deluxe-pool";
+  if (/\b(land view|landblick|landseite)\b/.test(name)) return "deluxe-land";
   return null;
 }
 

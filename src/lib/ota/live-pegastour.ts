@@ -20,6 +20,13 @@ export const PEGAS_HOTEL_CONFIG = {
     pageUrl:
       "https://pegast.ru/hotel/turkey/antalya/belek/port-nature-luxury-resort-hotel-and-spa-6609069",
   },
+  "sy-hotels-belek": {
+    hotelId: 816187159,
+    locationId: 7192,
+    hotelName: "SY Hotels Belek Boutique Luxury",
+    pageUrl:
+      "https://pegast.ru/hotel/turkey/antalya/belek/sy-hotels-belek-boutique-luxury-816187159",
+  },
 } as const;
 
 type PegasHotelKey = keyof typeof PEGAS_HOTEL_CONFIG;
@@ -91,8 +98,24 @@ function normalize(value: string): string {
     .trim();
 }
 
-export function matchPegasRoom(roomName: string): string | undefined {
+export function matchPegasRoom(
+  roomName: string,
+  hotelKey: PegasHotelKey = "port-nature",
+): string | undefined {
   const text = normalize(roomName);
+  if (hotelKey === "sy-hotels-belek") {
+    if (/(family|семеи)/.test(text) && /(swim up|swimup)/.test(text))
+      return "deluxe-family-swim-up";
+    if (/(duplex|dublex|дуплекс)/.test(text) && /(family|семеи)/.test(text))
+      return "deluxe-duplex-family";
+    if (/(family|семеи)/.test(text)) return "deluxe-family";
+    if (/(shallow pool|мелк)/.test(text)) return "deluxe-shallow-pool";
+    if (/superior/.test(text)) return "deluxe-superior";
+    if (/(swim up|swimup)/.test(text)) return "deluxe-swim-up";
+    if (/(pool view|вид на бассейн)/.test(text)) return "deluxe-pool";
+    if (/(land view|ландшафт|суш)/.test(text)) return "deluxe-land";
+    return undefined;
+  }
   if (/(family|familien|семеи)/.test(text)) return "family";
   if (/(king|royal|королев)/.test(text) && /(suite|suit|сьют)/.test(text))
     return "king-suite";
@@ -173,6 +196,7 @@ export function parsePegasHotelOnlyOffers(
     checkIn: string;
     checkOut: string;
     nights: number;
+    hotelKey?: PegasHotelKey;
   },
 ): PegasHotelOnlyOffer[] {
   const root = asRecord(value);
@@ -192,11 +216,6 @@ export function parsePegasHotelOnlyOffers(
   if (!Array.isArray(accommodationOptions))
     throw new Error("Pegas konaklama seçenekleri liste değil.");
 
-  const hotel = asRecord(data.hotel);
-  const hotelId = Number(hotel?.hotelId ?? data.hotelId);
-  if (hotelId !== expected.hotelId)
-    throw new Error("Pegas yanıtındaki otel benchmark oteliyle eşleşmiyor.");
-
   const checkIn = sourceDate(data.startDate ?? data.checkInDate);
   const nights = Number(data.duration ?? data.nights);
   const checkOut =
@@ -208,6 +227,19 @@ export function parsePegasHotelOnlyOffers(
     nights !== expected.nights
   )
     throw new Error("Pegas yanıtındaki tarihler benchmark aralığıyla eşleşmiyor.");
+
+  const hotel = asRecord(data.hotel);
+  const rawHotelId = hotel?.hotelId ?? data.hotelId;
+  const hotelId = Number(rawHotelId);
+  const hasHotelId = rawHotelId !== null && rawHotelId !== undefined;
+
+  // PEGAS doğrulanmış fakat boş bir aramada `hotel: null` ve
+  // `accommodationOptions: []` döndürüyor. İstek zaten tek bir hotelId ile
+  // gönderildiği ve yanıt tarihleri birebir doğrulandığı için bu durum
+  // kimlik uyuşmazlığı değil, teklif bulunmaması anlamına gelir.
+  if (!hasHotelId && accommodationOptions.length === 0) return [];
+  if (!hasHotelId || hotelId !== expected.hotelId)
+    throw new Error("Pegas yanıtındaki otel benchmark oteliyle eşleşmiyor.");
 
   const referenceDescription = asRecord(data.referenceDescription);
   const seen = new Set<string>();
@@ -279,7 +311,7 @@ export function parsePegasHotelOnlyOffers(
         roomCategoryId,
         boardName,
         boardCode,
-        matchedRoomId: matchPegasRoom(roomName),
+        matchedRoomId: matchPegasRoom(roomName, expected.hotelKey),
       });
     });
   });
@@ -357,7 +389,7 @@ export async function collectPegasTourLiveQuotes(
   scope: ReportScopeDefinition,
 ): Promise<ProviderCollectionResult> {
   const config = PEGAS_HOTEL_CONFIG[scope.hotelKey as PegasHotelKey];
-  if (!config || scope.id !== "port-nature-ru" || scope.currency !== "RUB") {
+  if (!config || scope.currency !== "RUB") {
     const reason = "Pegas Touristik Rusya için bu otel/RUB eşleştirmesi doğrulanmadı.";
     return {
       quotes: missingQuotes(provider, scope, reason),
@@ -388,8 +420,8 @@ export async function collectPegasTourLiveQuotes(
     const bodyText = await handle.page.locator("body").innerText();
     if (/Доступ временно ограничен|Access denied/i.test(bodyText))
       throw new Error("Pegas otomatik erişimi geçici olarak sınırlandırdı.");
-    if (!/Port Nature Luxury Resort/i.test(bodyText))
-      throw new Error("Pegas otel sayfası Port Nature kimliğini doğrulamadı.");
+    if (!bodyText.toLocaleLowerCase("ru-RU").includes(config.hotelName.toLocaleLowerCase("ru-RU")))
+      throw new Error("Pegas otel sayfası beklenen otel kimliğini doğrulamadı.");
 
     for (const window of scope.windows) {
       try {
@@ -402,6 +434,7 @@ export async function collectPegasTourLiveQuotes(
           checkIn: window.checkIn,
           checkOut: window.checkOut,
           nights: window.nights,
+          hotelKey: scope.hotelKey as PegasHotelKey,
         });
         const observedAt = new Date().toISOString();
         const windowOffers = parsed.map((offer): CollectedOffer => ({

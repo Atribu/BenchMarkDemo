@@ -5,6 +5,7 @@ interface OtaHotelConfig {
   roomAliases: Record<string, string[]>;
   searchQuery?: string;
   cardName?: string;
+  propertyId?: string;
 }
 
 interface TuiMarketConfig {
@@ -169,7 +170,25 @@ export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
       ],
       "king-suite": ["King Suite with Sea View", "King Suite"],
     },
-  }
+  },
+  "sy-hotels-belek": {
+    pageUrl: "https://www.booking.com/hotel/tr/sy-hotels-belek.html",
+    searchQuery: "SY Hotels Belek Boutique Luxury",
+    cardName: "Sy Hotels Belek",
+    roomAliases: {
+      "deluxe-land": ["Deluxe Room with Land View", "Deluxe Land View"],
+      "deluxe-pool": ["Deluxe Room with Pool View", "Deluxe Pool View"],
+      "deluxe-superior": ["Deluxe Superior Room", "Superior Deluxe Room"],
+      "deluxe-family": ["Deluxe Family Room"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": ["Deluxe Swim-Up Room", "Deluxe Swim Up Room"],
+      "deluxe-family-swim-up": [
+        "Deluxe Swim-Up Family Room",
+        "Deluxe Family Swim Up Room",
+      ],
+      "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
+    },
+  },
 };
 
 export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
@@ -231,6 +250,20 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
         "Family Room, Partial Sea View",
       ],
       "king-suite": ["King Suite, Sea View", "King Suite"],
+    },
+  },
+  "sy-hotels-belek": {
+    pageUrl:
+      "https://www.expedia.com/Serik-Hotels-Sy-Hotels-Belek.h112329850.Hotel-Information",
+    roomAliases: {
+      "deluxe-land": ["Deluxe Room, Land View", "Deluxe Land View"],
+      "deluxe-pool": ["Deluxe Room, Pool View", "Deluxe Pool View"],
+      "deluxe-superior": ["Deluxe Superior Room"],
+      "deluxe-family": ["Deluxe Family Room"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": ["Deluxe Swim-Up Room", "Deluxe Swim Up Room"],
+      "deluxe-family-swim-up": ["Deluxe Swim-Up Family Room"],
+      "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
     },
   },
 };
@@ -330,6 +363,54 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
       "king-suite": ["King Suite", "Königssuite"],
     },
   },
+  "sy-hotels-belek": {
+    pageUrl:
+      "https://www.holidaycheck.de/hi/sy-luxury-belek/3c0937bc-b1d6-42a8-9280-0644000c2a43",
+    roomAliases: {
+      "deluxe-land": [
+        "Deluxe Land View",
+        "Deluxe Zimmer Landblick",
+        "Doppelzimmer Deluxe Landseite Klimaanlage Dusche Balkon",
+        "Deluxe Room Land view",
+        "Deluxe Room Land View - 1 Queen Bed And 1 Large Twin Sofa Bed",
+      ],
+      "deluxe-pool": [
+        "Deluxe Pool View",
+        "Deluxe Zimmer Poolblick",
+        "Double Standard Room Pool View",
+        "Doppelzimmer, Poolblick",
+        "Standard Doppel Zimmer Poolblick",
+        "Doppelzimmer Poolblick",
+        "Doppelzimmer Deluxe Poolblick Klimaanlage Dusche Balkon",
+        "Doppelzimmer Deluxe Poolblick",
+      ],
+      "deluxe-superior": ["Deluxe Superior Room", "Deluxe Superior Zimmer"],
+      "deluxe-family": ["Deluxe Family Room", "Deluxe Familienzimmer"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": [
+        "Deluxe Swim Up Room",
+        "Deluxe Room With Swim Up Pool And Terrace",
+        "Doppelzimmer Swim Up",
+        "Double Deluxe Room with Terrace with Swimup Pool",
+        "Deluxe Doppel Zimmer mit Terrasse und Swimup Pool",
+        "Doppelzimmer Deluxe swim-up Poolblick Klimaanlage Dusche Terrasse",
+        "DZ Deluxe Poolzugang Terr",
+      ],
+      "deluxe-family-swim-up": [
+        "Deluxe Family Swim Up",
+        "Deluxe Family Room With Swim Up Pool And Terrace",
+        "Familienzimmer swim-up Poolblick Klimaanlage Dusche Terrasse",
+        "Deluxe Familien Zimmer mit Terrasse und Swimup Pool",
+        "Deluxe Family Room with Terrace with Swimup Pool",
+        "Deluxe Family Swim-Up Room",
+        "Deluxe Family Swim-Up Room - 1 Queen Bed And 2 Large Twin Beds",
+      ],
+      "deluxe-shallow-pool": [
+        "Deluxe Shallow Pool Room",
+        "Deluxe Shallow Pool Room - 1 Queen Bed",
+      ],
+    },
+  },
 };
 
 export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
@@ -382,7 +463,21 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
         "Corner Room",
       ],
     }
-  }
+  },
+  "sy-hotels-belek": {
+    pageUrl:
+      "https://www.loveholidays.com/holidays/turkey/antalya/belek/sy-hotels-belek-boutique-luxury.html",
+    roomAliases: {
+      "deluxe-land": ["Deluxe Standard Room with Land View Land View"],
+      "deluxe-pool": ["Deluxe Pool View Room"],
+      "deluxe-superior": ["Deluxe Superior Standard Room"],
+      "deluxe-family": ["Deluxe Family Room"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": ["Deluxe Swim-Up Standard Room"],
+      "deluxe-family-swim-up": ["Deluxe Swim-Up Family Room"],
+      "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
+    },
+  },
 };
 
 export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
@@ -472,7 +567,23 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
       family: ["Family Room Side Sea View", "Family Room"],
       "king-suite": ["King Suite Sea View", "King Suite"],
     },
-  }
+  },
+  "sy-hotels-belek": {
+    pageUrl:
+      "https://www.onthebeach.co.uk/hotels/turkey/antalya/belek/sy-hotels-boutique-luxury",
+    cardName: "SY Hotels Boutique Luxury",
+    propertyId: "3143226",
+    roomAliases: {
+      "deluxe-land": ["Deluxe Land View", "Deluxe Room Land View"],
+      "deluxe-pool": ["Deluxe Pool View", "Deluxe Room Pool View"],
+      "deluxe-superior": ["Deluxe Superior Room"],
+      "deluxe-family": ["Deluxe Family Room"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": ["Deluxe Swim Up Room", "Deluxe Swim-Up Room"],
+      "deluxe-family-swim-up": ["Deluxe Family Swim Up Room"],
+      "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
+    },
+  },
 };
 
 export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
@@ -552,6 +663,39 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
     ]
     }
   },
+  "sy-hotels-belek": {
+    giataId: 1449005,
+    offerSlug: "Hotel-SY-Hotels-Belek-Boutique-Luxury",
+    offerPageUrl:
+      "https://www.tui.com/hotels/sy-hotels-belek-boutique-luxury-1449005/hotelinformation/",
+    markets: {
+      EUR: {
+        market: "de",
+        locale: "de-DE",
+      },
+    },
+    roomAliases: {
+      "deluxe-land": ["Deluxe Land View", "Deluxe Zimmer Landblick"],
+      "deluxe-pool": [
+        "Deluxe Pool View",
+        "Deluxe Zimmer Poolblick",
+        "Double Standard Room Pool View",
+      ],
+      "deluxe-superior": ["Deluxe Superior Room"],
+      "deluxe-family": ["Deluxe Family Room"],
+      "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
+      "deluxe-swim-up": [
+        "Deluxe Swim Up Room",
+        "Double Deluxe Room with Terrace with Swimup Pool",
+      ],
+      "deluxe-family-swim-up": [
+        "Deluxe Family Swim Up Room",
+        "Deluxe Familien Zimmer mit Terrasse und Swimup Pool",
+        "Deluxe Family Room with Terrace with Swimup Pool",
+      ],
+      "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
+    },
+  },
 };
 
 
@@ -569,6 +713,13 @@ export const SCHAUINSLAND_HOTEL_CONFIG: Partial<
     giataId: "4894",
     pageUrl:
       "https://www.schauinsland-reisen.de/hotel/4894-miramare-queen-hotel",
+    market: "de",
+    currency: "EUR",
+  },
+  "sy-hotels-belek": {
+    giataId: "1449005",
+    pageUrl:
+      "https://www.schauinsland-reisen.de/hotel/1449005-sy-hotels-belek-boutique-luxury",
     market: "de",
     currency: "EUR",
   },
@@ -600,6 +751,14 @@ export const CHECK24_HOTEL_CONFIG = {
     currency: "EUR",
     accommodationId: "019ab528fa947e0c8466cf670e1024e9",
     accommodationSlug: "port-nature-luxury-resort",
+  },
+  "sy-hotels-belek": {
+    hotelId: "36332042",
+    hotelName: "Sy Hotels Belek - All inclusive",
+    pageUrl: "https://hotel.check24.de/hotel/turkey/36332042",
+    market: "de",
+    currency: "EUR",
+    accommodationId: "019ab53308e673799d4d0b164fb80e79",
   },
 } as const;
 
@@ -658,5 +817,11 @@ export const CORALTRAVEL_HOTEL_CONFIG: Partial<
       parentId: "100",
       parentName: "Боазкент (Bogazkent), Белек (Belek), Турция",
     },
+  },
+  "sy-hotels-belek": {
+    pageUrl: "https://coraltravel.de/hotels/sy-hotels-belek/",
+    hotelName: "SY Hotels Belek Boutique Luxury",
+    market: "de",
+    currency: "EUR",
   },
 };

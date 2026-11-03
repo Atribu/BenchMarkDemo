@@ -218,6 +218,79 @@ test("TUI requests hotel-only rooms and prefers exact land/sea over cheapest var
   assert.ok(result.quotes[2].observedAt);
 });
 
+test("TUI maps only explicit SY Hotels pool and swim-up supplier names", async (t) => {
+  const syOffer = (name: string, amount: number) => ({
+    ...tuiOffer(name, amount, "1449005"),
+    arrivalDate: "2027-05-10",
+    departureDate: "2027-05-15",
+  });
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json({
+      roomTypes: [
+        {
+          offers: [
+            syOffer("DOUBLE STANDARD ROOM POOL VIEW", 892),
+            syOffer(
+              "DOUBLE DELUXE ROOM WITH TERRACE WITH SWIMUP POOL",
+              1246,
+            ),
+            syOffer(
+              "DELUXE FAMILIEN ZIMMER MIT TERRASSE UND SWIMUP POOL",
+              2480,
+            ),
+            syOffer("DOUBLE DELUXE ROOM", 808),
+            syOffer("DELUXE DOPPEL ZIMMER MIT TERRASSE", 1069),
+          ],
+        },
+      ],
+    }),
+  );
+  const scope = REPORT_SCOPES.find((item) => item.id === "sy-hotels-eu")!;
+  const result = await collectTuiLiveQuotes(tuiProvider, {
+    ...scope,
+    windows: [
+      {
+        id: "2027-05-10_2027-05-15",
+        label: "10–15 Mayıs 2027",
+        checkIn: "2027-05-10",
+        checkOut: "2027-05-15",
+        nights: 5,
+      },
+    ],
+  });
+
+  assert.equal(
+    result.quotes.find((quote) => quote.roomId === "deluxe-pool")?.price,
+    892,
+  );
+  assert.equal(
+    result.quotes.find((quote) => quote.roomId === "deluxe-swim-up")?.price,
+    1246,
+  );
+  assert.equal(
+    result.quotes.find((quote) => quote.roomId === "deluxe-family-swim-up")
+      ?.price,
+    2480,
+  );
+  assert.equal(
+    result.quotes.find((quote) => quote.roomId === "deluxe-land")?.price,
+    null,
+  );
+  assert.ok(
+    result.offers?.some(
+      (offer) =>
+        offer.roomName === "DOUBLE DELUXE ROOM" && !offer.matchedRoomId,
+    ),
+  );
+  assert.ok(
+    result.offers?.some(
+      (offer) =>
+        offer.roomName === "DELUXE DOPPEL ZIMMER MIT TERRASSE" &&
+        !offer.matchedRoomId,
+    ),
+  );
+});
+
 test("TUI rejects per-person prices, wrong dates, hotel, currency and occupancy", async (t) => {
   const good = tuiOffer("Superior Land View", 1502);
   t.mock.method(globalThis, "fetch", async () =>

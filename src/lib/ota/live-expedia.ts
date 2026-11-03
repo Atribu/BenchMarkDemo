@@ -20,6 +20,13 @@ import {
   type PatchrightBrowserOptions,
 } from "./patchright-browser";
 
+export const EXPEDIA_ROOM_CARD_SELECTORS = [
+  '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
+  '[data-stid="section-room-list"] [data-stid="property-offer"]',
+  '[data-stid="section-room-list"] [data-stid*="room-offer"]',
+  '[data-stid="section-room-list"] article:has([role="status"])',
+] as const;
+
 export interface ExpediaRoomCard {
   name: string;
   text: string;
@@ -109,6 +116,38 @@ function dateLabel(date: string) {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
+function expediaCurrentPricePattern(currency: ReportScopeDefinition["currency"]) {
+  const token =
+    currency === "GBP"
+      ? String.raw`(?:£|GBP)`
+      : currency === "EUR"
+        ? String.raw`(?:€|EUR)`
+        : String.raw`(?:₽|RUB|руб\.?)`;
+  const amount = String.raw`[\d.,]+(?:[ \u00a0\u202f]\d{3})*(?:[.,]\d{2})?`;
+  const price = String.raw`(?:${token}\s*${amount}|${amount}\s*${token})`;
+  const marker = String.raw`(?:the\s+current\s+price\s+is|der\s+aktuelle\s+preis\s+(?:ist|beträgt)|aktueller\s+preis(?:\s+(?:ist|beträgt))?)`;
+  return new RegExp(String.raw`${marker}\s*:?\s*(${price})`, "i");
+}
+
+export function parseExpediaStayTotal(
+  priceText: string,
+  currency: ReportScopeDefinition["currency"],
+  nights: number,
+): number | null {
+  const currentPrice = priceText.match(
+    expediaCurrentPricePattern(currency),
+  )?.[1];
+  if (!currentPrice) return null;
+
+  const totalContexts = [
+    new RegExp(`\\bfor\\s+${nights}\\s+nights?\\s*,?\\s*1\\s+room\\b`, "i"),
+    new RegExp(`\\bfür\\s+${nights}\\s+nächte?\\s*,?\\s*1\\s+zimmer\\b`, "i"),
+  ];
+  if (!totalContexts.some((pattern) => pattern.test(priceText))) return null;
+
+  return parsePriceFromText(currentPrice, currency);
+}
+
 export function parseExpediaQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
@@ -179,14 +218,24 @@ export function parseExpediaQuotes(
     );
   }
 
+  const displayedHotelName = normalizeInlineText(snapshot.hotelName);
+  const expectedHotelName = normalizeInlineText(scope.hotelName);
+
+  // Expedia pazara ve deneye göre görünen başlığı kısaltabiliyor veya
+  // pazarlama eki ekleyebiliyor. Güvenilir mülk kimliği URL'deki değişmeyen
+  // Expedia hotel ID'sidir; görünen ad yalnızca tanılama amacıyla tutulur.
   if (
-    !normalizeInlineText(snapshot.hotelName)
-      .toLowerCase()
-      .startsWith(scope.hotelName.toLowerCase())
+    debug &&
+    displayedHotelName &&
+    !displayedHotelName
+      .toLocaleLowerCase("en")
+      .startsWith(expectedHotelName.toLocaleLowerCase("en"))
   ) {
-    validationErrors.push(
-      `hotelName: expected=${scope.hotelName}, actual=${snapshot.hotelName}`,
-    );
+    console.warn("[Expedia] Display name differs from catalog name:", {
+      expected: scope.hotelName,
+      actual: snapshot.hotelName,
+      verifiedHotelId: hotelId,
+    });
   }
 
   if (
@@ -263,27 +312,16 @@ export function parseExpediaQuotes(
 
     const available = matched
       .flatMap((card) => {
-        const current = card.priceText.match(
-          /The current price is\s*([€£][\d.,]+)/i,
-        )?.[1];
-        
-        const nightsMatch = new RegExp(
-      `for ${window.nights} nights?, 1 room`,
-      "i",
-    ).test(card.priceText);
-
-    
-       const price =
-      current && nightsMatch
-        ? parsePriceFromText(current, scope.currency)
-        : null;
+        const price = parseExpediaStayTotal(
+          card.priceText,
+          scope.currency,
+          window.nights,
+        );
 
     if (debug) console.log("[Expedia] Price parsing:", {
       roomId: room.id,
       cardName: card.name,
       priceText: card.priceText,
-      current,
-      nightsMatch,
       parsedPrice: price,
     });
 
@@ -332,11 +370,15 @@ export function parseExpediaQuotes(
       offerDescription: best?.name,
       offerConditions: best
         ? [
-            /All-inclusive/i.test(best.text) ? "All-inclusive" : null,
-            /Non-refundable/.test(best.text)
+            /All[- ]inclusive|Alles inklusive/i.test(best.text)
+              ? "All-inclusive"
+              : null,
+            /Non-refundable|Nicht erstattungsfähig/i.test(best.text)
               ? "Kartın varsayılan iptal seçeneğini kaynakta kontrol edin"
               : null,
-            /includes taxes & fees/.test(best.priceText)
+            /includes taxes & fees|inklusive Steuern und Gebühren/i.test(
+              best.priceText,
+            )
               ? "Vergiler ve ücretler dahil"
               : "Vergi ayrıntısı doğrulanmadı",
             `${window.nights} gece, 1 oda, 2 yetişkin; ekranda gösterilen toplam`,
@@ -383,6 +425,23 @@ export function resolveExpediaBrowserConfig(
     userAgent: providerConfig.userAgent,
     headless,
   };
+}
+
+async function resolveExpediaRoomCards(page: Page, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    for (const selector of EXPEDIA_ROOM_CARD_SELECTORS) {
+      const locator = page.locator(selector);
+      const count = await locator.count();
+      if (count > 0) return { locator, selector };
+    }
+    await page.waitForTimeout(500);
+  }
+
+  throw new Error(
+    `EXPEDIA_ROOM_CARDS_NOT_FOUND: ${EXPEDIA_ROOM_CARD_SELECTORS.join(" | ")}`,
+  );
 }
 
 export async function collectExpediaLiveQuotes(
@@ -438,26 +497,18 @@ export async function collectExpediaLiveQuotes(
       await assertPricePageAccessible(page, response?.status());
 
 
-await page
-  .locator(
-    '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
-  )
-  .first()
-  .waitFor({
-    timeout: 30000,
-  });
+const resolvedRoomCards = await resolveExpediaRoomCards(page);
 
 // Sayfa yüklenirken challenge sonradan çıkmış olabilir
 await assertNoExpediaBotChallenge(page);
 
 if (debug) {
   console.log("[Expedia] Access check: OK");
+  console.log("[Expedia] Room card selector:", resolvedRoomCards.selector);
   console.log("========== EXPEDIA DEBUG END ==========\n");
 }
 
-const roomCards = page.locator(
-  '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
-);
+const roomCards = resolvedRoomCards.locator;
 
 let previousCount = 0;
 
@@ -493,7 +544,7 @@ if (debug)
     await roomCards.count(),
   );
 
-const snapshot = await page.evaluate(() => ({
+const snapshot = await page.evaluate((roomCardSelector) => ({
 
         url: location.href,
         hotelName: document.querySelector("h1")?.textContent ?? "",
@@ -521,9 +572,7 @@ const snapshot = await page.evaluate(() => ({
 
             
         cards: Array.from(
-          document.querySelectorAll(
-            '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
-          ),
+          document.querySelectorAll(roomCardSelector),
         ).map((card) => ({
           
         name: (() => {
@@ -560,7 +609,7 @@ const snapshot = await page.evaluate(() => ({
     ?.innerText?.trim() ||
   (card as HTMLElement).innerText,
         })),
-      }));
+      }), resolvedRoomCards.selector);
 
       if (debug) console.log("[Expedia] Snapshot validation:", {
   expected: {
@@ -608,6 +657,8 @@ const snapshot = await page.evaluate(() => ({
   );
       const reason = blocked
         ? "Expedia erişim doğrulaması istedi; otomatik oda fiyatı alınamadı."
+        : /EXPEDIA_ROOM_CARDS_NOT_FOUND/.test(errorMessage)
+          ? "Expedia oda listesi açıldı ancak desteklenen oda kartı yapılarından hiçbiri bulunamadı; sayfa yapısı değişmiş olabilir."
         : "Expedia oda fiyatı veya arama koşulları doğrulanamadı.";
       warnings.push(
         `Expedia / ${scope.hotelName} / ${window.checkIn}: ${blocked ? reason : error instanceof Error ? error.message.split("\n")[0] : reason}`,

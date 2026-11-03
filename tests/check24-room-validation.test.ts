@@ -5,6 +5,7 @@ import {
   validateCheck24BeachOffer,
   validateCheck24PortNatureOffer,
   validateCheck24QueenOffer,
+  validateCheck24SyHotelsOffer,
 } from "../src/lib/ota/check24-room-validation";
 import { buildCheck24HotelSearchUrl } from "../src/lib/ota/live-check24";
 
@@ -163,5 +164,32 @@ test("CHECK24 builds Queen's numeric entry route while validating its modern ide
       "2027-05-15",
     ),
     "https://hotel.check24.de/search/Miramare%20Queen%20Hotel%20-%20Ultra%20All%20Inclusive-8571549/2027-05-10/2027-05-15/%5BA%7CA%5D/hotel.html",
+  );
+});
+
+test("CHECK24 maps all verified SY Hotels room categories", () => {
+  const cases = [
+    ["Doppelzimmer mit Landblick", "deluxe-land"],
+    ["Doppelzimmer, Poolblick", "deluxe-pool"],
+    ["Dz Superior Deluxe", "deluxe-superior"],
+    ["DELUXE FAMILY ROOM", "deluxe-family"],
+    ["DELUXE DUPLEX FAMILY ROOM", "deluxe-duplex-family"],
+    ["Doppelzimmer Swim Up", "deluxe-swim-up"],
+    [
+      "Deluxe Family Room with Swim Up Pool and Terrace",
+      "deluxe-family-swim-up",
+    ],
+    ["Dz Shallow Pool", "deluxe-shallow-pool"],
+  ] as const;
+
+  for (const [roomName, roomId] of cases) {
+    const result = validateCheck24SyHotelsOffer(offer(roomName), 5);
+    assert.equal(result.status, "matched", roomName);
+    assert.equal(result.roomId, roomId, roomName);
+  }
+
+  assert.equal(
+    validateCheck24SyHotelsOffer(offer("Deluxe Accessible Room"), 5).status,
+    "rejected",
   );
 });

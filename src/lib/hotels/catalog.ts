@@ -248,6 +248,90 @@ export const HOTEL_CATALOG = [
       },
     ],
   },
+  {
+    key: "sy-hotels-belek",
+    name: "SY Hotels Belek Boutique Luxury",
+    shortCode: "SY",
+    matchingPolicy: {
+      category: "standard",
+      requireBalcony: true,
+      roomByView: {
+        land: "deluxe-land",
+        garden: "deluxe-land",
+      },
+    },
+    scopes: [
+      {
+        id: "sy-hotels-eu",
+        label: "SY Hotels Avrupa Benchmark",
+        marketLabel: "Avrupa",
+        currency: "EUR",
+        requiredBoard: "all-inclusive",
+        notes:
+          "SY Hotels Belek Boutique Luxury için Avrupa/EUR hotel-only kapsamı.",
+      },
+      {
+        id: "sy-hotels-uk",
+        label: "SY Hotels Birleşik Krallık Benchmark",
+        marketLabel: "Birleşik Krallık",
+        currency: "GBP",
+        requiredBoard: "all-inclusive",
+        notes:
+          "On the Beach ve Loveholidays gibi UK kanalları için GBP kapsamı.",
+      },
+      {
+        id: "sy-hotels-ru",
+        label: "SY Hotels Rusya Benchmark",
+        marketLabel: "Rusya",
+        currency: "RUB",
+        requiredBoard: "all-inclusive",
+        notes:
+          "Rusya hotel-only kanalları için RUB kapsamı; kaynak RUB fiyatı korunur.",
+      },
+    ],
+    rooms: [
+      {
+        id: "deluxe-land",
+        name: "Deluxe Kara Manzaralı",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-pool",
+        name: "Deluxe Havuz Manzaralı",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-superior",
+        name: "Deluxe Superior",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-family",
+        name: "Deluxe Aile Odası",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-duplex-family",
+        name: "Deluxe Dubleks Aile Odası",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-swim-up",
+        name: "Deluxe Swim-Up",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-family-swim-up",
+        name: "Deluxe Swim-Up Aile Odası",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+      {
+        id: "deluxe-shallow-pool",
+        name: "Deluxe Sığ Havuzlu Oda",
+        occupancyLabel: "1 oda · 2 yetişkin",
+      },
+    ],
+  },
 ] as const satisfies readonly HotelCatalogEntry[];
 
 export type HotelKey = (typeof HOTEL_CATALOG)[number]["key"];

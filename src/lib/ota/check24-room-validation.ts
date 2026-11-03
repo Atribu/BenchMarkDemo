@@ -11,6 +11,7 @@ import {
   matchCheck24BeachRoom,
   matchCheck24PortNatureRoom,
   matchCheck24QueenRoom,
+  matchCheck24SyHotelsRoom,
 } from "./check24-room-mapping";
 
 import type { HotelKey } from "@/src/lib/hotels/catalog";
@@ -338,6 +339,41 @@ export function validateCheck24QueenOffer(
   };
 }
 
+export function validateCheck24SyHotelsOffer(
+  offer: Check24ParsedOffer,
+  expectedNights: number,
+): Check24RoomValidationResult {
+  const features = extractCheck24RoomFeatures(
+    offer.roomName,
+    offer.sourceRoomDescription ?? offer.roomCategoryName,
+  );
+  const roomId = matchCheck24SyHotelsRoom(offer);
+  const reject = (reason: string): Check24RoomValidationResult => ({
+    status: "rejected",
+    roomId,
+    features,
+    reasons: [reason],
+  });
+
+  if (offer.roomOccupancy !== "[A|A]")
+    return reject("Beklenen kişi sayısı 2 yetişkin değil.");
+  if (offer.currency !== "EUR") return reject("Para birimi EUR değil.");
+  if (!Number.isFinite(offer.totalPrice) || offer.totalPrice <= 0)
+    return reject("Geçerli bir toplam fiyat bulunamadı.");
+  if (offer.nights !== expectedNights)
+    return reject("Konaklama süresi uyuşmuyor.");
+  if (!roomId) return reject("SY Hotels oda adı güvenli bir oda alias'ıyla eşleşmedi.");
+  if (!/all[ _-]*inclusive/i.test(offer.mealType))
+    return reject("Pansiyon All Inclusive değil.");
+
+  return {
+    status: "matched",
+    roomId,
+    features,
+    reasons: ["SY Hotels oda adı, tarih, kişi sayısı ve pansiyon doğrulandı."],
+  };
+}
+
 export function validateCheck24Offer(
   offer: Check24ParsedOffer,
   expectedNights: number,
@@ -347,5 +383,7 @@ export function validateCheck24Offer(
     return validateCheck24PortNatureOffer(offer, expectedNights);
   if (hotelKey === "miramare-queen")
     return validateCheck24QueenOffer(offer, expectedNights);
+  if (hotelKey === "sy-hotels-belek")
+    return validateCheck24SyHotelsOffer(offer, expectedNights);
   return validateCheck24BeachOffer(offer, expectedNights);
 }

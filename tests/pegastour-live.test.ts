@@ -148,6 +148,28 @@ test("Pegas keeps Port Nature room categories distinct", () => {
   assert.equal(matchPegasRoom("Королевский Сьют"), "king-suite");
 });
 
+test("Pegas uses SY Hotels' verified identity and distinct room aliases", () => {
+  assert.equal(PEGAS_HOTEL_CONFIG["sy-hotels-belek"].hotelId, 816187159);
+  const cases = [
+    ["Deluxe Land View", "deluxe-land"],
+    ["Deluxe Pool View", "deluxe-pool"],
+    ["Deluxe Superior", "deluxe-superior"],
+    ["Deluxe Family Room", "deluxe-family"],
+    ["Deluxe Duplex Family Room", "deluxe-duplex-family"],
+    ["Deluxe Swim Up", "deluxe-swim-up"],
+    ["Deluxe Family Swim Up", "deluxe-family-swim-up"],
+    ["Deluxe Shallow Pool", "deluxe-shallow-pool"],
+  ] as const;
+
+  for (const [roomName, roomId] of cases) {
+    assert.equal(
+      matchPegasRoom(roomName, "sy-hotels-belek"),
+      roomId,
+      roomName,
+    );
+  }
+});
+
 test("Pegas rejects a different hotel or stay", () => {
   assert.throws(
     () =>
@@ -190,6 +212,31 @@ test("Pegas treats a verified empty response as no availability", () => {
         checkIn: window.checkIn,
         checkOut: window.checkOut,
         nights: window.nights,
+      },
+    ),
+    [],
+  );
+});
+
+test("Pegas treats its live empty-response shape with hotel null as no availability", () => {
+  assert.deepEqual(
+    parsePegasHotelOnlyOffers(
+      {
+        ok: true,
+        data: {
+          startDate: "2027-05-10T00:00:00",
+          duration: 5,
+          hotel: null,
+          accommodationOptions: [],
+          referenceDescription: {},
+        },
+      },
+      {
+        hotelId: 816187159,
+        checkIn: window.checkIn,
+        checkOut: window.checkOut,
+        nights: window.nights,
+        hotelKey: "sy-hotels-belek",
       },
     ),
     [],

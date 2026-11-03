@@ -4,10 +4,13 @@ import {
   parseOnTheBeachQuotes,
   parseOnTheBeachOffers,
   collectOnTheBeachLiveQuotes,
+  resolveOnTheBeachCardName,
+  resolveOnTheBeachPropertyId,
   type OnTheBeachSnapshot,
 } from "../src/lib/ota/live-onthebeach";
 import {
   buildExpediaUrl,
+  EXPEDIA_ROOM_CARD_SELECTORS,
   parseExpediaQuotes,
   resolveExpediaBrowserConfig,
   type ExpediaSnapshot,
@@ -20,6 +23,56 @@ const uk = REPORT_SCOPES.find((scope) => scope.id === "beach-uk")!;
 const eu = REPORT_SCOPES.find((scope) => scope.id === "beach-eu")!;
 const otb = OTA_PROVIDERS.find((provider) => provider.key === "onthebeach")!;
 const expedia = OTA_PROVIDERS.find((provider) => provider.key === "expedia")!;
+
+test("On the Beach uses the supplier card name without changing the canonical hotel identity", () => {
+  const sy = REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-uk")!;
+
+  assert.equal(resolveOnTheBeachCardName(sy), "SY Hotels Boutique Luxury");
+  assert.equal(resolveOnTheBeachPropertyId(sy), "3143226");
+  assert.equal(sy.hotelName, "SY Hotels Belek Boutique Luxury");
+  assert.equal(resolveOnTheBeachCardName(uk), "Miramare Beach");
+  assert.equal(resolveOnTheBeachPropertyId(uk), undefined);
+});
+
+test("On the Beach maps every configured SY Hotels room only after strict hotel validation", () => {
+  const sy = REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-uk")!;
+  const syRooms = [
+    ["Deluxe Land View", "deluxe-land"],
+    ["Deluxe Pool View", "deluxe-pool"],
+    ["Deluxe Superior Room", "deluxe-superior"],
+    ["Deluxe Family Room", "deluxe-family"],
+    ["Deluxe Duplex Family Room", "deluxe-duplex-family"],
+    ["Deluxe Swim-Up Room", "deluxe-swim-up"],
+    ["Deluxe Family Swim Up Room", "deluxe-family-swim-up"],
+    ["Deluxe Shallow Pool Room", "deluxe-shallow-pool"],
+  ] as const;
+  const sySnapshot: OnTheBeachSnapshot = {
+    sourceUrl:
+      "https://www.onthebeach.co.uk/hotel_searches/show/3168946074",
+    hotelName: sy.hotelName,
+    checkInLabel: "Check-in Date 16 Oct 2026",
+    returnLabel: "Return 21 Oct 2026",
+    nights: 5,
+    adults: 2,
+    children: 0,
+    infants: 0,
+    rooms: 1,
+    totalSelected: true,
+    offers: syRooms.map(([roomName]) => ({
+      roomName,
+      board: "All Inclusive",
+      priceText: "£1,000per party",
+    })),
+  };
+
+  assert.deepEqual(
+    parseOnTheBeachOffers(otb, sy, window, sySnapshot).map(
+      (offer) => offer.matchedRoomId,
+    ),
+    syRooms.map(([, roomId]) => roomId),
+  );
+});
+
 const window = {
   id: "window",
   label: "16-21 Oct",
@@ -371,6 +424,20 @@ test("Expedia uses regional sites and dates without reusing US currency defaults
   assert.equal(de.searchParams.get("chkin"), window.checkIn);
 });
 
+test("Expedia keeps room-card fallbacks scoped to the room list", () => {
+  assert.ok(EXPEDIA_ROOM_CARD_SELECTORS.length > 1);
+  assert.ok(
+    EXPEDIA_ROOM_CARD_SELECTORS.every((selector) =>
+      selector.startsWith('[data-stid="section-room-list"]'),
+    ),
+  );
+  assert.ok(
+    EXPEDIA_ROOM_CARD_SELECTORS.some((selector) =>
+      selector.includes('[data-stid="property-offer"]'),
+    ),
+  );
+});
+
 test("Expedia production browser uses the requested market, persistent state and proxy", (t) => {
   const environment = process.env as Record<string, string | undefined>;
   const keys = [
@@ -418,6 +485,26 @@ test("Expedia reads current stay total, never previous or nightly price, and rec
   assert.equal(sea.captureMethod, "automated");
 });
 
+test("Expedia reads German stay totals with the currency after the amount", () => {
+  const germanSnapshot = {
+    ...exSnapshot,
+    cards: [
+      exSnapshot.cards[0],
+      {
+        ...exSnapshot.cards[1],
+        text: "Alles inklusive\nNicht erstattungsfähig",
+        priceText:
+          "Vorheriger Preis 2.592 €\nDer aktuelle Preis ist 1.883,40 €\nfür 5 Nächte, 1 Zimmer\n377 € pro Nacht\ninklusive Steuern und Gebühren",
+      },
+    ],
+  };
+  const sea = parseExpediaQuotes(expedia, eu, window, germanSnapshot).find(
+    (quote) => quote.roomId === "superior-sea",
+  )!;
+  assert.equal(sea.price, 1883.4);
+  assert.match(sea.offerConditions ?? "", /Vergiler ve ücretler dahil/);
+});
+
 test("Expedia accepts its secure EUR regional hostname redirect", () => {
   const redirected = {
     ...exSnapshot,
@@ -431,11 +518,23 @@ test("Expedia accepts its secure EUR regional hostname redirect", () => {
   );
 });
 
-test("Expedia refuses redirected dates, wrong hotel, party and currency", () => {
+test("Expedia uses the property ID as primary identity when the market display name differs", () => {
+  const marketTitle = {
+    ...exSnapshot,
+    hotelName: "Miramare Beach Resort - All Inclusive",
+  };
+  assert.equal(
+    parseExpediaQuotes(expedia, eu, window, marketTitle).find(
+      (quote) => quote.roomId === "superior-sea",
+    )?.price,
+    1883,
+  );
+});
+
+test("Expedia refuses redirected dates, wrong property ID, party and currency", () => {
   for (const patch of [
     { travellers: "Travellers, 12 travellers, 1 room" },
     { currencyLabel: "USD United States" },
-    { hotelName: "Another Hotel" },
     { startLabel: "Start date, 17 Oct" },
     { endLabel: "End date, 22 Oct" },
     { url: exSnapshot.url.replace("chkin=2026-10-16", "chkin=2026-10-17") },
@@ -464,6 +563,10 @@ test("Expedia excludes incomplete totals and does not turn missing prices into s
     "The previous price was €2,592\nfor 5 nights, 1 room",
     "The current price is £1,883\nfor 5 nights, 1 room",
     "The current price is €1,883\nfor 6 nights, 1 room",
+    "Vorheriger Preis 2.592 €\nfür 5 Nächte, 1 Zimmer",
+    "Der aktuelle Preis ist 1.883 €\n377 € pro Nacht",
+    "Der aktuelle Preis ist 1.883 £\nfür 5 Nächte, 1 Zimmer",
+    "Der aktuelle Preis ist 1.883 €\nfür 6 Nächte, 1 Zimmer",
   ])
     assert.equal(
       parseExpediaQuotes(expedia, eu, window, {

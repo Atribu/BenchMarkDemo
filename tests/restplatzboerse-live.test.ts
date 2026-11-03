@@ -223,6 +223,47 @@ test("Restplatzbörse official hotel identities include both Miramare hotels", (
     hotelIffCode: 17048,
     hotelName: "Miramare Queen Hotel",
   });
+  assert.deepEqual(RESTPLATZBOERSE_HOTEL_CONFIG["sy-hotels-belek"], {
+    hotelIffCode: 297825,
+    hotelName: "SY Hotels Belek Boutique Luxury",
+  });
+});
+
+test("Restplatzbörse maps only explicit SY Hotels room categories", () => {
+  const cases = [
+    ["Deluxe Land View", "deluxe-land"],
+    ["Deluxe Pool View", "deluxe-pool"],
+    ["Deluxe Superior Room", "deluxe-superior"],
+    ["Deluxe Family Room", "deluxe-family"],
+    ["Deluxe Duplex Family Room", "deluxe-duplex-family"],
+    ["Deluxe Swim Up Room", "deluxe-swim-up"],
+    ["Deluxe Family Swim Up Room", "deluxe-family-swim-up"],
+    ["Deluxe Shallow Pool Room", "deluxe-shallow-pool"],
+  ] as const;
+
+  for (const [roomName, roomId] of cases) {
+    assert.equal(
+      matchRestplatzboerseRoom(
+        "sy-hotels-belek",
+        roomName,
+        "SY",
+        "DoubleRoom",
+        "NothingSpecial",
+      ),
+      roomId,
+      roomName,
+    );
+  }
+  assert.equal(
+    matchRestplatzboerseRoom(
+      "sy-hotels-belek",
+      "Deluxe Room",
+      "SY",
+      "DoubleRoom",
+      "NothingSpecial",
+    ),
+    undefined,
+  );
 });
 
 test("Restplatzbörse maps Miramare rooms without upgrading side-sea or balcony-free rooms", () => {

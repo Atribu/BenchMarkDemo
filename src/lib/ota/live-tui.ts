@@ -360,7 +360,21 @@ if (typeof price !== "number") {
             "TUI ekonomi",
           )
         : undefined;
-    const match = exactEconomyMatch ?? matchOfferRoom(scope, roomFeatures);
+    const exactConfiguredMatch = Object.entries(config.roomAliases)
+      .map(([roomId, aliases]) =>
+        matchExactRoomAlias(
+          scope,
+          name,
+          roomId,
+          aliases,
+          "TUI",
+        ),
+      )
+      .find((candidate) => Boolean(candidate));
+    const match =
+      exactEconomyMatch ??
+      exactConfiguredMatch ??
+      matchOfferRoom(scope, roomFeatures);
 
     console.log("[TUI] Accepted offer:", {
       roomName: name,

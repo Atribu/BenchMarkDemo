@@ -153,7 +153,7 @@ const CHANNEL_INFO: Record<
   pegastour: {
     label: "Hotel-only · Beta",
     detail:
-      "Port Nature için PEGAS Touristik Rusya tekliflerini okur. Kesin tarih, " +
+      "Port Nature ve SY Hotels için PEGAS Touristik Rusya tekliflerini okur. Kesin tarih, " +
       "1 oda / 2 yetişkin, RUB ve All Inclusive toplamı doğrulanır; uçuşlu paket " +
       "ve gecelik fiyatlar kullanılmaz. RUB kaynak fiyatı TCMB kuruyla EUR karşılığıyla gösterilir.",
     type: "beta",
@@ -161,7 +161,7 @@ const CHANNEL_INFO: Record<
   restplatzboerse: {
     label: "Hotel-only · Canlı API",
     detail:
-      "Miramare Beach, Miramare Queen ve Port Nature için Restplatzbörse tekliflerini okur. Kesin tarih, " +
+      "Miramare Beach, Miramare Queen, Port Nature ve SY Hotels için Restplatzbörse tekliflerini okur. Kesin tarih, " +
       "2 yetişkin, EUR ve All Inclusive pansiyon doğrulanır; kişi başı fiyat " +
       "yerine güncel iki yetişkin konaklama toplamı gösterilir.",
     type: "beta",
@@ -177,7 +177,7 @@ const CHANNEL_INFO: Record<
 check24: {
   label: "Hotel-only · Beta",
   detail:
-    "CHECK24 Almanya üzerinden Miramare Beach için " +
+    "CHECK24 Almanya üzerinden Miramare Beach, Miramare Queen, Port Nature ve SY Hotels için " +
     "canlı konaklama fiyatları toplanır. " +
     "Oda adı, manzara, kişi sayısı, tarih, pansiyon ve " +
     "toplam fiyatı eşleşen teklifler oda tablosuna alınır. " +

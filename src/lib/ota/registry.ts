@@ -28,6 +28,8 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
       "queen-eu",
       "queen-uk",
       "port-nature-eu",
+      "sy-hotels-eu",
+      "sy-hotels-uk",
     ],
     searchTemplate:
       "https://www.booking.com/searchresults.html?ss={hotelName}&checkin={checkIn}&checkout={checkOut}",
@@ -42,13 +44,18 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   readiness: "selector-mapping",
   notes:
     "CHECK24 Almanya canlı otel fiyatları. " +
-    "Miramare Beach için eski ve yeni API; Miramare Queen ve Port Nature için tarihli otel araması desteklenir. " +
+    "Miramare Beach için eski ve yeni API; Miramare Queen, Port Nature ve SY Hotels için tarihli otel araması desteklenir. " +
     "Seçilen tarih, 1 oda / 2 yetişkin, EUR ve " +
     "All Inclusive fiyat adayları toplanır. " +
     "Queen için yalnızca açık kara ve tam deniz manzaralı standart oda adları eşleştirilir; " +
     "genel, yandan deniz, superior, aile ve suite odalar kapsam dışında kalır. " +
     "İptal ve vergi koşulları ayrıca doğrulanmalıdır.",
-  supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
+  supportedScopes: [
+    "beach-eu",
+    "queen-eu",
+    "port-nature-eu",
+    "sy-hotels-eu",
+  ],
   searchTemplate: "https://hotels.check24.de/",
 },
 
@@ -67,6 +74,8 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
       "queen-eu",
       "queen-uk",
       "port-nature-eu",
+      "sy-hotels-eu",
+      "sy-hotels-uk",
     ],
     searchTemplate:
       "https://www.expedia.com/Hotel-Search?destination={hotelName}&startDate={checkIn}&endDate={checkOut}",
@@ -80,7 +89,12 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Live beta aktif. Exact-date hotel-only offer sayfasi acilip all-offers-service cevabindan oda ve fiyat okunuyor.",
-    supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
+    supportedScopes: [
+      "beach-eu",
+      "queen-eu",
+      "port-nature-eu",
+      "sy-hotels-eu",
+    ],
     searchTemplate:
       "https://www.holidaycheck.de/suche?search={hotelName}&from={checkIn}&to={checkOut}",
   },
@@ -106,7 +120,12 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Hotel Only formu: secilen tarih, 2-28 gece, 1 oda/2 yetiskin; otel adi ve Total Hotel Price / per party dogrulanir. GBP toplam oda fiyatini okur.",
-    supportedScopes: ["beach-uk", "queen-uk", "port-nature-uk"],
+    supportedScopes: [
+      "beach-uk",
+      "queen-uk",
+      "port-nature-uk",
+      "sy-hotels-uk",
+    ],
     searchTemplate: "https://www.onthebeach.co.uk/_p/hotels",
   },
   {
@@ -117,8 +136,8 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     liveSupported: true,
     readiness: "api-contract",
     notes:
-      "Port Nature için Pegas Rusya hotel-only tekliflerini okur. Kesin tarih, 1 oda / 2 yetişkin, RUB, All Inclusive ve konaklama toplamı doğrulanır; uçuşlu paket ve gecelik fiyatlar kullanılmaz.",
-    supportedScopes: ["port-nature-ru"],
+      "Port Nature ve SY Hotels için Pegas Rusya hotel-only tekliflerini okur. Kesin tarih, 1 oda / 2 yetişkin, RUB, All Inclusive ve konaklama toplamı doğrulanır; uçuşlu paket ve gecelik fiyatlar kullanılmaz.",
+    supportedScopes: ["port-nature-ru", "sy-hotels-ru"],
     searchTemplate:
       "https://pegast.ru/hotel/turkey/antalya/belek/port-nature-luxury-resort-hotel-and-spa-6609069",
   },
@@ -130,10 +149,15 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     liveSupported: true,
     readiness: "api-contract",
     notes:
-      "Miramare Beach, Miramare Queen ve Port Nature için Restplatzbörse/Flux hotel-only tekliflerini okur. " +
+      "Miramare Beach, Miramare Queen, Port Nature ve SY Hotels için Restplatzbörse/Flux hotel-only tekliflerini okur. " +
       "Kesin tarih, 1 oda / 2 yetişkin, EUR, oda kodu ve All Inclusive pansiyon " +
       "doğrulanır; kişi başı fiyat yerine verify-offer toplamı kullanılır.",
-    supportedScopes: ["beach-eu", "queen-eu", "port-nature-eu"],
+    supportedScopes: [
+      "beach-eu",
+      "queen-eu",
+      "port-nature-eu",
+      "sy-hotels-eu",
+    ],
     searchTemplate: "https://www.restplatzboerse.at/hotels/",
   },
   {
@@ -160,7 +184,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     readiness: "selector-mapping",
     notes:
       "Live beta aktif. Resmi TUI offer endpoint'inden hotel-only teklifleri ve oda aciklamalari okunuyor.",
-    supportedScopes: ["beach-eu", "queen-uk"],
+    supportedScopes: ["beach-eu", "queen-uk", "sy-hotels-eu"],
     searchTemplate:
       "https://www.tui.com/pauschalreisen/suchen/hotels/?search={hotelName}&from={checkIn}",
   },
@@ -180,7 +204,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     "Canli collector baglantisi henuz tamamlanmadi." + "Canli GraphQL collector, oda eslestirme, " +
 "pansiyon filtreleme ve pagination destegi aktif. " +
 "Iptal ve vergi kosullari ayrica dogrulanmali.",
-  supportedScopes: ["beach-eu", "queen-eu"],
+  supportedScopes: ["beach-eu", "queen-eu", "sy-hotels-eu"],
   searchTemplate:
     "https://www.schauinsland-reisen.de/hotel/4893-miramare-beach-hotel",
 },

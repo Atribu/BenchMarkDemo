@@ -47,6 +47,20 @@ export interface OnTheBeachSnapshot {
   offers: { roomName: string; board: string; priceText: string }[];
 }
 
+export function resolveOnTheBeachCardName(
+  scope: ReportScopeDefinition,
+): string {
+  return (
+    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.cardName ?? scope.hotelName
+  ).trim();
+}
+
+export function resolveOnTheBeachPropertyId(
+  scope: ReportScopeDefinition,
+): string | undefined {
+  return ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.propertyId;
+}
+
 function dateLabel(date: string) {
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -176,7 +190,26 @@ const roomFeatures = classifyRoom(roomName);
 
 const normalMatch = matchOfferRoom(scope, roomFeatures);
 
-let specificMatch:
+let specificMatch = Object.entries(
+  ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases ?? {},
+)
+  .map(([roomId, aliases]) =>
+    matchExactRoomAlias(
+      scope,
+      roomName,
+      roomId,
+      aliases,
+      "On the Beach",
+    ),
+  )
+  .find(
+    (candidate): candidate is {
+      matchedRoomId?: string;
+      matchReason: string;
+    } => Boolean(candidate),
+  );
+
+let beachSpecificMatch:
   | {
       matchedRoomId?: string;
       matchReason: string;
@@ -184,24 +217,26 @@ let specificMatch:
   | undefined;
 
 if (scope.hotelKey === "miramare-beach") {
-  specificMatch = matchExactRoomAlias(
+  beachSpecificMatch = matchExactRoomAlias(
     scope,
     roomName,
     "economy",
     ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
     "On the Beach ekonomi",
   );
-  if (!specificMatch &&
+  if (!beachSpecificMatch &&
     /^(superior corner|double or twin superior corner balcony)$/i.test(
       roomName,
     )
   ) {
-    specificMatch = {
+    beachSpecificMatch = {
       matchedRoomId: "corner",
       matchReason: "OnTheBeach Superior Corner oda eşleşmesi.",
     };
   }
 }
+
+specificMatch = beachSpecificMatch ?? specificMatch;
 
 const roomMatch =
   specificMatch &&
@@ -918,7 +953,12 @@ if (!resultsLoaded) {
 
 await assertSearchAccessible(page);
 
-const targetHotelName = scope.hotelName.trim();
+// The catalog name is our canonical report identity, while the supplier can
+// render a different public name (for example SY Hotels Boutique Luxury).
+// Filtering and DOM verification must use the supplier name; the final
+// snapshot keeps the canonical name so strict report validation still works.
+const targetHotelName = resolveOnTheBeachCardName(scope);
+const targetHotelId = resolveOnTheBeachPropertyId(scope);
 const filteredResultsUrl = new URL(page.url());
 filteredResultsUrl.searchParams.set("filters[hotel_name]", targetHotelName);
 filteredResultsUrl.searchParams.set("pagination[page]", "1");
@@ -1012,9 +1052,13 @@ console.log("[OnTheBeach] Results structure inspection:", {
 
 onStep("Hotel Only hedef oteli sonuç sayfalarında arama");
 
-const hotelNameLocator = page.getByText(targetHotelName, {
-  exact: true,
-});
+const targetHotelResult = targetHotelId
+  ? page.locator(
+      `.hotel-result.search-result[data-hotel-id="${targetHotelId}"]`,
+    )
+  : page.locator(".hotel-result.search-result").filter({
+      has: page.getByText(targetHotelName, { exact: true }),
+    });
 
 const currentResultsUrl = new URL(page.url());
 
@@ -1045,7 +1089,9 @@ while (currentPage <= lastResultPage) {
 
   visitedPages.add(currentPage);
 
-  const hotelMatches = await hotelNameLocator.allTextContents();
+  const hotelMatches = await targetHotelResult
+    .locator("h3.hotel-result__title")
+    .allTextContents();
 
   console.log("[OnTheBeach] Hotel search page:", {
     page: currentPage,
@@ -1138,14 +1184,15 @@ console.log("[OnTheBeach] Pagination completed:", {
 
 if (!targetHotelFound) {
   throw new Error(
-    `${targetHotelName} oteli taranan sonuç sayfalarında bulunamadı.`,
+    targetHotelId
+      ? `${targetHotelName} (${targetHotelId}) seçili tarihlerde On the Beach Hotel Only envanterinde listelenmedi.`
+      : `${targetHotelName} oteli taranan sonuç sayfalarında bulunamadı.`,
   );
 }
 
 onStep("Hotel Only hedef otel kartını inceleme");
 
-const hotelCardInspection = await page
-  .getByText(targetHotelName, { exact: true })
+const hotelCardInspection = await targetHotelResult
   .first()
   .evaluate((element) => {
     const ancestors = [];
@@ -1183,16 +1230,7 @@ console.log(
 
 onStep("Hotel Only hedef otelin oda ve fiyat alanlarını inceleme");
 
-const targetHotelCard = page
-  .locator(".hotel-result.search-result")
-  .filter({
-    has: page.locator("h3.hotel-result__title").filter({
-      hasText: new RegExp(
-        `^\\s*${targetHotelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`,
-        "i",
-      ),
-    }),
-  });
+const targetHotelCard = targetHotelResult;
 
 await targetHotelCard.waitFor({
   state: "visible",
@@ -1359,7 +1397,7 @@ if (invalidOffers.length > 0 || collectedOffers.length === 0) {
 
 const snapshot: OnTheBeachSnapshot = {
   sourceUrl: page.url(),
-  hotelName: targetHotelName,
+  hotelName: scope.hotelName,
   checkInLabel: dateLabel(window.checkIn),
   returnLabel: dateLabel(window.checkOut),
   nights: window.nights,
