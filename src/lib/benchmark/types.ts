@@ -139,6 +139,26 @@ export interface ProviderCollectionResult {
   quotes: ProviderQuote[];
   warnings: string[];
   offers?: CollectedOffer[];
+  attempts?: CollectionAttempt[];
+  diagnostics?: ProviderCollectionDiagnostics;
+}
+
+export interface ProviderCollectionDiagnostics {
+  schemaVersion: 1;
+  providerKey: OtaKey;
+  scopeKey: ScopeKey;
+  quoteCount: number;
+  rawOfferCount: number;
+  acceptedOfferCount: number;
+  attemptCount: number;
+  quoteStatusCounts: Record<ProviderQuote["status"], number>;
+  attemptStatusCounts: Record<CollectionAttemptStatus, number>;
+  errorCounts: Partial<Record<BenchmarkErrorCode, number>>;
+  validationEvidenceCounts: {
+    collector: number;
+    derived: number;
+  };
+  contractIssues: string[];
 }
 
 // The advertised seller is not the collection source. Never insert these into direct OTA cells.
@@ -167,6 +187,98 @@ export type BenchmarkErrorCode =
   | "invalid_response"
   | "currency_mismatch"
   | "configuration_missing";
+
+export type CollectionAttemptStatus =
+  | "completed"
+  | "partial"
+  | "failed"
+  | "not_run";
+
+export type ValidationStage =
+  | "source_access"
+  | "hotel_identity"
+  | "stay_dates"
+  | "occupancy"
+  | "raw_offers"
+  | "room_mapping"
+  | "board"
+  | "price"
+  | "currency";
+
+export type ValidationCheckState =
+  | "passed"
+  | "failed"
+  | "empty"
+  | "unknown"
+  | "not_applicable";
+
+export interface CollectionValidationCheck {
+  stage: ValidationStage;
+  state: ValidationCheckState;
+  evidence: "collector" | "derived";
+  detail?: string;
+}
+
+export interface CollectionAttempt {
+  id: string;
+  providerKey: OtaKey;
+  scopeKey: ScopeKey;
+  hotelKey: HotelKey;
+  windowId: string;
+  status: CollectionAttemptStatus;
+  startedAt: string;
+  completedAt: string;
+  durationMs?: number;
+  rawOfferCount: number;
+  acceptedOfferCount: number;
+  errorCode?: BenchmarkErrorCode | null;
+  reason?: string;
+  validationChecks?: CollectionValidationCheck[];
+}
+
+export interface ValidationFunnelStageSummary {
+  stage: ValidationStage;
+  label: string;
+  passedCount: number;
+  failedCount: number;
+  emptyCount: number;
+  unknownCount: number;
+  notApplicableCount: number;
+  evaluatedCount: number;
+}
+
+export type ProviderReliabilityLevel = "strong" | "partial" | "weak";
+
+export interface ReliabilityMetrics {
+  attemptedCount: number;
+  resolvedCount: number;
+  verifiedPriceCount: number;
+  manualPriceCount: number;
+  noInventoryCount: number;
+  reviewCount: number;
+  technicalFailureCount: number;
+  reliabilityPct: number;
+  level: ProviderReliabilityLevel;
+  errorCounts: Partial<Record<BenchmarkErrorCode, number>>;
+  queryAttemptCount: number;
+  queryResponseCount: number;
+  queryCompletedCount: number;
+  queryPartialCount: number;
+  queryFailureCount: number;
+  queryNotRunCount: number;
+  queryReliabilityPct: number;
+  queryLevel: ProviderReliabilityLevel;
+}
+
+export interface ProviderReliabilitySummary extends ReliabilityMetrics {
+  providerKey: OtaKey;
+  providerName: string;
+}
+
+export interface HotelReliabilitySummary extends ReliabilityMetrics {
+  hotelKey: HotelKey;
+  hotelName: string;
+}
 
 export type CellTone =
   "muted" | "risk" | "soft-risk" | "parity" | "premium" | "strong-premium";
@@ -264,6 +376,11 @@ export interface BenchmarkRunResult {
   providers: ProviderDescriptor[];
   scopes: BenchmarkScopeResult[];
   summary: BenchmarkRunSummary;
+  reliability?: ProviderReliabilitySummary[];
+  hotelReliability?: HotelReliabilitySummary[];
+  collectionAttempts?: CollectionAttempt[];
+  validationFunnel?: ValidationFunnelStageSummary[];
+  collectionDiagnostics?: ProviderCollectionDiagnostics[];
   hotelPrices?: HotelPriceObservation[];
   secondaryOffers?: SecondaryOffer[];
   browserOffers?: BrowserImportedOffer[];

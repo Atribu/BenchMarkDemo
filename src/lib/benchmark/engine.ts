@@ -1,5 +1,6 @@
 import type {
   BenchmarkCell,
+  CollectionAttempt,
   BenchmarkRunResult,
   BenchmarkRunSummary,
   BenchmarkScopeResult,
@@ -12,6 +13,11 @@ import type {
   ReportScopeDefinition,
   ScopeProviderSelection,
 } from "@/src/lib/benchmark/types";
+import {
+  buildHotelReliabilitySummaries,
+  buildReliabilitySummaries,
+} from "./reliability";
+import { buildValidationFunnel } from "./validation-funnel";
 
 interface BuildBenchmarkResultArgs {
   mode: BenchmarkRunResult["mode"];
@@ -21,6 +27,7 @@ interface BuildBenchmarkResultArgs {
   quotes: ProviderQuote[];
   providersByScope?: ScopeProviderSelection;
   offers?: CollectedOffer[];
+  attempts?: CollectionAttempt[];
 }
 
 function getQuoteKey(
@@ -84,6 +91,7 @@ export function buildBenchmarkResult({
   quotes,
   providersByScope,
   offers = [],
+  attempts = [],
 }: BuildBenchmarkResultArgs): BenchmarkRunResult {
   const quotesByKey = new Map<string, ProviderQuote>();
 
@@ -351,5 +359,9 @@ export function buildBenchmarkResult({
     providers,
     scopes: scopeResults,
     summary,
+    reliability: buildReliabilitySummaries(providers, scopeResults, attempts),
+    hotelReliability: buildHotelReliabilitySummaries(scopeResults, attempts),
+    collectionAttempts: attempts,
+    validationFunnel: buildValidationFunnel(attempts),
   };
 }

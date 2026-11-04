@@ -1,5 +1,4 @@
 import { buildBenchmarkResult } from "@/src/lib/benchmark/engine";
-import { withBenchmarkErrorCode } from "@/src/lib/benchmark/status";
 import { nightCount } from "@/src/lib/benchmark/request";
 import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
 import {
@@ -39,6 +38,7 @@ import { collectCheck24LiveQuotes } from "./live-check24-provider";
 import { collectRestplatzboerseLiveQuotes } from "./live-restplatzboerse";
 import { collectStayforlongLiveQuotes } from "./live-stayforlong";
 import { collectPegasTourLiveQuotes } from "./live-pegastour";
+import { normalizeProviderCollectionResult } from "./collection-contract";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
 import {
@@ -420,49 +420,72 @@ export async function runBenchmarkJob(
     plan.tasks.map(
       ({ provider, scope, supported, reason }) =>
         async (): Promise<ProviderCollectionResult> => {
+          const startedAt = new Date().toISOString();
+          const startedMs = Date.now();
+          let result: ProviderCollectionResult;
+          let executed = false;
+
           if (!supported) {
-            const result = buildManualReviewQuotes(
+            result = buildManualReviewQuotes(
               provider,
               scope,
               "",
               reason,
               reason,
             );
-            return {
+            result = {
               ...result,
               quotes: result.quotes.map((quote) => ({
                 ...quote,
                 dataMode: resolvedRequest.mode,
               })),
             };
+          } else if (resolvedRequest.mode === "live") {
+            executed = true;
+            result = await collectLive(provider, scope).catch((error) => {
+              const detail = `${provider.name}: ${error instanceof Error ? error.message.split("\n")[0] : "Bağlantı hatası"}`;
+              return buildManualReviewQuotes(
+                provider,
+                scope,
+                "",
+                detail,
+                detail,
+              );
+            });
+          } else {
+            result = {
+              quotes: await collectProviderQuotes(
+                provider,
+                scope,
+                resolvedRequest.mode,
+              ),
+              warnings: [],
+            };
           }
-          return resolvedRequest.mode === "live"
-            ? collectLive(provider, scope).catch((error) => {
-                const detail = `${provider.name}: ${error instanceof Error ? error.message.split("\n")[0] : "Bağlantı hatası"}`;
-                return buildManualReviewQuotes(
-                  provider,
-                  scope,
-                  "",
-                  detail,
-                  detail,
-                );
-              })
-            : {
-                quotes: await collectProviderQuotes(
-                  provider,
-                  scope,
-                  resolvedRequest.mode,
-                ),
-                warnings: [],
-              };
+
+          if (resolvedRequest.mode !== "live") return result;
+
+          const completedAt = new Date().toISOString();
+          return normalizeProviderCollectionResult({
+            provider,
+            scope,
+            result,
+            executed,
+            startedAt,
+            completedAt,
+            durationMs: Date.now() - startedMs,
+          });
         },
     ),
   );
 
   let quotes = collectionResults.flatMap((result) => result.quotes);
-  if (resolvedRequest.mode === "live") {
-    quotes = quotes.map(withBenchmarkErrorCode);
-  }
+  const collectionAttempts = collectionResults.flatMap(
+    (result) => result.attempts ?? [],
+  );
+  const collectionDiagnostics = collectionResults.flatMap((result) =>
+    result.diagnostics ? [result.diagnostics] : [],
+  );
   let collectedOffers = collectionResults.flatMap(
     (result) => result.offers ?? [],
   );
@@ -586,6 +609,7 @@ export async function runBenchmarkJob(
     providers: selectedProviders,
     quotes,
     offers: collectedOffers,
+    attempts: collectionAttempts,
     providersByScope: plan.providersByScope,
   });
   return {
@@ -596,5 +620,6 @@ export async function runBenchmarkJob(
     },
     secondaryOffers: supplementary.secondaryOffers,
     hotelPrices: secondaryResults.flatMap((result) => result.hotelPrices),
+    collectionDiagnostics,
   };
 }

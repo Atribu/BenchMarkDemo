@@ -154,6 +154,11 @@ test("collector errors reach report cells with structured status labels", async 
     assert.equal(benchmarkStatusLabel(entries[0]), "Sorgu zaman aşımı");
     assert.equal(entries[1].errorCode, "currency_mismatch");
     assert.equal(benchmarkStatusLabel(entries[1]), "Para birimi uyuşmuyor");
+    assert.equal(report.collectionAttempts?.length, 1);
+    assert.equal(report.collectionAttempts?.[0].status, "partial");
+    assert.equal(report.reliability?.[0].queryAttemptCount, 1);
+    assert.equal(report.reliability?.[0].queryReliabilityPct, 100);
+    assert.equal(report.reliability?.[0].reliabilityPct, 0);
   } finally {
     if (previousGoogle === undefined) delete process.env.OTA_GOOGLE_HOTELS;
     else process.env.OTA_GOOGLE_HOTELS = previousGoogle;

@@ -14,15 +14,20 @@ import type {
   RoomFeatures,
   SecondaryOffer,
   BrowserImportedOffer,
+  BenchmarkErrorCode,
   OtaKey,
   ProviderDescriptor,
+  ReliabilityMetrics,
   ReportScopeDefinition,
   ScopeKey,
 } from "@/src/lib/benchmark/types";
 import { nightCount } from "@/src/lib/benchmark/request";
 import { benchmarkCsv } from "@/src/lib/benchmark/export";
 import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
-import { benchmarkStatusLabel } from "@/src/lib/benchmark/status";
+import {
+  benchmarkErrorLabel,
+  benchmarkStatusLabel,
+} from "@/src/lib/benchmark/status";
 import { offerConditions } from "@/src/lib/ota/offer-matching";
 import { formatCurrency, formatDateTime } from "@/src/lib/utils/format";
 import {
@@ -595,6 +600,199 @@ function RateCell({
         </a>
       )}
     </td>
+  );
+}
+
+const RELIABILITY_LABELS = {
+  strong: "Güçlü",
+  partial: "Kısmi",
+  weak: "Zayıf",
+} as const;
+
+function ReliabilitySummaryCard({
+  name,
+  summary,
+}: {
+  name: string;
+  summary: ReliabilityMetrics;
+}) {
+  const leadingErrors = (
+    Object.entries(summary.errorCounts) as [BenchmarkErrorCode, number][]
+  )
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 2);
+  const hasQueryTelemetry =
+    summary.queryAttemptCount + summary.queryNotRunCount > 0;
+  const score = hasQueryTelemetry
+    ? summary.queryReliabilityPct
+    : summary.reliabilityPct;
+  const level = hasQueryTelemetry ? summary.queryLevel : summary.level;
+
+  return (
+    <article className="reliabilityCard">
+      <div className="reliabilityCardHeading">
+        <strong>{name}</strong>
+        <span className={`reliabilityBadge ${level}`}>
+          {RELIABILITY_LABELS[level]}
+        </span>
+      </div>
+      <div className="reliabilityScore">
+        <strong>%{score}</strong>
+        <span>
+          {hasQueryTelemetry
+            ? `${summary.queryResponseCount}/${summary.queryAttemptCount} kaynak yanıtı`
+            : `${summary.resolvedCount}/${summary.attemptedCount} oda sonucu`}
+        </span>
+      </div>
+      <div
+        className="reliabilityBar"
+        role="progressbar"
+        aria-label={`${name} sorgu güvenilirliği`}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={score}
+      >
+        <i style={{ width: `${score}%` }} />
+      </div>
+      {hasQueryTelemetry && (
+        <p className="queryAttemptBreakdown">
+          {summary.queryCompletedCount} tamamlandı · {summary.queryPartialCount}{" "}
+          kısmi · {summary.queryFailureCount} başarısız
+          {summary.queryNotRunCount > 0 &&
+            ` · ${summary.queryNotRunCount} çalıştırılmadı`}
+        </p>
+      )}
+      <p>
+        Oda kapsamı %{summary.reliabilityPct} · {summary.verifiedPriceCount}{" "}
+        otomatik fiyat
+        {summary.manualPriceCount > 0 &&
+          ` · ${summary.manualPriceCount} elle doğrulama`}
+        {` · ${summary.noInventoryCount} teklif yok`}
+      </p>
+      {(summary.reviewCount > 0 || summary.technicalFailureCount > 0) && (
+        <p className="reliabilityIssues">
+          {summary.reviewCount} inceleme · {summary.technicalFailureCount}{" "}
+          teknik hata
+        </p>
+      )}
+      {leadingErrors.length > 0 && (
+        <ul>
+          {leadingErrors.map(([errorCode, count]) => (
+            <li key={errorCode}>
+              {benchmarkErrorLabel(errorCode)}: {count}
+            </li>
+          ))}
+        </ul>
+      )}
+    </article>
+  );
+}
+
+function ReliabilityPanel({ report }: { report: BenchmarkRunResult }) {
+  const summaries = report.reliability ?? [];
+  const hotelSummaries = report.hotelReliability ?? [];
+  const diagnostics = report.collectionDiagnostics ?? [];
+  const contractIssueCount = diagnostics.reduce(
+    (total, diagnostic) => total + diagnostic.contractIssues.length,
+    0,
+  );
+  const collectorEvidenceCount = diagnostics.reduce(
+    (total, diagnostic) =>
+      total + diagnostic.validationEvidenceCounts.collector,
+    0,
+  );
+  const derivedEvidenceCount = diagnostics.reduce(
+    (total, diagnostic) =>
+      total + diagnostic.validationEvidenceCounts.derived,
+    0,
+  );
+  if (report.mode !== "live" || summaries.length === 0) return null;
+
+  return (
+    <section
+      className="reliabilityPanel"
+      aria-labelledby="reliability-heading"
+    >
+      <header>
+        <div>
+          <p className="eyebrow">CANLI SORGU SAĞLIĞI</p>
+          <h3 id="reliability-heading">Kanal sorgu güvenilirliği</h3>
+        </div>
+        <p>
+          Kaynak yanıtı oranı kanal–otel–tarih çalışmasını ölçer. Oda kapsamı
+          ayrıca gösterilir; tek bağlantı hatası oda sayısı kadar çoğaltılmaz.
+        </p>
+      </header>
+      {!!report.validationFunnel?.length && (
+        <section className="validationFunnel" aria-label="Doğrulama hunisi">
+          <div className="validationFunnelHeading">
+            <div>
+              <h4>Doğrulama hunisi</h4>
+              <p>
+                Collector kanıtı bulunmayan adımlar güvenli tarafta kalınarak
+                belirsiz gösterilir.
+              </p>
+            </div>
+            {diagnostics.length > 0 && (
+              <p className="contractSummary">
+                {diagnostics.length} collector sonucu · {collectorEvidenceCount}{" "}
+                doğrudan / {derivedEvidenceCount} merkezi kanıt
+                {contractIssueCount > 0 &&
+                  ` · ${contractIssueCount} sözleşme ihlali elendi`}
+              </p>
+            )}
+          </div>
+          <div className="validationFunnelGrid">
+            {report.validationFunnel.map((stage, index) => (
+              <article className="validationStage" key={stage.stage}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{stage.label}</strong>
+                <p>{stage.passedCount} geçti</p>
+                <small>
+                  {stage.failedCount > 0 && `${stage.failedCount} kaldı`}
+                  {stage.failedCount > 0 &&
+                    (stage.emptyCount > 0 || stage.unknownCount > 0) &&
+                    " · "}
+                  {stage.emptyCount > 0 &&
+                    `${stage.emptyCount} teklif yok`}
+                  {stage.emptyCount > 0 && stage.unknownCount > 0 && " · "}
+                  {stage.unknownCount > 0 &&
+                    `${stage.unknownCount} belirsiz`}
+                  {stage.failedCount === 0 &&
+                    stage.emptyCount === 0 &&
+                    stage.unknownCount === 0 &&
+                    "Ek kontrol yok"}
+                </small>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      <h4>Kanallar</h4>
+      <div className="reliabilityGrid">
+        {summaries.map((summary) => (
+          <ReliabilitySummaryCard
+            key={summary.providerKey}
+            name={summary.providerName}
+            summary={summary}
+          />
+        ))}
+      </div>
+      {hotelSummaries.length > 0 && (
+        <div className="hotelReliabilitySection">
+          <h4>Oteller</h4>
+          <div className="reliabilityGrid hotelReliabilityGrid">
+            {hotelSummaries.map((summary) => (
+              <ReliabilitySummaryCard
+                key={summary.hotelKey}
+                name={summary.hotelName}
+                summary={summary}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1237,6 +1435,7 @@ export function BenchmarkDashboard({
                       </>
                     )}
                   </p>
+                  <ReliabilityPanel report={report} />
                   {!!report.secondaryOffers?.length && (
                     <p className="reportNotice secondarySourceNotice">
                       Doğrudan erişimden ayrı olarak HolidayCheck üzerinden{" "}
@@ -1507,6 +1706,9 @@ export function BenchmarkDashboard({
             <div className="channelGrid">
               {providerCatalog.map((provider) => {
                 const info = CHANNEL_INFO[provider.key];
+                const reliability = report?.reliability?.find(
+                  (summary) => summary.providerKey === provider.key,
+                );
                 const cells =
                   report?.mode === "live"
                     ? (report.scopes.flatMap((scope) =>
@@ -1550,6 +1752,15 @@ export function BenchmarkDashboard({
                         .join(" · ")}
                     </div>
                     <footer>
+                      {reliability &&
+                        reliability.queryAttemptCount +
+                          reliability.queryNotRunCount >
+                          0 && (
+                        <span className={`channelReliability ${reliability.queryLevel}`}>
+                          Sorgu güvenilirliği %{reliability.queryReliabilityPct}{" "}
+                          · {RELIABILITY_LABELS[reliability.queryLevel]}
+                        </span>
+                        )}
                       {cells.length
                         ? `${cells.filter((cell) => cell.status === "available" && cell.captureMethod !== "manual-browser").length} otomatik fiyat · ${cells.filter((cell) => cell.captureMethod === "manual-browser").length} elle kontrol kaydı / ${cells.length} sonuç`
                         : "Son raporda canlı sonuç yok"}

@@ -17,6 +17,10 @@ const ERROR_LABELS: Record<BenchmarkErrorCode, string> = {
   configuration_missing: "Entegrasyon ayarı eksik",
 };
 
+export function benchmarkErrorLabel(errorCode: BenchmarkErrorCode): string {
+  return ERROR_LABELS[errorCode];
+}
+
 function normalizeReason(reason?: string): string {
   return (reason ?? "")
     .toLocaleLowerCase("tr-TR")

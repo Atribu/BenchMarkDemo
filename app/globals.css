@@ -884,6 +884,200 @@ svg {
   padding: 13px 15px;
   margin-bottom: 16px;
 }
+.reliabilityPanel {
+  margin: 18px 0 22px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.reliabilityPanel > header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+.reliabilityPanel .eyebrow {
+  color: #9a8ca5;
+  font-size: 8px;
+  margin-bottom: 5px;
+}
+.reliabilityPanel h3 {
+  font-size: 19px;
+  font-weight: 500;
+}
+.reliabilityPanel h4 {
+  margin-bottom: 9px;
+  color: #8f8099;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.reliabilityPanel > header > p {
+  max-width: 470px;
+  color: #8f829a;
+  font-size: 10px;
+  line-height: 1.6;
+  text-align: right;
+}
+.validationFunnel {
+  margin-bottom: 19px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #eee9f1;
+}
+.validationFunnelHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+.validationFunnelHeading h4 {
+  margin-bottom: 3px;
+}
+.validationFunnelHeading p {
+  color: #a094a8;
+  font-size: 8px;
+}
+.validationFunnelHeading .contractSummary {
+  max-width: 320px;
+  color: #887391;
+  line-height: 1.5;
+  text-align: right;
+}
+.validationFunnelGrid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 6px;
+}
+.validationStage {
+  position: relative;
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid #ece7f0;
+  border-radius: 6px;
+  background: #fcfbfd;
+}
+.validationStage > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #b49ac5;
+  font: 500 9px var(--font-display), sans-serif;
+}
+.validationStage > strong {
+  display: block;
+  min-height: 27px;
+  color: #6f6278;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.validationStage > p {
+  margin-top: 7px;
+  color: #53867e;
+  font-size: 9px;
+}
+.validationStage > small {
+  display: block;
+  min-height: 24px;
+  margin-top: 3px;
+  color: #a3717c;
+  font-size: 7px;
+  line-height: 1.5;
+}
+.reliabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.hotelReliabilitySection {
+  margin-top: 19px;
+  padding-top: 16px;
+  border-top: 1px solid #eee9f1;
+}
+.hotelReliabilityGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.reliabilityCard {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #ece7f0;
+  border-radius: 7px;
+  background: #fcfbfd;
+}
+.reliabilityCardHeading,
+.reliabilityScore {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.reliabilityCardHeading > strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reliabilityBadge,
+.channelReliability {
+  border-radius: 4px;
+  font-size: 8px;
+}
+.reliabilityBadge {
+  padding: 3px 5px;
+}
+.reliabilityBadge.strong,
+.channelReliability.strong {
+  color: #4f8379;
+  background: #eaf5f1;
+}
+.reliabilityBadge.partial,
+.channelReliability.partial {
+  color: #9a7540;
+  background: #faf2e5;
+}
+.reliabilityBadge.weak,
+.channelReliability.weak {
+  color: #a55f70;
+  background: #faecef;
+}
+.reliabilityScore {
+  align-items: baseline;
+  margin-top: 12px;
+}
+.reliabilityScore strong {
+  font: 500 24px var(--font-display), sans-serif;
+  letter-spacing: -0.04em;
+}
+.reliabilityScore span,
+.reliabilityCard p,
+.reliabilityCard li {
+  color: #95899e;
+  font-size: 8px;
+  line-height: 1.5;
+}
+.reliabilityBar {
+  height: 4px;
+  margin: 8px 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #eee9f1;
+}
+.reliabilityBar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b69bc9, #7bb9b1);
+}
+.reliabilityIssues {
+  color: #a06d78 !important;
+}
+.reliabilityCard ul {
+  margin: 7px 0 0;
+  padding: 7px 0 0 13px;
+  border-top: 1px solid #eee9f1;
+}
 .demoNotice {
   background: #fff7e8;
   border: 1px solid #f0dfbf;
@@ -1349,6 +1543,12 @@ tbody th small {
   font-size: 9px;
   color: #9e8ba9;
 }
+.channelReliability {
+  display: block;
+  width: fit-content;
+  margin-bottom: 7px;
+  padding: 4px 6px;
+}
 .setupNote {
   display: flex;
   align-items: flex-start;
@@ -1500,6 +1700,12 @@ tbody th small {
   }
   .channelGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .reliabilityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .validationFunnelGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 1000px) {
@@ -1948,6 +2154,28 @@ tbody th small {
   .channelGrid {
     grid-template-columns: 1fr;
     gap: 13px;
+  }
+  .reliabilityPanel > header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .reliabilityPanel > header > p {
+    text-align: left;
+  }
+  .validationFunnelHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .validationFunnelHeading .contractSummary {
+    text-align: left;
+  }
+  .reliabilityGrid {
+    grid-template-columns: 1fr;
+  }
+  .validationFunnelGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .channelCard p {
     font-size: 12px;
