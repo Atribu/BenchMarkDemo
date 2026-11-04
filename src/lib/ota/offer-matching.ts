@@ -8,6 +8,15 @@ import type {
   RoomFeatures,
 } from "../benchmark/types";
 import { getHotelDefinition } from "../hotels/catalog";
+import { hasCompatibleView } from "./room-matching";
+
+export type RoomAliasMap = Readonly<Record<string, readonly string[]>>;
+
+export interface ResolvedRoomMatch {
+  roomFeatures: RoomFeatures;
+  matchedRoomId?: string;
+  matchReason: string;
+}
 
 function normalize(text: string) {
   return text
@@ -17,30 +26,6 @@ function normalize(text: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-}
-
-export function matchExactRoomAlias(
-  scope: ReportScopeDefinition,
-  roomName: string,
-  roomId: string,
-  aliases: string[],
-  providerLabel: string,
-) {
-  const normalizedRoomName = normalize(roomName);
-  const matchesAlias = aliases.some(
-    (alias) => normalize(alias) === normalizedRoomName,
-  );
-
-  if (!matchesAlias) return undefined;
-
-  return scope.rooms.some((room) => room.id === roomId)
-    ? {
-        matchedRoomId: roomId,
-        matchReason: `${providerLabel} oda adı açık alias ile doğrulandı.`,
-      }
-    : {
-        matchReason: `${providerLabel} oda adı doğrulandı ancak oda rapor kapsamında değil.`,
-      };
 }
 
 export function classifyRoom(name: string, details = ""): RoomFeatures {
@@ -125,6 +110,144 @@ export function matchOfferRoom(
           "Oda kategorisi eşleşti; pansiyon ve iptal koşulları ayrıca karşılaştırılmalı.",
       }
     : { matchReason: "Bu oda raporun oda kategorilerinde yok." };
+}
+
+export function resolveRoomMatch(
+  scope: ReportScopeDefinition,
+  roomName: string,
+  aliases: RoomAliasMap = {},
+  details = "",
+): ResolvedRoomMatch {
+  const roomFeatures = classifyRoom(roomName, details);
+  const normalizedRoomName = normalize(roomName);
+  const exactRoomIds = Object.entries(aliases)
+    .filter(([, roomAliases]) =>
+      roomAliases.some((alias) => normalize(alias) === normalizedRoomName),
+    )
+    .map(([roomId]) => roomId);
+
+  if (exactRoomIds.length > 1) {
+    return {
+      roomFeatures,
+      matchReason:
+        "Oda adı birden fazla doğrulanmış kategoriyle çakıştığı için eşleştirilmedi.",
+    };
+  }
+
+  const exactRoomId = exactRoomIds[0];
+  if (!exactRoomId) {
+    return { roomFeatures, ...matchOfferRoom(scope, roomFeatures) };
+  }
+
+  if (!scope.rooms.some((room) => room.id === exactRoomId)) {
+    return {
+      roomFeatures,
+      matchReason: "Doğrulanan oda rapor kapsamındaki odalarda yok.",
+    };
+  }
+
+  const policy = getHotelDefinition(scope.hotelKey).matchingPolicy;
+  const expectedViews = Object.entries(policy.roomByView)
+    .filter(([, roomId]) => roomId === exactRoomId)
+    .map(([view]) => view);
+
+  if (
+    roomFeatures.view !== "unknown" &&
+    expectedViews.length > 0 &&
+    !expectedViews.includes(roomFeatures.view)
+  ) {
+    return {
+      roomFeatures,
+      matchReason:
+        roomFeatures.view === "partial-sea"
+          ? "Yan/kısmi deniz manzarası; tam deniz manzarası ile eşdeğer değil."
+          : "Oda adındaki manzara, doğrulanmış oda kategorisiyle çelişiyor.",
+    };
+  }
+
+  if (
+    expectedViews.length > 0 &&
+    (roomFeatures.category === "standard" ||
+      roomFeatures.category === "superior") &&
+    roomFeatures.category !== policy.category
+  ) {
+    return {
+      roomFeatures,
+      matchReason: "Oda adındaki kategori, otelin oda kategorisiyle çelişiyor.",
+    };
+  }
+
+  if (
+    expectedViews.length > 0 &&
+    policy.requireBalcony &&
+    roomFeatures.balcony === "no"
+  ) {
+    return {
+      roomFeatures,
+      matchReason: "Balkonsuz oda; normal oda satırına dahil edilmedi.",
+    };
+  }
+
+  return {
+    roomFeatures,
+    matchedRoomId: exactRoomId,
+    matchReason: "Oda adı doğrulanmış alias ile kesin olarak eşleşti.",
+  };
+}
+
+export function namedRoomRank(
+  roomId: string,
+  name: string,
+  aliases: readonly string[] = [],
+): number | null {
+  const normalizedName = name.replace(/\s+/g, " ").trim();
+  const aliasRank = aliases.findIndex(
+    (alias) => normalize(alias) === normalize(normalizedName),
+  );
+
+  if (roomId === "economy") {
+    if (aliasRank >= 0) return aliasRank;
+    if (/^Economy Room$/i.test(normalizedName)) return 0;
+    if (/^Economy$/i.test(normalizedName)) return 5;
+    return null;
+  }
+
+  if (roomId === "family" || roomId === "king-suite")
+    return aliasRank >= 0 ? aliasRank : null;
+
+  if (roomId === "corner") {
+    if (/^Superior Corner Room$/i.test(normalizedName)) return 0;
+    if (/\bcorner\b/i.test(normalizedName)) return 5;
+    return null;
+  }
+
+  if (
+    !hasCompatibleView(roomId, normalizedName) ||
+    /\b(suite|family|deluxe|corner|familienzimmer|eckzimmer)\b/i.test(
+      normalizedName,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    roomId.startsWith("superior") &&
+    !/\bsuperior\b/i.test(normalizedName)
+  ) {
+    return null;
+  }
+
+  if (
+    roomId.startsWith("standard") &&
+    /\bsuperior\b/i.test(normalizedName)
+  ) {
+    return null;
+  }
+
+  return (
+    (aliasRank >= 0 ? aliasRank : 10) +
+    (/promo|economy|no balcony|without balcony/i.test(normalizedName) ? 20 : 0)
+  );
 }
 
 export function offerConditions(terms: OfferTerms): string {

@@ -1,4 +1,5 @@
 import { buildBenchmarkResult } from "@/src/lib/benchmark/engine";
+import { withBenchmarkErrorCode } from "@/src/lib/benchmark/status";
 import { nightCount } from "@/src/lib/benchmark/request";
 import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
 import {
@@ -459,6 +460,9 @@ export async function runBenchmarkJob(
   );
 
   let quotes = collectionResults.flatMap((result) => result.quotes);
+  if (resolvedRequest.mode === "live") {
+    quotes = quotes.map(withBenchmarkErrorCode);
+  }
   let collectedOffers = collectionResults.flatMap(
     (result) => result.offers ?? [],
   );

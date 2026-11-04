@@ -13,7 +13,7 @@ import {
   resolveProviderLiveConfig,
 } from "./live-helpers";
 import { assertPricePageAccessible } from "./browser-diagnostics";
-import { namedRoomRank } from "./live-onthebeach";
+import { namedRoomRank } from "./offer-matching";
 
 export interface BookingSnapshot {
   url: string;

@@ -7,10 +7,8 @@ import type {
 } from "@/src/lib/benchmark/types";
 import { TUI_HOTEL_CONFIG } from "@/src/lib/ota/live-config";
 import {
-  classifyRoom,
   deduplicateOffers,
-  matchExactRoomAlias,
-  matchOfferRoom,
+  resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
 import {
@@ -345,36 +343,12 @@ if (typeof price !== "number") {
         ?.map((facility) => facility.text ?? "")
         .join(" ") ?? "";
 
-    const roomFeatures = classifyRoom(
+    const { roomFeatures, ...match } = resolveRoomMatch(
+      scope,
       name,
+      config.roomAliases,
       facilities,
     );
-
-    const exactEconomyMatch =
-      scope.hotelKey === "miramare-beach"
-        ? matchExactRoomAlias(
-            scope,
-            name,
-            "economy",
-            config.roomAliases.economy ?? [],
-            "TUI ekonomi",
-          )
-        : undefined;
-    const exactConfiguredMatch = Object.entries(config.roomAliases)
-      .map(([roomId, aliases]) =>
-        matchExactRoomAlias(
-          scope,
-          name,
-          roomId,
-          aliases,
-          "TUI",
-        ),
-      )
-      .find((candidate) => Boolean(candidate));
-    const match =
-      exactEconomyMatch ??
-      exactConfiguredMatch ??
-      matchOfferRoom(scope, roomFeatures);
 
     console.log("[TUI] Accepted offer:", {
       roomName: name,

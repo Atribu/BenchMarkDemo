@@ -4,8 +4,8 @@ import { REPORT_SCOPES } from "../src/lib/benchmark/sample-data";
 import { OTA_PROVIDERS } from "../src/lib/ota/registry";
 import {
   classifyRoom,
-  matchExactRoomAlias,
   matchOfferRoom,
+  resolveRoomMatch,
   selectOfferQuotes,
   deduplicateOffers,
   offerConditions,
@@ -130,13 +130,11 @@ test("strict room matching recognizes German names without confusing partial/ful
 
 test("explicit economy aliases match only the complete configured room name", () => {
   assert.equal(
-    matchExactRoomAlias(
+    resolveRoomMatch(
       beach,
       "Doppelzimmer Economy",
-      "economy",
-      ["Doppelzimmer Economy"],
-      "Test",
-    )?.matchedRoomId,
+      { economy: ["Doppelzimmer Economy"] },
+    ).matchedRoomId,
     "economy",
   );
   for (const roomName of [
@@ -146,17 +144,57 @@ test("explicit economy aliases match only the complete configured room name", ()
     "Best Price Room",
   ]) {
     assert.equal(
-      matchExactRoomAlias(
+      resolveRoomMatch(
         beach,
         roomName,
-        "economy",
-        ["Doppelzimmer Economy"],
-        "Test",
-      ),
+        { economy: ["Doppelzimmer Economy"] },
+      ).matchedRoomId,
       undefined,
       roomName,
     );
   }
+});
+
+test("central room resolver rejects ambiguous and contradictory aliases", () => {
+  const ambiguous = resolveRoomMatch(beach, "Shared Room", {
+    economy: ["Shared Room"],
+    corner: ["Shared Room"],
+  });
+  assert.equal(ambiguous.matchedRoomId, undefined);
+  assert.match(ambiguous.matchReason, /birden fazla/);
+
+  const partialAsFull = resolveRoomMatch(
+    beach,
+    "Superior Side Sea View Balcony",
+    { "superior-sea": ["Superior Side Sea View Balcony"] },
+  );
+  assert.equal(partialAsFull.matchedRoomId, undefined);
+  assert.match(partialAsFull.matchReason, /kısmi deniz/i);
+
+  const balconyConflict = resolveRoomMatch(
+    beach,
+    "Superior Land View without Balcony",
+    { "superior-land": ["Superior Land View without Balcony"] },
+  );
+  assert.equal(balconyConflict.matchedRoomId, undefined);
+  assert.match(balconyConflict.matchReason, /Balkonsuz/);
+});
+
+test("central room resolver accepts verified variants without provider logic", () => {
+  const economy = resolveRoomMatch(
+    beach,
+    "Superior Land View Best Price without Balcony",
+    { economy: ["Superior Land View Best Price without Balcony"] },
+  );
+  assert.equal(economy.matchedRoomId, "economy");
+
+  const exactSea = resolveRoomMatch(
+    beach,
+    "Superior-Standardzimmer mit Meerblick",
+    { "superior-sea": ["Superior-Standardzimmer mit Meerblick"] },
+  );
+  assert.equal(exactSea.matchedRoomId, "superior-sea");
+  assert.match(exactSea.matchReason, /kesin olarak/);
 });
 
 test("HolidayCheck maps the verified Beach economy name without relaxing generic variants", () => {

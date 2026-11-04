@@ -108,8 +108,15 @@ test("Loveholidays collector returns unmatched offers instead of losing them in 
   const page = {
     setDefaultTimeout() {},
     async waitForTimeout() {},
+    async title() {
+      return "Miramare Queen | Loveholidays";
+    },
+    frames() {
+      return [];
+    },
     async goto() {
-      if (++navigations > 1) throw new Error("Second window unavailable");
+      // The collector first opens the hotel landing page, then each window.
+      if (++navigations > 2) throw new Error("Second window unavailable");
       return { status: () => 200 };
     },
     url: () => buildLoveholidaysUrl(queen, window),
@@ -121,10 +128,20 @@ test("Loveholidays collector returns unmatched offers instead of losing them in 
       if (!(name instanceof RegExp))
         throw new Error(`Unexpected locator: ${String(name)}`);
       if (name.test("Reject non-essential") || name.test("Show more"))
-        return { isVisible: async () => false };
+        return {
+          isVisible: async () => false,
+          waitFor: async () => {
+            throw new Error("Not visible");
+          },
+          click: async () => {},
+          first() {
+            return this;
+          },
+        };
       if (name.test("Room option 1"))
         return {
           first: () => ({ waitFor: async () => {} }),
+          count: async () => 1,
           all: async () => [card],
         };
       if (name.test("Check-in date")) return textLocator("16.10.2026");

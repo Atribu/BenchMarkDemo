@@ -108,11 +108,8 @@ export const BOOKING_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
     searchQuery: "Miramare Beach Hotel Ultra All Inclusive",
     cardName: "Miramare Beach Hotel - Ultra All Inclusive",
     roomAliases: {
-      "superior-land": ["Superior Room with Land View", "Superior Corner Room"],
-      "superior-sea": [
-        "Superior Room with Sea View",
-        "Superior Room with Side Sea View"
-      ],
+      "superior-land": ["Superior Room with Land View"],
+      "superior-sea": ["Superior Room with Sea View"],
       economy: [
         "Economy Room",
         "Economy Doppelzimmer",
@@ -204,9 +201,6 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
       "superior-sea": [
         "Superior Room with Sea View",
         "Superior Room Sea View",
-        "Superior Room with Side Sea View",
-        "Superior Side Sea View",
-        "Sea View"
       ],
 
       "economy":[
@@ -285,10 +279,7 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
       "superior-sea": [
         "meerblick",
         "direkter meerblick",
-        "teilmeerblick",
-        "seitlicher meerblick",
         "sea view",
-        "side sea view",
         "Superior-Standardzimmer mit Meerblick"
       ],
 
@@ -323,10 +314,7 @@ export const HOLIDAYCHECK_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
       "standard-sea": [
         "meerblick",
         "direkter meerblick",
-        "teilmeerblick",
-        "seitlicher meerblick",
         "sea view",
-        "side sea view",
         "Superior-Standardzimmer mit Meerblick"
       ],
 
@@ -434,21 +422,25 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
       "Standard Room Sea View",
       "Standard Sea View",
       "Sea View",
-      "Side Sea View",
-      "Partial Sea View",
       "Standardzimmer mit Meerblick",
       "Standard-Doppelzimmer mit Meerblick",
       "Doppelzimmer mit Meerblick",
-      "Zimmer mit seitlichem Meerblick",
-      "Standardzimmer mit seitlichem Meerblick"
     ]
     }
   },
   "miramare-beach": {
     pageUrl: "https://www.loveholidays.com/de/urlaub/tuerkei/antalya/side/miramare-beach/",
     roomAliases: {
-      "superior-land": ["Superior Doppel- oder Zweibettzimmer mit Landblick", "land view"],
-      "superior-sea": ["Superior Doppel- oder Zweibettzimmer mit Meerblick", "sea view"],
+      "superior-land": [
+        "Superior Doppel- oder Zweibettzimmer mit Landblick",
+        "Superior-Standardzimmer mit Blick ins Grüne",
+        "land view",
+      ],
+      "superior-sea": [
+        "Superior Doppel- oder Zweibettzimmer mit Meerblick",
+        "Superior-Standardzimmer mit Meerblick",
+        "sea view",
+      ],
 
             "economy":[
         "Economy Room",
@@ -461,6 +453,7 @@ export const LOVEHOLIDAYS_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>
        "corner": [
         "Superior Corner Room",
         "Corner Room",
+        "Eckzimmer (Standard)",
       ],
     }
   },
@@ -501,33 +494,15 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
       "Standard Room Sea View",
       "Standard Sea View",
       "Sea View",
-      "Side Sea View",
-      "Partial Sea View",
       "Standardzimmer mit Meerblick",
       "Standard-Doppelzimmer mit Meerblick",
       "Doppelzimmer mit Meerblick",
-      "Zimmer mit seitlichem Meerblick",
-      "Standardzimmer mit seitlichem Meerblick"
     ]
     }
   },
   "miramare-beach": {
     pageUrl: "https://www.onthebeach.co.uk/hotels/turkey/antalya/side/miramare-beach",
     roomAliases: {
-      "superior-land": [
-        "superior land view",
-        "land view",
-        "garden view",
-        "inland view",
-        "Superior-Standardzimmer mit Blick ins Grüne"
-      ],
-      "superior-sea": [
-        "superior sea view",
-        "sea view",
-        "side sea view",
-        "meerblick",
-        "Superior-Standardzimmer mit Meerblick"
-      ],
             "economy":[
         "Economy Room",
         "Economy",
@@ -541,6 +516,7 @@ export const ONTHEBEACH_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> 
          "Superior Corner",
         "Superior Corner Room",
         "Corner Room",
+        "Double Or Twin Superior Corner Balcony",
       ],
     }
   },
@@ -601,7 +577,6 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
       "superior-land": ["Superior Land View", "Superior Corner"],
       "superior-sea": [
         "Superior Sea View",
-        "Superior Side Sea View",
         "Superior Room Sea View"
       ],
 
@@ -653,13 +628,9 @@ export const TUI_HOTEL_CONFIG: Partial<Record<HotelKey, TuiHotelConfig>> = {
       "Standard Room Sea View",
       "Standard Sea View",
       "Sea View",
-      "Side Sea View",
-      "Partial Sea View",
       "Standardzimmer mit Meerblick",
       "Standard-Doppelzimmer mit Meerblick",
       "Doppelzimmer mit Meerblick",
-      "Zimmer mit seitlichem Meerblick",
-      "Standardzimmer mit seitlichem Meerblick"
     ]
     }
   },

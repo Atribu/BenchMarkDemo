@@ -5,6 +5,7 @@ import type {
   ProviderQuote,
   ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
+import { classifyBenchmarkErrorCode } from "@/src/lib/benchmark/status";
 
 import { buildCheck24OfferTerms } from "./check24-offer-terms";
 
@@ -38,14 +39,26 @@ export async function collectCheck24LiveQuotes(
     scope.hotelKey === "miramare-queen" ||
     scope.hotelKey === "port-nature" ||
     scope.hotelKey === "sy-hotels-belek";
-  if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
-    return buildManualReviewQuotes(
-      provider,
-      scope,
-      "https://hotels.check24.de/",
-      "CHECK24 bu otel/kapsam için henüz doğrulanmadı.",
-    );
-  }
+if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
+  const result = buildManualReviewQuotes(
+    provider,
+    scope,
+    "https://hotels.check24.de/",
+    "CHECK24 bu otel/kapsam için henüz doğrulanmadı.",
+  );
+
+  return {
+    ...result,
+    quotes: result.quotes.map((quote) => ({
+      ...quote,
+      errorCode: !hotelConfig
+        ? ("hotel_mapping_missing" as const)
+        : scope.currency !== "EUR"
+          ? ("currency_mismatch" as const)
+          : ("configuration_missing" as const),
+    })),
+  };
+}
 
   for (const window of scope.windows) {
     let handle:
@@ -218,6 +231,10 @@ export async function collectCheck24LiveQuotes(
             price: null,
             currency: scope.currency,
             status: "manual-review",
+            errorCode:
+              result.totalOffers === 0
+                ? "no_inventory"
+                : "room_mapping_failed",
             dataMode: "live",
             sourceHint,
             observedAt: collectedAt,
@@ -244,6 +261,7 @@ export async function collectCheck24LiveQuotes(
           price: offer.totalPrice,
           currency: scope.currency,
           status: confirmed ? "available" : "manual-review",
+          errorCode: confirmed ? null : "room_mapping_failed",
           dataMode: "live",
           sourceHint,
           observedAt: collectedAt,
@@ -282,6 +300,16 @@ export async function collectCheck24LiveQuotes(
           ? error.message.split("\n")[0]
           : "CHECK24 fiyatları doğrulanamadı.";
 
+      const errorCode = classifyBenchmarkErrorCode({
+        status: "manual-review",
+        dataMode: "live",
+        reason,
+        errorCode:
+          error instanceof Error && error.name === "TimeoutError"
+            ? "timeout"
+            : null,
+      });
+
       console.error("[CHECK24] Collection failed:", {
         hotel: scope.hotelName,
         checkIn: window.checkIn,
@@ -302,6 +330,7 @@ export async function collectCheck24LiveQuotes(
           price: null,
           currency: scope.currency,
           status: "manual-review",
+          errorCode,
           dataMode: "live",
           sourceHint,
           reason,

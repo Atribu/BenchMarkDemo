@@ -139,23 +139,33 @@ export function buildBenchmarkResult({
             status: "missing",
             dataMode: mode,
             sourceHint: provider.searchTemplate ?? "",
+            errorCode: mode === "live" ? "invalid_response" : null,
           };
 
           const collectedQuote =
             quotesByKey.get(
               getQuoteKey(scope.id, room.id, window.id, provider.key),
             ) ?? fallbackQuote;
-          const quote =
-            collectedQuote.currency !== scope.currency ||
-            (collectedQuote.price !== null &&
-              (!Number.isFinite(collectedQuote.price) ||
-                collectedQuote.price <= 0))
-              ? {
-                  ...collectedQuote,
-                  price: null,
-                  status: "manual-review" as const,
-                }
-              : collectedQuote;
+          let quote = collectedQuote;
+          if (collectedQuote.currency !== scope.currency) {
+            quote = {
+              ...collectedQuote,
+              price: null,
+              status: "manual-review" as const,
+              errorCode: "currency_mismatch",
+            };
+          } else if (
+            collectedQuote.price !== null &&
+            (!Number.isFinite(collectedQuote.price) ||
+              collectedQuote.price <= 0)
+          ) {
+            quote = {
+              ...collectedQuote,
+              price: null,
+              status: "manual-review" as const,
+              errorCode: "invalid_response",
+            };
+          }
 
           const differencePct =
             // Live references do not carry equivalent board/refund/tax terms yet.
@@ -208,6 +218,7 @@ export function buildBenchmarkResult({
             observedAt: quote.observedAt,
             roomFeatures: quote.roomFeatures,
             terms: quote.terms,
+            errorCode: quote.errorCode ?? null,
           };
         });
 

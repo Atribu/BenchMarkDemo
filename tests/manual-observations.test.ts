@@ -257,7 +257,10 @@ test("report and CSV retain manual provenance and original conditions", () => {
     ...result,
   });
   assert.equal(report.summary.availableRateCount, 4);
-  const entry = report.scopes[0].windows[0].rows[0].entries[0];
+  const entry = report.scopes
+    .find((scope) => scope.id === "beach-eu")!
+    .windows[0].rows.find((row) => row.roomId === "superior-land")!
+    .entries.find((candidate) => candidate.providerKey === "expedia")!;
   assert.equal(entry.captureMethod, "manual-browser");
   assert.equal(entry.observedAt, records[0].observedAt);
   assert.equal(entry.offerConditions, records[0].conditions);
@@ -318,7 +321,10 @@ test("a failed live query never fills prices from saved browser observations", a
       window.rows.flatMap((row) => row.entries),
     ),
   );
-  assert.equal(entries.length, 2);
+  const roomCount = REPORT_SCOPES.find(
+    (scope) => scope.id === "beach-uk",
+  )!.rooms.length;
+  assert.equal(entries.length, roomCount);
   assert.ok(entries.every((entry) => entry.scrapedPrice === null));
   assert.ok(entries.every((entry) => entry.captureMethod !== "manual-browser"));
   assert.ok(entries.every((entry) => entry.reason === "Current query blocked"));

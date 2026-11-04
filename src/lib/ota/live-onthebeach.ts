@@ -19,15 +19,12 @@ import {
   resolveProviderLiveConfig,
 } from "./live-helpers";
 import {
-  classifyRoom,
   deduplicateOffers,
-  matchExactRoomAlias,
-  matchOfferRoom,
+  resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import { ONTHEBEACH_HOTEL_CONFIG } from "./live-config";
-import { hasCompatibleView } from "./room-matching";
 
 const SEARCH_URL = "https://www.onthebeach.co.uk/hotels-in";
 const DESTINATION = "Antalya (Alanya, Belek, Lara Beach, Side), Turkey";
@@ -70,84 +67,6 @@ function dateLabel(date: string) {
   }).format(new Date(`${date}T12:00:00Z`));
 }
 
-// Legacy Booking/Expedia parsers still import this; On the Beach uses strict offers below.
-export function namedRoomRank(
-  roomId: string,
-  name: string,
-  aliases: string[] = [],
-): number | null {
-  const normalizedName = normalizeInlineText(name);
-  const aliasRank = aliases.findIndex(
-    (alias) =>
-      normalizeInlineText(alias).toLowerCase() === normalizedName.toLowerCase(),
-  );
-
-  // Economy sadece Economy Room ile eşleşsin.
-  if (roomId === "economy") {
-    if (aliasRank >= 0) return aliasRank;
-
-    if (/^Economy Room$/i.test(normalizedName)) {
-      return 0;
-    }
-
-    if (/^Economy$/i.test(normalizedName)) {
-      return 5;
-    }
-
-    return null;
-  }
-
-  // Aile ve süit gibi varyantlar yalnızca sağlayıcıya özel açık oda adıyla
-  // eşleşir; genel "family"/"suite" metninden kategori tahmini yapılmaz.
-  if (roomId === "family" || roomId === "king-suite")
-    return aliasRank >= 0 ? aliasRank : null;
-
-  // Corner sadece Corner Room ile eşleşsin.
-  if (roomId === "corner") {
-    if (/^Superior Corner Room$/i.test(normalizedName)) {
-      return 0;
-    }
-
-    if (/\bcorner\b/i.test(normalizedName)) {
-      return 5;
-    }
-
-    return null;
-  }
-
-  if (
-    !hasCompatibleView(roomId, normalizedName) ||
-    /\b(suite|family|deluxe|corner|familienzimmer|eckzimmer)\b/i.test(
-      normalizedName,
-    )
-  ) {
-    return null;
-  }
-
-  if (
-    roomId.startsWith("superior") &&
-    !/\bsuperior\b/i.test(normalizedName)
-  ) {
-    return null;
-  }
-
-  if (
-    roomId.startsWith("standard") &&
-    /\bsuperior\b/i.test(normalizedName)
-  ) {
-    return null;
-  }
-
-  return (
-    (aliasRank >= 0 ? aliasRank : 10) +
-    (/promo|economy|no balcony|without balcony/i.test(
-      normalizedName,
-    )
-      ? 20
-      : 0)
-  );
-}
-
 export function parseOnTheBeachOffers(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
@@ -186,63 +105,11 @@ export function parseOnTheBeachOffers(
     const roomName = normalizeInlineText(offer.roomName);
     if (price === null || !Number.isFinite(price) || price <= 0 || !roomName)
       continue;
-const roomFeatures = classifyRoom(roomName);
-
-const normalMatch = matchOfferRoom(scope, roomFeatures);
-
-let specificMatch = Object.entries(
-  ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases ?? {},
-)
-  .map(([roomId, aliases]) =>
-    matchExactRoomAlias(
-      scope,
-      roomName,
-      roomId,
-      aliases,
-      "On the Beach",
-    ),
-  )
-  .find(
-    (candidate): candidate is {
-      matchedRoomId?: string;
-      matchReason: string;
-    } => Boolean(candidate),
-  );
-
-let beachSpecificMatch:
-  | {
-      matchedRoomId?: string;
-      matchReason: string;
-    }
-  | undefined;
-
-if (scope.hotelKey === "miramare-beach") {
-  beachSpecificMatch = matchExactRoomAlias(
-    scope,
-    roomName,
-    "economy",
-    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
-    "On the Beach ekonomi",
-  );
-  if (!beachSpecificMatch &&
-    /^(superior corner|double or twin superior corner balcony)$/i.test(
-      roomName,
-    )
-  ) {
-    beachSpecificMatch = {
-      matchedRoomId: "corner",
-      matchReason: "OnTheBeach Superior Corner oda eşleşmesi.",
-    };
-  }
-}
-
-specificMatch = beachSpecificMatch ?? specificMatch;
-
-const roomMatch =
-  specificMatch &&
-  scope.rooms.some((room) => room.id === specificMatch.matchedRoomId)
-    ? specificMatch
-    : normalMatch;
+const { roomFeatures, ...roomMatch } = resolveRoomMatch(
+  scope,
+  roomName,
+  ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+);
 
 offers.push({
       id: `onthebeach:${scope.id}:${window.id}:${offers.length}`,

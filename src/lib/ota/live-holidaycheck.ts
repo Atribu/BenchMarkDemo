@@ -14,10 +14,8 @@ import {
   resolveProviderLiveConfig,
 } from "./live-helpers";
 import {
-  classifyRoom,
   deduplicateOffers,
-  matchExactRoomAlias,
-  matchOfferRoom,
+  resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
 
@@ -120,7 +118,13 @@ export function parseHolidayCheckOffers(
     );
     if (!roomName) continue;
     // Do not infer room identity from HolidayCheck's LLM-generated room details.
-    const roomFeatures = classifyRoom(roomName);
+    const roomAliases =
+      HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey]?.roomAliases ?? {};
+    const { roomFeatures, ...roomMatch } = resolveRoomMatch(
+      scope,
+      roomName,
+      roomAliases,
+    );
     const cancellation = offer.specials?.find(
       (special) => special.specialType === "CANCELLATION",
     );
@@ -135,20 +139,6 @@ export function parseHolidayCheckOffers(
       .map((text) => normalizeInlineText(text.text ?? ""))
       .filter(Boolean)
       .join(" / ");
-    const roomAliases =
-      HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey]?.roomAliases ?? {};
-    const exactAliasMatch = Object.entries(roomAliases)
-      .map(([roomId, aliases]) =>
-        matchExactRoomAlias(
-          scope,
-          roomName,
-          roomId,
-          aliases,
-          "HolidayCheck",
-        ),
-      )
-      .find((match) => match?.matchedRoomId);
-
     offers.push({
       id: `holidaycheck:${scope.id}:${window.id}:${offers.length}`,
       providerKey: provider.key,
@@ -165,7 +155,7 @@ export function parseHolidayCheckOffers(
       roomFeatures,
       sourceHint,
       observedAt,
-      ...(exactAliasMatch ?? matchOfferRoom(scope, roomFeatures)),
+      ...roomMatch,
       terms: {
         board: offer.mealTypeName || "Belirtilmedi",
         operator: offer.tourOperator?.name,

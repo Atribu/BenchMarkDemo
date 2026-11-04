@@ -89,6 +89,7 @@ export interface ProviderQuote {
   roomFeatures?: RoomFeatures;
   terms?: OfferTerms;
   conversion?: CurrencyConversion;
+  errorCode?: BenchmarkErrorCode | null;
 }
 
 export interface RoomFeatures {
@@ -156,6 +157,17 @@ export interface BrowserImportedOffer extends CollectedOffer {
   importedAt: string;
 }
 
+export type BenchmarkErrorCode =
+  | "hotel_mapping_missing"
+  | "no_inventory"
+  | "room_mapping_failed"
+  | "access_blocked"
+  | "rate_limited"
+  | "timeout"
+  | "invalid_response"
+  | "currency_mismatch"
+  | "configuration_missing";
+
 export type CellTone =
   "muted" | "risk" | "soft-risk" | "parity" | "premium" | "strong-premium";
 
@@ -178,6 +190,7 @@ export interface BenchmarkCell {
   observedAt?: string;
   roomFeatures?: RoomFeatures;
   terms?: OfferTerms;
+  errorCode?: BenchmarkErrorCode | null;
 }
 
 export interface BenchmarkWindowRow {

@@ -39,7 +39,7 @@ for (const [input, currency, expected] of priceCases)
   test(`price: ${input} / ${currency}`, () =>
     assert.equal(parsePriceFromText(input, currency), expected));
 
-test("view matching rejects generic and opposite views, accepts German aliases", () => {
+test("view matching keeps full and partial sea categories separate", () => {
   assert.equal(
     hasCompatibleView("standard-land", "Standard Room Sea View"),
     false,
@@ -55,6 +55,13 @@ test("view matching rejects generic and opposite views, accepts German aliases",
   );
   assert.equal(
     hasCompatibleView("superior-sea", "Superior seitlicher Meerblick"),
+    false,
+  );
+  assert.equal(
+    hasCompatibleView(
+      "standard-side-sea",
+      "Standard Zimmer seitlicher Meerblick",
+    ),
     true,
   );
   assert.equal(hasCompatibleView("superior-land", "Land or Sea View"), false);
@@ -82,12 +89,17 @@ test("TUI sea-view offer cannot be assigned to the generic land alias", async (t
     Response.json({
       roomTypes: [
         {
-          offers: [tuiOffer("Standard Room Sea View", 1300, "4894")],
+          offers: [
+            {
+              ...tuiOffer("Standard Room Sea View", 1300, "A0319662"),
+              currency: "GBP",
+            },
+          ],
         },
       ],
     }),
   );
-  const scope = REPORT_SCOPES.find((scope) => scope.id === "queen-eu")!;
+  const scope = REPORT_SCOPES.find((scope) => scope.id === "queen-uk")!;
   const result = await collectTuiLiveQuotes(
     OTA_PROVIDERS.find((provider) => provider.key === "tui")!,
     { ...scope, windows: scope.windows.slice(0, 1) },

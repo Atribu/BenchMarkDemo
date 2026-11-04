@@ -1,53 +1,185 @@
+
 import test from "node:test";
 import assert from "node:assert/strict";
-import { benchmarkStatusLabel } from "../src/lib/benchmark/status";
 
-test("unavailable rates distinguish configuration, access, mapping and query failures", () => {
-  const examples = [
-    [
-      "Booking otel sayfasini Turkiye ana sayfasina yonlendirdi; bu bir doluluk sonucu degil.",
-      "Bölgesel erişim engeli",
-    ],
-    ["Servis API anahtarı eksik.", "API ayarı eksik"],
-    ["Queen için otel/pazar eşleştirmesi eksik.", "Otel eşleştirmesi eksik"],
-    ["Expedia erişim doğrulaması istedi.", "Site doğrulaması gerekli"],
-    [
-      "Site erisim dogrulamasi veya hiz siniri uyguladi.",
-      "Site doğrulaması gerekli",
-    ],
-    ["Site doğrulaması gerekiyor (CAPTCHA).", "Site doğrulaması gerekli"],
-    ["Expedia HTTP 429 döndürdü.", "Site doğrulaması gerekli"],
-    ["locator.click: Timeout 15000ms exceeded.", "Sorgu zaman aşımı"],
-    [
-      "TUI oda servisine ulaşılamadı veya yanıt doğrulanamadı.",
-      "Kaynağa erişilemedi",
-    ],
-    [
-      "Otel bulundu ancak istenen oda için toplam fiyat eşleşmedi.",
-      "Oda fiyatı eşleşmedi",
-    ],
-    ["Tanımlanamayan hata", "Kontrol bekliyor"],
+import {
+  benchmarkStatusLabel,
+  classifyBenchmarkErrorCode,
+} from "../src/lib/benchmark/status";
+import type { BenchmarkErrorCode } from "../src/lib/benchmark/types";
+import { runBenchmarkJob } from "../src/lib/ota/run-benchmark";
+
+test("unavailable rates use structured error codes", () => {
+  const examples: {
+    errorCode: BenchmarkErrorCode;
+    expected: string;
+  }[] = [
+    {
+      errorCode: "hotel_mapping_missing",
+      expected: "Otel eşleştirmesi eksik",
+    },
+    {
+      errorCode: "no_inventory",
+      expected: "Teklif bulunamadı",
+    },
+    {
+      errorCode: "room_mapping_failed",
+      expected: "Oda eşleşmesi doğrulanamadı",
+    },
+    {
+      errorCode: "access_blocked",
+      expected: "Site erişimi engellendi",
+    },
+    {
+      errorCode: "rate_limited",
+      expected: "Sorgu hız sınırına ulaşıldı",
+    },
+    {
+      errorCode: "timeout",
+      expected: "Sorgu zaman aşımı",
+    },
+    {
+      errorCode: "invalid_response",
+      expected: "Geçersiz kaynak yanıtı",
+    },
+    {
+      errorCode: "currency_mismatch",
+      expected: "Para birimi uyuşmuyor",
+    },
+    {
+      errorCode: "configuration_missing",
+      expected: "Entegrasyon ayarı eksik",
+    },
   ];
-  for (const [reason, expected] of examples)
+
+  for (const { errorCode, expected } of examples) {
     assert.equal(
       benchmarkStatusLabel({
+        status: "manual-review",
+        dataMode: "live",
+        errorCode,
+      }),
+      expected,
+      `Incorrect label for ${errorCode}`,
+    );
+  }
+});
+
+test("missing error codes retain generic status labels", () => {
+  assert.equal(
+    benchmarkStatusLabel({
+      status: "manual-review",
+      dataMode: "live",
+    }),
+    "Kontrol bekliyor",
+  );
+
+  assert.equal(
+    benchmarkStatusLabel({
+      status: "missing",
+      dataMode: "live",
+    }),
+    "Fiyat alınamadı",
+  );
+});
+
+test("collector reasons are classified centrally when no explicit code exists", () => {
+  const examples = [
+    ["Booking HTTP 429 döndürdü.", "rate_limited"],
+    ["Site doğrulaması gerekiyor (CAPTCHA).", "access_blocked"],
+    ["locator.click: Timeout 15000ms exceeded.", "timeout"],
+    ["Queen için otel eşleştirmesi eksik.", "hotel_mapping_missing"],
+    ["Servis API anahtarı eksik.", "configuration_missing"],
+    ["İstenen oda için fiyat eşleşmedi.", "room_mapping_failed"],
+    ["Teklif bulunamadı.", "no_inventory"],
+    ["Kaynak yanıtı ayrıştırılamadı.", "invalid_response"],
+  ] as const;
+
+  for (const [reason, expected] of examples) {
+    assert.equal(
+      classifyBenchmarkErrorCode({
         status: "manual-review",
         dataMode: "live",
         reason,
       }),
       expected,
+      reason,
     );
+  }
+});
+
+test("collector errors reach report cells with structured status labels", async () => {
+  const previousGoogle = process.env.OTA_GOOGLE_HOTELS;
+  const previousSecondary = process.env.OTA_HOLIDAYCHECK_SECONDARY;
+  process.env.OTA_GOOGLE_HOTELS = "false";
+  process.env.OTA_HOLIDAYCHECK_SECONDARY = "false";
+
+  try {
+    const report = await runBenchmarkJob(
+      {
+        mode: "live",
+        providerKeys: ["booking"],
+        scopeKeys: ["queen-eu"],
+        customWindow: {
+          checkIn: "2027-05-10",
+          checkOut: "2027-05-15",
+        },
+      },
+      async (provider, scope) => ({
+        quotes: scope.windows.flatMap((window) =>
+          scope.rooms.map((room, index) => ({
+            providerKey: provider.key,
+            scopeKey: scope.id,
+            roomId: room.id,
+            windowId: window.id,
+            price: index === 0 ? null : 1000,
+            currency: index === 0 ? scope.currency : "GBP",
+            status: index === 0 ? "manual-review" as const : "available" as const,
+            dataMode: "live" as const,
+            sourceHint: "https://example.test",
+            reason:
+              index === 0
+                ? "locator.click: Timeout 15000ms exceeded."
+                : undefined,
+          })),
+        ),
+        warnings: [],
+      }),
+    );
+
+    const entries = report.scopes[0].windows[0].rows.map(
+      (row) => row.entries[0],
+    );
+    assert.equal(entries[0].errorCode, "timeout");
+    assert.equal(benchmarkStatusLabel(entries[0]), "Sorgu zaman aşımı");
+    assert.equal(entries[1].errorCode, "currency_mismatch");
+    assert.equal(benchmarkStatusLabel(entries[1]), "Para birimi uyuşmuyor");
+  } finally {
+    if (previousGoogle === undefined) delete process.env.OTA_GOOGLE_HOTELS;
+    else process.env.OTA_GOOGLE_HOTELS = previousGoogle;
+    if (previousSecondary === undefined)
+      delete process.env.OTA_HOLIDAYCHECK_SECONDARY;
+    else process.env.OTA_HOLIDAYCHECK_SECONDARY = previousSecondary;
+  }
 });
 
 test("real, demo, manual and no-offer results retain their provenance", () => {
   assert.equal(
-    benchmarkStatusLabel({ status: "available", dataMode: "live" }),
+    benchmarkStatusLabel({
+      status: "available",
+      dataMode: "live",
+    }),
     "Canlı fiyat",
   );
+
   assert.equal(
-    benchmarkStatusLabel({ status: "available", dataMode: "mock" }),
+    benchmarkStatusLabel({
+      status: "available",
+      dataMode: "mock",
+    }),
     "Örnek fiyat",
   );
+
   assert.equal(
     benchmarkStatusLabel({
       status: "available",
@@ -56,6 +188,7 @@ test("real, demo, manual and no-offer results retain their provenance", () => {
     }),
     "Elle doğrulandı",
   );
+
   assert.equal(
     benchmarkStatusLabel({
       status: "manual-review",
@@ -64,12 +197,51 @@ test("real, demo, manual and no-offer results retain their provenance", () => {
     }),
     "Eski elle kontrol",
   );
+
   assert.equal(
-    benchmarkStatusLabel({ status: "sold_out", dataMode: "live" }),
+    benchmarkStatusLabel({
+      status: "sold_out",
+      dataMode: "live",
+    }),
     "Teklif bulunamadı",
   );
+
   assert.equal(
-    benchmarkStatusLabel({ status: "missing", dataMode: "live" }),
+    benchmarkStatusLabel({
+      status: "missing",
+      dataMode: "live",
+    }),
     "Fiyat alınamadı",
+  );
+});
+
+test("status and provenance take priority over error codes", () => {
+  assert.equal(
+    benchmarkStatusLabel({
+      status: "available",
+      dataMode: "live",
+      errorCode: "timeout",
+    }),
+    "Canlı fiyat",
+  );
+
+  assert.equal(
+    benchmarkStatusLabel({
+      status: "available",
+      dataMode: "live",
+      captureMethod: "manual-browser",
+      errorCode: "access_blocked",
+    }),
+    "Elle doğrulandı",
+  );
+
+  assert.equal(
+    benchmarkStatusLabel({
+      status: "manual-review",
+      dataMode: "live",
+      captureMethod: "manual-browser",
+      errorCode: "timeout",
+    }),
+    "Eski elle kontrol",
   );
 });

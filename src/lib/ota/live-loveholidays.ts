@@ -13,7 +13,6 @@ import type {
   ProviderDescriptor,
   ProviderQuote,
   ReportScopeDefinition,
-  RoomFeatures,
 } from "../benchmark/types";
 import {
   normalizeInlineText,
@@ -23,10 +22,8 @@ import {
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import { LOVEHOLIDAYS_HOTEL_CONFIG } from "./live-config";
 import {
-  classifyRoom,
   deduplicateOffers,
-  matchExactRoomAlias,
-  matchOfferRoom,
+  resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
 
@@ -131,117 +128,6 @@ export function buildLoveholidaysUrl(
   return url.toString();
 }
 
-function normalizeLoveholidaysRoomName(name: string): string {
-  return normalizeInlineText(name)
-    .replace(
-      /Superior-Standardzimmer mit seitlichem Meerblick/gi,
-      "Superior Room Partial Sea View",
-    )
-    .replace(
-      /Superior-Standardzimmer mit Meerblick/gi,
-      "Superior Room Sea View",
-    )
-    .replace(
-      /Superior-Standardzimmer mit Blick ins Grüne/gi,
-      "Superior Room Garden View",
-    )
-    .replace(/Economy Doppelzimmer/gi, "Economy Room")
-    .replace(/Eckzimmer \(Standard\)/gi, "Superior Corner Room")
-    .replace(
-      /Deluxe-Standardzimmer mit Whirlpool und Balkon\/Terrasse/gi,
-      "Deluxe Room Whirlpool Balcony Terrace",
-    )
-    .replace(
-      /Superior Familienzimmer mit Verbindungstür/gi,
-      "Superior Family Room Connecting Door",
-    );
-}
-
-function matchLoveholidaysRoom(
-  scope: ReportScopeDefinition,
-  normalizedRoomName: string,
-  features: RoomFeatures,
-) {
-
-  // Miramare Beach: only explicitly mapped Economy names are accepted.
-  if (scope.hotelKey === "miramare-beach") {
-    const exactEconomyMatch = matchExactRoomAlias(
-      scope,
-      normalizedRoomName,
-      "economy",
-      LOVEHOLIDAYS_HOTEL_CONFIG[scope.hotelKey]?.roomAliases.economy ?? [],
-      "Loveholidays ekonomi",
-    );
-    if (exactEconomyMatch) return exactEconomyMatch;
-  }
-
-  // Miramare Beach: Corner Room
-  if (
-    scope.hotelKey === "miramare-beach" &&
-    /\bcorner room\b/i.test(normalizedRoomName)
-  ) {
-    return scope.rooms.some((room) => room.id === "corner")
-      ? {
-          matchedRoomId: "corner",
-          matchReason:
-            "Loveholidays Corner oda adı doğrudan doğrulandı.",
-        }
-      : {
-          matchReason: "Corner oda rapor kapsamındaki odalarda yok.",
-        };
-  }
-
-  // Kısmi deniz manzarasını tam deniz manzarasıyla eşleştirme.
-  if (features.view === "partial-sea") {
-    return {
-      matchReason:
-        "Yan/kısmi deniz manzarası; tam deniz manzarası ile eşdeğer değil.",
-    };
-  }
-
-  // Miramare Beach Superior odaları.
-  if (
-    scope.hotelKey === "miramare-beach" &&
-    features.category === "superior"
-  ) {
-    if (features.balcony === "no") {
-      return {
-        matchReason:
-          "Balkonsuz Superior oda; normal Superior oda satırına dahil edilmedi.",
-      };
-    }
-
-    if (features.view === "sea") {
-      return scope.rooms.some((room) => room.id === "superior-sea")
-        ? {
-            matchedRoomId: "superior-sea",
-            matchReason:
-              "Loveholidays Superior deniz manzaralı oda adı doğrulandı; balkon bilgisi kaynakta belirtilmemiş olabilir.",
-          }
-        : {
-            matchReason:
-              "Superior deniz manzaralı oda rapor kapsamındaki odalarda yok.",
-          };
-    }
-
-    if (features.view === "garden" || features.view === "land") {
-      return scope.rooms.some((room) => room.id === "superior-land")
-        ? {
-            matchedRoomId: "superior-land",
-            matchReason:
-              "Loveholidays Superior kara/bahçe manzaralı oda adı doğrulandı; balkon bilgisi kaynakta belirtilmemiş olabilir.",
-          }
-        : {
-            matchReason:
-              "Superior kara manzaralı oda rapor kapsamındaki odalarda yok.",
-          };
-    }
-  }
-
-  // Loveholidays'e özel eşleşme bulunamadıysa mevcut ortak kurala dön.
-  return matchOfferRoom(scope, features);
-}
-
 export function parseLoveholidaysOffers(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
@@ -308,11 +194,11 @@ export function parseLoveholidaysOffers(
       continue;
 
 
-const normalizedRoomName =
-  normalizeLoveholidaysRoomName(offer.name);
-
-const roomFeatures =
-  classifyRoom(normalizedRoomName);
+const { roomFeatures, ...roomMatch } = resolveRoomMatch(
+  scope,
+  offer.name,
+  LOVEHOLIDAYS_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+);
 
 offers.push({
   id: `loveholidays:${scope.id}:${window.id}:${offers.length}`,
@@ -328,11 +214,7 @@ offers.push({
   currency: scope.currency,
   roomName: offer.name,
   roomFeatures,
-  ...matchLoveholidaysRoom(
-    scope,
-    normalizedRoomName,
-    roomFeatures,
-  ),
+  ...roomMatch,
   sourceHint: snapshot.url,
   observedAt: new Date().toISOString(),
   terms: {

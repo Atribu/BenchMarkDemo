@@ -19,7 +19,7 @@ export function hasCompatibleView(
     );
   if (roomId.endsWith("side-sea") || roomId.endsWith("partial-sea"))
     return sea && partialSea && !land;
-  if (roomId.endsWith("-sea")) return sea && !land;
+  if (roomId.endsWith("-sea")) return sea && !partialSea && !land;
   if (roomId.endsWith("-land")) return land && !sea;
   return true;
 }

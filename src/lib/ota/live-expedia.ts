@@ -13,7 +13,7 @@ import {
   parsePriceFromText,
   resolveProviderLiveConfig,
 } from "./live-helpers";
-import { namedRoomRank } from "./live-onthebeach";
+import { namedRoomRank } from "./offer-matching";
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import {
   createPatchrightBrowserPage,

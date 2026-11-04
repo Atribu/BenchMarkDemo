@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { JSDOM } from "jsdom";
 import { prepareBrowserImport } from "../src/lib/benchmark/browser-import";
 import { mergeBrowserImport } from "../src/lib/benchmark/browser-import-merge";
 import { benchmarkCsv } from "../src/lib/benchmark/export";
@@ -267,7 +266,18 @@ const script = readFileSync(
   new URL("../browser-helper/capture.js", import.meta.url),
   "utf8",
 );
-function extract(html: string, url: string) {
+const [nodeMajor, nodeMinor, nodePatch] = process.versions.node
+  .split(".")
+  .map(Number);
+const supportsJsdom =
+  (nodeMajor === 22 &&
+    (nodeMinor > 22 || (nodeMinor === 22 && nodePatch >= 2))) ||
+  (nodeMajor === 24 && nodeMinor >= 15) ||
+  nodeMajor >= 26;
+const domTest = supportsJsdom ? test : test.skip;
+
+async function extract(html: string, url: string) {
+  const { JSDOM } = await import("jsdom");
   const dom = new JSDOM(html, { url, runScripts: "outside-only" });
   Object.defineProperty(dom.window.HTMLElement.prototype, "innerText", {
     get() {
@@ -302,23 +312,27 @@ const loveHtml = `<p>Private customer email: secret@example.com</p>
 <span role="region" aria-label="Zimmerpreisinformationen">Ab <span role="region" aria-label="Zimmerpreisinformationen">272 € pro Nacht / 1.356 € insgesamt</span></span><span>Hotel + Flug 2.000 € insgesamt</span></div>
 <div role="button" aria-label="Zimmeroption 2" hidden><h3>Hidden</h3><span role="region" aria-label="Zimmerpreisinformationen">1 € insgesamt</span></div>`;
 
-test("helper reads only visible hotel-only card totals and excludes page/account data and tracking URL", () => {
-  const [data] = extract(
-    loveHtml,
-    capture.snapshot.url + "&tracking=email%40example.com",
-  );
-  assert.equal(data.snapshot.offers.length, 1);
-  assert.equal(
-    data.snapshot.offers[0].priceText,
-    "272 € pro Nacht / 1.356 € insgesamt",
-  );
-  assert.equal(data.snapshot.url, capture.snapshot.url);
-  assert.ok(!JSON.stringify(data).includes("secret@example.com"));
-  assert.equal(
-    prepare({ ...data, observedAt: now.toISOString() }).browserOffers![0].price,
-    1356,
-  );
-});
+domTest(
+  "helper reads only visible hotel-only card totals and excludes page/account data and tracking URL",
+  async () => {
+    const [data] = await extract(
+      loveHtml,
+      capture.snapshot.url + "&tracking=email%40example.com",
+    );
+    assert.equal(data.snapshot.offers.length, 1);
+    assert.equal(
+      data.snapshot.offers[0].priceText,
+      "272 € pro Nacht / 1.356 € insgesamt",
+    );
+    assert.equal(data.snapshot.url, capture.snapshot.url);
+    assert.ok(!JSON.stringify(data).includes("secret@example.com"));
+    assert.equal(
+      prepare({ ...data, observedAt: now.toISOString() }).browserOffers![0]
+        .price,
+      1356,
+    );
+  },
+);
 
 const otbHtml = `<button>Check-in Date 23 Oct 2026</button><div>Return 28 Oct 2026</div>
 ${Object.entries({
@@ -336,39 +350,45 @@ ${Object.entries({
 <article class="hotel-result"><h3>Miramare Queen<span></span></h3><input type="checkbox" name="price[toggle]" checked>
 <div class="board-option"><div class="board-option__title"><strong>All Inclusive</strong> Double Or Twin Land View Balcony</div><div class="board-option__price">£1,019<span>.88</span> per party</div></div>
 <div class="board-option" hidden><div class="board-option__title"><strong>All Inclusive</strong>Hidden room</div><div class="board-option__price">£1 per party</div></div></article>`;
-test("helper OTB contract keeps split pennies, source dates and occupancy and requires Total Hotel Price", () => {
-  const [data] = extract(otbHtml, otb.snapshot.sourceUrl);
-  assert.equal(data.snapshot.offers.length, 1);
-  const report = prepare({ ...data, observedAt: now.toISOString() });
-  assert.equal(report.browserOffers![0].price, 1019.88);
-  assert.throws(
-    () => extract(otbHtml.replace(" checked", ""), otb.snapshot.sourceUrl),
-    /Total Hotel Price/,
-  );
-});
+domTest(
+  "helper OTB contract keeps split pennies, source dates and occupancy and requires Total Hotel Price",
+  async () => {
+    const [data] = await extract(otbHtml, otb.snapshot.sourceUrl);
+    assert.equal(data.snapshot.offers.length, 1);
+    const report = prepare({ ...data, observedAt: now.toISOString() });
+    assert.equal(report.browserOffers![0].price, 1019.88);
+    await assert.rejects(
+      () => extract(otbHtml.replace(" checked", ""), otb.snapshot.sourceUrl),
+      /Total Hotel Price/,
+    );
+  },
+);
 
-test("helper refuses unrelated pages and visible verification challenges", () => {
-  assert.throws(
-    () => extract(loveHtml, "https://evil.example/hotels/l/"),
-    /desteklenmiyor/,
-  );
-  assert.throws(
-    () =>
-      extract(
-        loveHtml,
-        capture.snapshot.url.replace("/hotels/l/", "/holidays/"),
-      ),
-    /desteklenmiyor/,
-  );
-  assert.throws(
-    () =>
-      extract(
-        loveHtml + '<iframe title="Verification system"></iframe>',
-        capture.snapshot.url,
-      ),
-    /CAPTCHA/,
-  );
-});
+domTest(
+  "helper refuses unrelated pages and visible verification challenges",
+  async () => {
+    await assert.rejects(
+      () => extract(loveHtml, "https://evil.example/hotels/l/"),
+      /desteklenmiyor/,
+    );
+    await assert.rejects(
+      () =>
+        extract(
+          loveHtml,
+          capture.snapshot.url.replace("/hotels/l/", "/holidays/"),
+        ),
+      /desteklenmiyor/,
+    );
+    await assert.rejects(
+      () =>
+        extract(
+          loveHtml + '<iframe title="Verification system"></iframe>',
+          capture.snapshot.url,
+        ),
+      /CAPTCHA/,
+    );
+  },
+);
 
 test("helper permissions stay user-triggered with no persistent host, background, cookies or downloads permissions", () => {
   const manifest = JSON.parse(
@@ -383,73 +403,77 @@ test("helper permissions stay user-triggered with no persistent host, background
   assert.equal(manifest.content_scripts, undefined);
 });
 
-test("extension popup reads only on click, previews the selected hotel and exports JSON only on confirmation", async () => {
-  const html = readFileSync(
-    new URL("../browser-helper/popup.html", import.meta.url),
-    "utf8",
-  );
-  const popupScript = readFileSync(
-    new URL("../browser-helper/popup.js", import.meta.url),
-    "utf8",
-  );
-  const dom = new JSDOM(html, {
-    url: "https://extension-test.invalid/",
-    runScripts: "outside-only",
-  });
-  let reads = 0;
-  let downloads = 0;
-  let blob: Blob | undefined;
-  Object.assign(dom.window, {
-    chrome: {
-      tabs: { query: async () => [{ id: 1, url: capture.snapshot.url }] },
-      scripting: {
-        executeScript: async (options: unknown) => {
-          reads++;
-          assert.deepEqual(JSON.parse(JSON.stringify(options)), {
-            target: { tabId: 1 },
-            files: ["capture.js"],
-          });
-          return [
-            { result: [{ ...capture, observedAt: new Date().toISOString() }] },
-          ];
+domTest(
+  "extension popup reads only on click, previews the selected hotel and exports JSON only on confirmation",
+  async () => {
+    const { JSDOM } = await import("jsdom");
+    const html = readFileSync(
+      new URL("../browser-helper/popup.html", import.meta.url),
+      "utf8",
+    );
+    const popupScript = readFileSync(
+      new URL("../browser-helper/popup.js", import.meta.url),
+      "utf8",
+    );
+    const dom = new JSDOM(html, {
+      url: "https://extension-test.invalid/",
+      runScripts: "outside-only",
+    });
+    let reads = 0;
+    let downloads = 0;
+    let blob: Blob | undefined;
+    Object.assign(dom.window, {
+      chrome: {
+        tabs: { query: async () => [{ id: 1, url: capture.snapshot.url }] },
+        scripting: {
+          executeScript: async (options: unknown) => {
+            reads++;
+            assert.deepEqual(JSON.parse(JSON.stringify(options)), {
+              target: { tabId: 1 },
+              files: ["capture.js"],
+            });
+            return [
+              { result: [{ ...capture, observedAt: new Date().toISOString() }] },
+            ];
+          },
         },
       },
-    },
-  });
-  dom.window.URL.createObjectURL = (value) => {
-    blob = value as Blob;
-    return "blob:example";
-  };
-  dom.window.URL.revokeObjectURL = () => {};
-  dom.window.HTMLAnchorElement.prototype.click = function () {
-    downloads++;
-    assert.match(this.download, /^dgtlface-loveholidays-miramare-queen\.json$/);
-  };
-  try {
-    vm.runInContext(popupScript, dom.getInternalVMContext());
-    assert.equal(reads, 0);
-    assert.equal(downloads, 0);
-    (dom.window.document.getElementById("read") as HTMLButtonElement).click();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    assert.equal(reads, 1);
-    assert.equal(downloads, 0);
-    assert.equal(
-      (dom.window.document.getElementById("preview") as HTMLElement).hidden,
-      false,
-    );
-    assert.match(
-      dom.window.document.getElementById("summary")!.textContent!,
-      /Miramare Queen/,
-    );
-    (
-      dom.window.document.getElementById("download") as HTMLButtonElement
-    ).click();
-    assert.equal(downloads, 1);
-    assert.equal(blob?.type, "application/json");
-  } finally {
-    dom.window.close();
-  }
-});
+    });
+    dom.window.URL.createObjectURL = (value) => {
+      blob = value as Blob;
+      return "blob:example";
+    };
+    dom.window.URL.revokeObjectURL = () => {};
+    dom.window.HTMLAnchorElement.prototype.click = function () {
+      downloads++;
+      assert.match(this.download, /^dgtlface-loveholidays-miramare-queen\.json$/);
+    };
+    try {
+      vm.runInContext(popupScript, dom.getInternalVMContext());
+      assert.equal(reads, 0);
+      assert.equal(downloads, 0);
+      (dom.window.document.getElementById("read") as HTMLButtonElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(reads, 1);
+      assert.equal(downloads, 0);
+      assert.equal(
+        (dom.window.document.getElementById("preview") as HTMLElement).hidden,
+        false,
+      );
+      assert.match(
+        dom.window.document.getElementById("summary")!.textContent!,
+        /Miramare Queen/,
+      );
+      (
+        dom.window.document.getElementById("download") as HTMLButtonElement
+      ).click();
+      assert.equal(downloads, 1);
+      assert.equal(blob?.type, "application/json");
+    } finally {
+      dom.window.close();
+    }
+  },
+);
 
 test("retired import route cannot inject user-supplied prices into live reports", async () => {
   const call = (
