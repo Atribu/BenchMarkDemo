@@ -228,3 +228,153 @@ toplam fiyat canli olarak dogrulanmadan `src/lib/ota/registry.ts` icindeki
 
 Her yeni otel icin `tests/hotel-catalog.test.ts` kapsaminda en az katalog,
 oda eslestirme, saglayici kimligi ve etkin kanal testleri eklenmelidir.
+
+### Otel yasam dongusu
+
+Kullanici tarafindan eklenecek oteller `taslak`, `hazir`, `aktif` ve
+`arsivlenmis` durumlarindan gecer. Yalnizca aktif oteller benchmark sorgularina
+katilabilir. Taslak bir otel once hazir duruma alinmadan aktif edilemez;
+arsivlenmis bir otel de yeniden dogrudan aktif edilemez, once taslaga doner ve
+kanal eslestirmeleri tekrar kontrol edilir. Izin verilen gecisler ve bu kuralin
+tek kaynagi `src/lib/hotels/lifecycle.ts` dosyasidir.
+
+### Yonetilen otel veri modeli
+
+Kullanici tarafindan eklenecek otellerin kalici kayit sozlesmesi
+`src/lib/hotels/model.ts` dosyasinda tanimlidir. Temel otel ve konum bilgileri;
+pazarlar, odalar, oda eslestirme politikasi ve kanal eslestirmelerinden ayri
+alanlarda tutulur. Kayit, degisiklik cakismalarini ileride denetlemek icin bir
+`version` ve olusturan/guncelleme zamanlarini iceren audit alanlari tasir.
+
+`createHotelDraft` yeni kaydi daima kullanici kaynakli, surum 1 ve bos bagli
+kayitlarla taslak olarak olusturur. Bu model henuz veritabanina, API'ye veya
+mevcut statik katalog ve benchmark akisina bagli degildir.
+
+### Otel okuma repository'si
+
+`src/lib/hotels/repository.ts`, mevcut statik katalog kayitlarini aktif ve salt
+okunur sistem otellerine donusturur; kullanici otellerini bunlari ezmeden ayni
+okuma listesinde birlestirir. Ayni `id` veya `key` ile sistem otelini ezme
+girisimleri reddedilir. Taslak ve arsivlenmis oteller benchmark listesine
+girmez; arsivlenmis oteller yonetim ekrani icin acikca istendiginde listelenir.
+
+Bu katman henuz panel ve benchmark tarafindan kullanilmaz. Mevcut kanal
+konfigurasyonlari `live-config.ts` ve `registry.ts` icinde kalmaya devam eder;
+repository'ye kanal tasima sonraki, ayri bir gecis adimidir.
+
+### Calisma zamani kimlikleri
+
+Mevcut collector'larin kullandigi derleme zamani `HotelKey` ve `ScopeKey`
+union tipleri korunur. Kullanici kayitlari ise `src/lib/hotels/identifiers.ts`
+icindeki ayri `RuntimeHotelId`, `RuntimeHotelKey` ve `RuntimeScopeKey` sinir
+tiplerini kullanir. Disaridan gelen kimlikler bu tiplere ancak calisma zamani
+dogrulamasindan sonra donusebilir.
+
+Otel ve pazar anahtarlari 3-80/100 karakterlik kucuk harfli slug bicimindedir;
+bosluk, buyuk harf, alt cizgi, path parcasi ve ardisik tire kabul edilmez. Girdi
+sessizce normalize edilmez. Bu sayede farkli bir kullanici girdisinin mevcut
+bir katalog anahtarina istemeden donusmesi engellenir.
+
+### Kullanici oteli saklama katmani
+
+`src/lib/hotels/file-store.ts` kullanici otellerini varsayilan olarak
+`.benchmark-state/user-hotels.json` dosyasinda saklar. Konum
+`BENCHMARK_STATE_DIR` ile degistirilebilir. Dizin `0700`, dosya `0600` izinle
+olusturulur; yazim gecici dosya ve atomik yeniden adlandirma ile tamamlanir.
+Kilit dizini ayni anda iki degisikligin birbirini ezmesini engeller.
+
+Dosya 2 MB / 500 otel ile sinirlidir. Her okumada sema, runtime kimlikleri ve
+alt kayitlar yeniden dogrulanir. Bozuk, bilinmeyen surumlu veya sistem kaydi
+taklidi yapan veri bos kayit gibi kabul edilmez; depo kapali bicimde hata verir.
+Bu adapter tek sunucu dosya sistemi icindir. Birden fazla uygulama instance'i
+veya gecici dosya sistemi kullanan yayin ortaminda ayni `HotelStore` arayuzu
+uzerinden paylasimli bir veritabani adapteri kullanilmalidir.
+
+### Otel yonetim API'si
+
+`GET /api/hotels` sistem ve kullanici otellerini listeler. Arsivlenmis kayitlar
+yalnizca `?includeArchived=true` ile yonetim listesine eklenir.
+
+`POST /api/hotels` temel otel ve konum bilgileriyle kalici bir taslak olusturur.
+Kimlik, kaynak, durum, surum, audit, pazar, oda ve kanal alanlari istemciden
+alinmaz. Bilinmeyen alanlar reddedilir; otel anahtari hem sistem hem kullanici
+kayitlari icinde benzersiz olmalidir. Yazma istegi mevcut Basic Auth,
+same-origin, JSON content-type ve 16 KB govde sinirindan gecer. Bu ilk ucta
+olusan otel yalnizca taslaktir ve benchmark sorgusuna katilmaz.
+
+`GET /api/hotels/:id` sistem veya kullanici otelinin tekil kaydini verir.
+`PATCH /api/hotels/:id` yalnizca kullanici kaynakli `draft` ve `ready`
+otellerin ad, kisa kod, konum ve HTTPS web sitesi alanlarini degistirir. Otel
+anahtari, kaynak, durum ve bagli kanal verileri bu uctan degistirilemez; sistem
+otelleri salt okunurdur. Istekte mevcut `version` zorunludur. Surum eskimis ise
+`409` doner, kayit degistirilmez ve istemcinin guncel kaydi yeniden yuklemesi
+gerekir. Basarili yazim surumu bir artirir, guncelleyen kullaniciyi ve zamani
+audit alanlarina kaydeder.
+
+`PATCH /api/hotels/:id/status` kontrollu yasam dongusu gecisini yapar ve yine
+guncel `version` ister. Sistem otellerinin durumu degistirilemez. `ready` olmak
+icin en az bir pazar, oda, manzara-oda politikasi ve referanslari gecerli kanal
+eslestirmesi gerekir. `active` olmak icin bunlara ek olarak her pazarda kimligi
+ve dogrulama zamani bulunan en az bir `verified` kanal eslestirmesi zorunludur.
+Bos veya eksik taslaklar benchmark akisina etkinlestirilemez. Arsivleme zamani
+audit kaydina yazilir; arsivden donus yalnizca taslaga yapilir ve bu zaman
+temizlenir.
+
+Pazar yapilandirmasi yalnizca kullanici kaynakli `draft` otellerde
+degistirilebilir. `POST /api/hotels/:id/markets` yeni pazar ekler;
+`PATCH /api/hotels/:id/markets/:marketId` pazar etiketini, para birimini,
+pansiyon kuralini ve notunu gunceller; `DELETE` ayni uctan pazari siler. Her
+yazim guncel otel `version` degerini ister. Pazar kimlikleri sistem ve kullanici
+otellerinin tamaminda benzersizdir ve olusturulduktan sonra degistirilemez.
+Bagli kanal eslestirmesi bulunan pazar silinemez. Para birimi veya pansiyon
+kurali degisirse o pazarin eski kanal dogrulamasi otomatik olarak `draft`
+durumuna alinir ve yeniden dogrulanmadan otel etkinlestirilemez.
+
+Dinamik oda tipleri de yalnizca kullanici kaynakli `draft` otellerde
+yonetilir. `POST /api/hotels/:id/rooms` oda kimligi, gorunen ad ve yapisal
+doluluk (`rooms`, `adults`, `children`) bilgisiyle oda ekler.
+`PATCH /api/hotels/:id/rooms/:roomId` adi veya dolulugu gunceller; `DELETE`
+ayni uctan oda tipini siler. Oda kimligi otel icinde benzersiz ve degismezdir.
+En az bir yetiskin zorunludur; sayilar sinirli tam sayi olarak dogrulanir.
+
+Oda ekleme veya anlamsal oda degisikligi, daha once dogrulanmis tum kanal
+eslestirmelerini `draft` durumuna alir. Oda eslestirme politikasinda ya da
+kanal alias kaydinda kullanilan bir oda once bu baglantilar kaldirilmadan
+silinemez. Boylece eski bir kanal dogrulamasi yeni oda semasiyla yanlislikla
+aktif kabul edilmez.
+
+Oda eslestirme politikasi `PUT /api/hotels/:id/matching-policy` ile atomik
+olarak kaydedilir. Istek ana oda kategorisini (`standard` veya `superior`),
+balkon zorunlulugunu ve `land`, `garden`, `sea`, `partial-sea` manzaralarinin
+otel icindeki oda kimliklerine baglantisini tasir. En az bir manzara eslesmesi
+zorunludur; otelde bulunmayan oda ve bilinmeyen manzara kabul edilmez. Ayni
+uctaki `DELETE`, politikayi kaldirir.
+
+Politika yalnizca kullanici kaynakli `draft` otelde degistirilebilir ve her
+yazim guncel `version` ister. Politikanin eklenmesi, anlamsal olarak degismesi
+veya silinmesi eski kanal dogrulamalarini `draft` durumuna alir. Mevcut sistem
+otellerinin statik eslestirme politikalari bu API tarafindan degistirilemez.
+
+OTA eslestirmeleri `POST /api/hotels/:id/channel-mappings` ile yalnizca mevcut
+OTA registry anahtarlari kullanilarak olusturulur. Pazar ve oda kimlikleri
+ilgili kullanici oteline ait olmalidir. Harici otel kimligi, OTA sayfa adresi
+veya arama adindan en az biri zorunludur. Sayfa adresi yalnizca secilen OTA'nin
+HTTPS alan adinda olabilir. Ayni otel, OTA ve pazar uclusu yinelenemez.
+
+`PATCH /api/hotels/:id/channel-mappings/:mappingId` kimlik ve oda alias
+bilgilerini gunceller; her guncelleme kaydi yeniden `draft` durumuna getirir.
+Ayni uctaki `DELETE` kaydi kaldirir. Provider ve pazar kimligi olusturma
+sonrasinda degistirilemez. Tum yazimlar guncel otel `version` degerini ister ve
+yalnizca kullanici kaynakli `draft` otellerde calisir.
+
+Durum degisikligi
+`PATCH /api/hotels/:id/channel-mappings/:mappingId/status` uzerinden ayri
+yapilir. `verified` icin kanal kimligi, oda eslestirme politikasi ve politikada
+kullanilan her oda icin en az bir kanal alias'i zorunludur; dogrulama zamani
+sunucu tarafindan yazilir. Buradaki `verified`, yonetici tarafindan eslestirme
+konfigurasyonunun tamamlandigi anlamindadir; OTA'nin her sorguda erisilebilir
+oldugunu veya canli fiyat dondurecegini garanti etmez.
+
+Bu adim kullanici otelinin kanal konfigurasyonunu kalici hale getirir; mevcut
+collector'larin statik sistem oteli ayarlarini degistirmez. Dinamik kaydin
+collector calisma zamaninda kullanilmasi ayri bir entegrasyon adimidir.

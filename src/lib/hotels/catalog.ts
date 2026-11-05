@@ -21,6 +21,11 @@ export interface HotelCatalogEntry {
   key: string;
   name: string;
   shortCode: string;
+  location: {
+    countryCode: string;
+    city: string;
+    region?: string;
+  };
   scopes: readonly HotelScopeCatalogEntry[];
   rooms: readonly HotelRoomCatalogEntry[];
   matchingPolicy: {
@@ -35,6 +40,7 @@ export const HOTEL_CATALOG = [
     key: "miramare-beach",
     name: "Miramare Beach",
     shortCode: "MB",
+    location: { countryCode: "TR", city: "Antalya", region: "Side" },
     matchingPolicy: {
       category: "superior",
       requireBalcony: true,
@@ -121,6 +127,7 @@ export const HOTEL_CATALOG = [
     key: "miramare-queen",
     name: "Miramare Queen",
     shortCode: "MQ",
+    location: { countryCode: "TR", city: "Antalya", region: "Side" },
     matchingPolicy: {
       category: "standard",
       requireBalcony: false,
@@ -182,6 +189,7 @@ export const HOTEL_CATALOG = [
     key: "port-nature",
     name: "Port Nature Luxury Resort Hotel & Spa",
     shortCode: "PN",
+    location: { countryCode: "TR", city: "Antalya", region: "Belek" },
     matchingPolicy: {
       category: "standard",
       requireBalcony: false,
@@ -252,6 +260,7 @@ export const HOTEL_CATALOG = [
     key: "sy-hotels-belek",
     name: "SY Hotels Belek Boutique Luxury",
     shortCode: "SY",
+    location: { countryCode: "TR", city: "Antalya", region: "Belek" },
     matchingPolicy: {
       category: "standard",
       requireBalcony: true,

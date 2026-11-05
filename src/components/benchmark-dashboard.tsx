@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { PriceSummary } from "./price-summary";
+import { HotelManagement } from "./hotel-management";
 import { useRef, useState } from "react";
 import { browserBatchKey } from "@/src/lib/benchmark/browser-import-merge";
 import type {
@@ -43,9 +44,9 @@ interface BenchmarkDashboardProps {
   managedSourceReady?: boolean;
 }
 
-type Section = "benchmark" | "channels";
+type Section = "benchmark" | "hotels" | "channels";
 type IconName =
-  "grid" | "channels" | "arrow" | "download" | "check" | "clock" | "external";
+  "grid" | "hotel" | "channels" | "arrow" | "download" | "check" | "clock" | "external";
 
 function Icon({
   name,
@@ -61,6 +62,12 @@ function Icon({
         <rect x="14" y="3" width="7" height="7" rx="1.5" />
         <rect x="3" y="14" width="7" height="7" rx="1.5" />
         <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </>
+    ),
+    hotel: (
+      <>
+        <path d="M4 21V6l8-3 8 3v15" />
+        <path d="M9 21v-4h6v4M8 8h1m3 0h1m3 0h1M8 12h1m3 0h1m3 0h1" />
       </>
     ),
     channels: (
@@ -970,10 +977,16 @@ export function BenchmarkDashboard({
   }[] = [
     { id: "benchmark", label: "Benchmark", icon: "grid", number: "01" },
     {
+      id: "hotels",
+      label: "Otel yönetimi",
+      icon: "hotel",
+      number: "02",
+    },
+    {
       id: "channels",
       label: "OTA bağlantıları",
       icon: "channels",
-      number: "02",
+      number: "03",
     },
   ];
 
@@ -1793,6 +1806,10 @@ export function BenchmarkDashboard({
               </p>
             </div>
           </section>
+        )}
+
+        {section === "hotels" && (
+          <HotelManagement providerCatalog={providerCatalog} />
         )}
 
         <footer className="workspaceFooter">
