@@ -7,6 +7,7 @@ import type {
   ManagedHotelRecord,
 } from "@/src/lib/hotels/model";
 import type { HotelLifecycleStatus } from "@/src/lib/hotels/lifecycle";
+import { DYNAMIC_COLLECTOR_PROVIDERS } from "@/src/lib/hotels/runtime-manifest";
 
 interface HotelManagementProps {
   providerCatalog: ProviderDescriptor[];
@@ -289,7 +290,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
           <p className="eyebrow">HOTEL ONBOARDING</p>
           <h1>Yeni oteli ekleyin.<br /><span>Mevcut yapıyı koruyun.</span></h1>
           <p className="pageLead">
-            Kayıtlar önce taslakta hazırlanır. Sistem otelleri salt okunurdur ve yeni otel canlı benchmark listesine otomatik eklenmez.
+            Kayıtlar önce taslakta hazırlanır. Sistem otelleri salt okunurdur; yeni otel yalnızca collector yapılandırması doğrulanıp aktifleştirildikten sonra canlı benchmark listesine eklenir.
           </p>
         </div>
         <div className="isolationNote">
@@ -429,14 +430,14 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
                         const provider = providerCatalog.find((item) => item.key === mapping.providerKey);
                         return <article className="mappingCard" key={mapping.id}>
                           <div><span className="providerLetter">{provider?.shortName.slice(0, 1) ?? "?"}</span><div><strong>{provider?.name ?? mapping.providerKey}</strong><small>{selected.markets.find((market) => market.id === mapping.marketId)?.label ?? mapping.marketId} · {Object.keys(mapping.roomAliases).length} oda alias grubu</small></div></div>
-                          <span className={`mappingStatus ${mapping.status}`}>{MAPPING_STATUS_LABELS[mapping.status]}</span>
+                          <span className={`mappingStatus ${mapping.status}`}>{MAPPING_STATUS_LABELS[mapping.status]}{DYNAMIC_COLLECTOR_PROVIDERS.some((key) => key === mapping.providerKey) ? " · Collector destekli" : ""}</span>
                           {editable && <div className="mappingActions"><button type="button" onClick={() => setMappingStatus(mapping.id, "verified")} disabled={busy || mapping.status === "verified"}>Doğrula</button><button type="button" onClick={() => setMappingStatus(mapping.id, "disabled")} disabled={busy || mapping.status === "disabled"}>Devre dışı</button></div>}
                         </article>;
                       })}
                     </div>
                     <form className="managerForm compactForm" onSubmit={addMapping}>
                       <div className="formGrid formGridThree">
-                        <label><span>OTA kanalı</span><select name="providerKey" required disabled={!editable}><option value="">Kanal seçin</option>{providerCatalog.map((provider) => <option value={provider.key} key={provider.key}>{provider.name}</option>)}</select></label>
+                        <label><span>OTA kanalı</span><select name="providerKey" required disabled={!editable}><option value="">Kanal seçin</option>{providerCatalog.map((provider) => <option value={provider.key} key={provider.key}>{provider.name}{DYNAMIC_COLLECTOR_PROVIDERS.includes(provider.key as (typeof DYNAMIC_COLLECTOR_PROVIDERS)[number]) ? " · Dinamik destekli" : " · Yapılandırma kaydı"}</option>)}</select></label>
                         <label><span>Pazar</span><select name="marketId" required disabled={!editable}><option value="">Pazar seçin</option>{selected.markets.map((market) => <option value={market.id} key={market.id}>{market.label}</option>)}</select></label>
                         <label><span>Harici otel kimliği</span><input name="externalHotelId" disabled={!editable} /></label>
                         <label><span>Kanal sayfa adresi</span><input name="pageUrl" type="url" placeholder="https://…" disabled={!editable} /></label>
@@ -451,11 +452,11 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
                     <div><span className="stepKicker">05 / DURUM</span><h2>Kontrollü yayın akışı</h2><p>“Hazır”, yapılandırmanın tamamlandığını belirtir. Canlı benchmark’a otomatik dahil etmez.</p></div>
                     <div className="releaseActions">
                       {selected.status === "draft" && <><button className="managerPrimary" onClick={() => setHotelStatus("ready")} disabled={busy}>Hazıra al</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
-                      {selected.status === "ready" && <><button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslağa dön</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
+                      {selected.status === "ready" && <><button className="managerPrimary" onClick={() => setHotelStatus("active")} disabled={busy}>Doğrula ve aktifleştir</button><button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslağa dön</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
                       {selected.status === "active" && <><button className="managerSecondary" onClick={() => setHotelStatus("ready")} disabled={busy}>Hazıra çek</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
                       {selected.status === "archived" && <button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslak olarak geri aç</button>}
                     </div>
-                    {selected.status === "ready" && <div className="runtimeGuard"><strong>Canlı aktivasyon kilitli</strong><span>Dinamik fiyat toplayıcı bağlantısı tamamlanana kadar bu arayüz oteli Aktif duruma geçirmez.</span></div>}
+                    {selected.status === "ready" && <div className="runtimeGuard"><strong>Collector doğrulaması zorunlu</strong><span>Aktivasyon için her pazarda Booking.com, CHECK24 (EUR), Expedia, HolidayCheck veya TUI (EUR) kanallarından en az birinin doğrulanmış sayfa adresi ve kapsamdaki tüm odaların alias kayıtları gerekir. CHECK24 için sayısal otel kimliği, TUI için sayısal GIATA kimliği “Harici otel kimliği” alanına girilir. Eksik yapılandırma kapalı biçimde reddedilir.</span></div>}
                   </section>
                 </>
               )}

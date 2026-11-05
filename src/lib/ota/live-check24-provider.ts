@@ -6,6 +6,7 @@ import type {
   ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
 import { classifyBenchmarkErrorCode } from "@/src/lib/benchmark/status";
+import type { DynamicOtaCollectorConfig } from "@/src/lib/hotels/runtime-manifest";
 
 import { buildCheck24OfferTerms } from "./check24-offer-terms";
 
@@ -24,17 +25,64 @@ import { CHECK24_HOTEL_CONFIG } from "./live-config";
 import { extractCheck24RoomFeatures } from "./check24-room-features";
 
 import { validateCheck24Offer } from "./check24-room-validation";
+import type { Check24ParsedOffer } from "./check24-parser";
+import { resolveRoomMatch } from "./offer-matching";
+
+export function validateDynamicCheck24Offer(
+  offer: Check24ParsedOffer,
+  expectedNights: number,
+  scope: ReportScopeDefinition,
+  runtimeConfig: DynamicOtaCollectorConfig,
+): ReturnType<typeof validateCheck24Offer> {
+  const match = resolveRoomMatch(
+    scope,
+    offer.roomName,
+    runtimeConfig.roomAliases,
+    offer.sourceRoomDescription ?? offer.roomCategoryName,
+    runtimeConfig.matchingPolicy,
+  );
+  const reject = (reason: string): ReturnType<typeof validateCheck24Offer> => ({
+    status: "rejected",
+    roomId: match.matchedRoomId ?? null,
+    features: match.roomFeatures,
+    reasons: [reason],
+  });
+  if (offer.roomOccupancy !== "[A|A]")
+    return reject("Beklenen kişi sayısı 2 yetişkin değil.");
+  if (offer.currency !== "EUR") return reject("Para birimi EUR değil.");
+  if (!Number.isFinite(offer.totalPrice) || offer.totalPrice <= 0)
+    return reject("Geçerli bir toplam fiyat bulunamadı.");
+  if (offer.nights !== expectedNights)
+    return reject("Konaklama süresi uyuşmuyor.");
+  if (!/all[ _-]*inclusive/i.test(offer.mealType))
+    return reject("Pansiyon All Inclusive değil.");
+  if (!match.matchedRoomId)
+    return {
+      status: "manual-review",
+      roomId: null,
+      features: match.roomFeatures,
+      reasons: [match.matchReason],
+    };
+  return {
+    status: "matched",
+    roomId: match.matchedRoomId,
+    features: match.roomFeatures,
+    reasons: [match.matchReason, "Tarih, kişi sayısı ve pansiyon doğrulandı."],
+  };
+}
 
 export async function collectCheck24LiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const quotes: ProviderQuote[] = [];
   const offers: CollectedOffer[] = [];
   const warnings: string[] = [];
 
-  const hotelConfig = CHECK24_HOTEL_CONFIG[scope.hotelKey];
+  const hotelConfig = runtimeConfig?.check24 ?? CHECK24_HOTEL_CONFIG[scope.hotelKey];
   const supportedHotel =
+    Boolean(runtimeConfig?.check24) ||
     scope.hotelKey === "miramare-beach" ||
     scope.hotelKey === "miramare-queen" ||
     scope.hotelKey === "port-nature" ||
@@ -79,7 +127,7 @@ if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
       });
 
       const result =
-        scope.hotelKey === "miramare-beach"
+        !runtimeConfig && scope.hotelKey === "miramare-beach"
           ? await collectCheck24Beach(
               handle.page,
               window.checkIn,
@@ -118,11 +166,14 @@ if (!hotelConfig || !supportedHotel || scope.currency !== "EUR") {
       >();
 
       for (const offer of result.offers) {
-        const validation = validateCheck24Offer(
-          offer,
-          window.nights,
-          scope.hotelKey,
-        );
+        const validation = runtimeConfig
+          ? validateDynamicCheck24Offer(
+              offer,
+              window.nights,
+              scope,
+              runtimeConfig,
+            )
+          : validateCheck24Offer(offer, window.nights, scope.hotelKey);
 
         if (validation.status === "rejected" || !validation.roomId) {
           continue;

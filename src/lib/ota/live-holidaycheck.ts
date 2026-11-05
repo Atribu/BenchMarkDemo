@@ -18,6 +18,14 @@ import {
   resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
+
+function holidayCheckCollectorConfig(
+  scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
+): DynamicOtaCollectorConfig | undefined {
+  return runtimeConfig ?? HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey];
+}
 
 type DateValue =
   | { day?: number; month?: number; year?: number; formatted?: string }
@@ -80,8 +88,10 @@ export function parseHolidayCheckOffers(
   window: BenchmarkWindowDefinition,
   rawOffers: HolidayCheckOffer[],
   sourceHint: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
-  const expectedHotelId = HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey]?.pageUrl
+  const config = holidayCheckCollectorConfig(scope, runtimeConfig);
+  const expectedHotelId = config?.pageUrl
     .split("/")
     .filter(Boolean)
     .at(-1);
@@ -118,12 +128,13 @@ export function parseHolidayCheckOffers(
     );
     if (!roomName) continue;
     // Do not infer room identity from HolidayCheck's LLM-generated room details.
-    const roomAliases =
-      HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey]?.roomAliases ?? {};
+    const roomAliases = config?.roomAliases ?? {};
     const { roomFeatures, ...roomMatch } = resolveRoomMatch(
       scope,
       roomName,
       roomAliases,
+      "",
+      config?.matchingPolicy,
     );
     const cancellation = offer.specials?.find(
       (special) => special.specialType === "CANCELLATION",
@@ -250,8 +261,9 @@ async function readWindow(
 export async function collectHolidayCheckLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
-  const config = HOLIDAYCHECK_HOTEL_CONFIG[scope.hotelKey];
+  const config = holidayCheckCollectorConfig(scope, runtimeConfig);
   if (!config)
     return buildManualReviewQuotes(
       provider,
@@ -295,6 +307,7 @@ export async function collectHolidayCheckLiveQuotes(
           window,
           state.offers,
           sourceHint,
+          runtimeConfig,
         );
         offers.push(...windowOffers);
         const windowQuotes = selectOfferQuotes(

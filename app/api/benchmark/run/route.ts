@@ -4,6 +4,7 @@ import { runBenchmarkJob } from "@/src/lib/ota/run-benchmark";
 import { checkAccess, checkRequestOrigin } from "@/src/lib/server/access";
 import { readBoundedJson } from "@/src/lib/server/bounded-json";
 import { acquireQuery } from "@/src/lib/server/query-gate";
+import { loadDynamicHotelRuntimeContext } from "@/src/lib/hotels/runtime-store";
 
 export const runtime = "nodejs";
 
@@ -21,8 +22,22 @@ export async function POST(request: Request) {
       { status: 415 },
     );
   let payload;
+  let runtimeContext;
   try {
-    payload = parseBenchmarkRequest(await readBoundedJson(request, 4096));
+    runtimeContext = await loadDynamicHotelRuntimeContext();
+  } catch {
+    return NextResponse.json(
+      { error: "Aktif otel collector yapılandırması okunamadı." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+  try {
+    payload = parseBenchmarkRequest(
+      await readBoundedJson(request, 4096),
+      undefined,
+      runtimeContext.catalog,
+      runtimeContext.providers,
+    );
   } catch (error) {
     return NextResponse.json(
       {
@@ -55,9 +70,12 @@ export async function POST(request: Request) {
       },
     );
   try {
-    return NextResponse.json(await runBenchmarkJob(payload), {
+    return NextResponse.json(
+      await runBenchmarkJob(payload, undefined, runtimeContext),
+      {
       headers: { "Cache-Control": "no-store" },
-    });
+      },
+    );
   } catch {
     return NextResponse.json(
       {

@@ -64,6 +64,7 @@ export const REPORT_SCOPES: ReportScopeDefinition[] = HOTEL_CATALOG.flatMap(
       label: scope.label,
       hotelKey: hotel.key,
       hotelName: hotel.name,
+      hotelShortCode: hotel.shortCode,
       marketLabel: scope.marketLabel,
       currency: scope.currency,
       requiredBoard: scope.requiredBoard,

@@ -52,6 +52,7 @@ function draft(configured = false): ManagedHotelRecord {
         marketId,
         status: "verified",
         externalHotelId: "example-123",
+        pageUrl: "https://www.booking.com/hotel/tr/example-resort.html",
         roomAliases: { "standard-land": ["Standard Land View"] },
         verifiedAt: "2026-11-05T09:30:00.000Z",
       },

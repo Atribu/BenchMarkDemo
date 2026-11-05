@@ -1,11 +1,13 @@
 import type {
   CollectedOffer,
+  CurrencyCode,
   ProviderCollectionResult,
   ProviderDescriptor,
   ProviderQuote,
   ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
 import { TUI_HOTEL_CONFIG } from "@/src/lib/ota/live-config";
+import type { DynamicOtaCollectorConfig } from "@/src/lib/hotels/runtime-manifest";
 import {
   deduplicateOffers,
   resolveRoomMatch,
@@ -44,6 +46,42 @@ interface TuiRoomType {
   offers?: TuiRoomOffer[];
 }
 
+interface TuiResolvedMarketConfig {
+  hotelId?: string;
+  productId?: string;
+  market: "de" | "uk";
+  locale: "de-DE" | "en-GB";
+  sourcing?: string;
+}
+
+interface TuiResolvedConfig {
+  giataId: number;
+  offerSlug: string;
+  offerPageUrl: string;
+  markets: Partial<Record<CurrencyCode, TuiResolvedMarketConfig>>;
+  roomAliases: Readonly<Record<string, readonly string[]>>;
+}
+
+function tuiCollectorConfig(
+  scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
+): TuiResolvedConfig | undefined {
+  if (!runtimeConfig?.tui) return TUI_HOTEL_CONFIG[scope.hotelKey];
+  return {
+    giataId: runtimeConfig.tui.giataId,
+    offerSlug: runtimeConfig.tui.offerSlug,
+    offerPageUrl: runtimeConfig.pageUrl,
+    markets: {
+      EUR: {
+        hotelId: runtimeConfig.tui.hotelId,
+        market: runtimeConfig.tui.market,
+        locale: runtimeConfig.tui.locale,
+      },
+    },
+    roomAliases: runtimeConfig.roomAliases,
+  };
+}
+
 function offerUrl(
   giataId: number,
   slug: string,
@@ -67,8 +105,9 @@ function offerUrl(
 export async function collectTuiLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
-  const config = TUI_HOTEL_CONFIG[scope.hotelKey];
+  const config = tuiCollectorConfig(scope, runtimeConfig);
   if (!config)
     return buildManualReviewQuotes(
       provider,
@@ -348,6 +387,7 @@ if (typeof price !== "number") {
       name,
       config.roomAliases,
       facilities,
+      runtimeConfig?.matchingPolicy,
     );
 
     console.log("[TUI] Accepted offer:", {

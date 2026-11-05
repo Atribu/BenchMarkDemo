@@ -117,7 +117,10 @@ function providerPageUrl(
   } catch {
     throw new Error("Kanal sayfa adresi geçerli bir HTTPS adresi olmalıdır.");
   }
-  const root = template.hostname.toLowerCase().replace(/^www\./, "");
+  const root =
+    providerKey === "check24"
+      ? "check24.de"
+      : template.hostname.toLowerCase().replace(/^www\./, "");
   const hostname = url.hostname.toLowerCase();
   if (
     url.protocol !== "https:" ||

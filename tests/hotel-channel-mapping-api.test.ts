@@ -185,6 +185,23 @@ test("channel mapping validation rejects unknown providers and unsafe references
   }
 });
 
+test("CHECK24 mapping accepts its verified legacy hotel subdomain", async () => {
+  const { directory, collection } = await fixture();
+  try {
+    const response = await createMapping(collection, {
+      ...validMapping,
+      providerKey: "check24",
+      externalHotelId: "7654321",
+      pageUrl: "https://hotel.check24.de/hotel/turkey/7654321",
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.mapping.providerKey, "check24");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("one OTA and market pair can have only one mapping", async () => {
   const { directory, collection } = await fixture();
   try {

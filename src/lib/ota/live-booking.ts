@@ -14,6 +14,18 @@ import {
 } from "./live-helpers";
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import { namedRoomRank } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
+
+type BookingCollectorConfig = DynamicOtaCollectorConfig;
+
+function bookingCollectorConfig(
+  scope: ReportScopeDefinition,
+  runtimeConfig?: BookingCollectorConfig,
+): BookingCollectorConfig {
+  const config = runtimeConfig ?? BOOKING_HOTEL_CONFIG[scope.hotelKey];
+  if (!config) throw new Error("Booking otel eslestirmesi eksik.");
+  return config;
+}
 
 export interface BookingSnapshot {
   url: string;
@@ -33,9 +45,9 @@ export interface BookingSnapshot {
 export function buildBookingUrl(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
+  runtimeConfig?: BookingCollectorConfig,
 ) {
-  const config = BOOKING_HOTEL_CONFIG[scope.hotelKey];
-  if (!config) throw new Error("Booking otel eslestirmesi eksik.");
+  const config = bookingCollectorConfig(scope, runtimeConfig);
   const url = new URL(config.pageUrl);
   url.pathname = url.pathname.replace(
     /(?:\.[a-z]{2}(?:-[a-z]{2})?)?\.html$/,
@@ -80,9 +92,11 @@ export function parseBookingQuotes(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: BookingSnapshot,
+  runtimeConfig?: BookingCollectorConfig,
 ): ProviderQuote[] {
+  const config = bookingCollectorConfig(scope, runtimeConfig);
   const url = new URL(snapshot.url);
-  const expected = new URL(buildBookingUrl(scope, window));
+  const expected = new URL(buildBookingUrl(scope, window, config));
   const stay = normalizeInlineText(snapshot.stayLabel);
   if (
     url.origin !== expected.origin ||
@@ -100,8 +114,8 @@ export function parseBookingQuotes(
     ![
       scope.hotelName,
       `${scope.hotelName} Hotel`,
-      BOOKING_HOTEL_CONFIG[scope.hotelKey]?.cardName,
-      BOOKING_HOTEL_CONFIG[scope.hotelKey]?.searchQuery,
+      config.cardName,
+      config.searchQuery,
     ]
       .filter(Boolean)
       .map((name) => name!.toLowerCase())
@@ -129,7 +143,7 @@ export function parseBookingQuotes(
         let rank = namedRoomRank(
           room.id,
           row.name,
-          BOOKING_HOTEL_CONFIG[scope.hotelKey]?.roomAliases[room.id] ?? [],
+          config.roomAliases[room.id] ?? [],
         );
         const partialSeaName =
           /\b(side|partial|lateral|seitl|seitlich|seitlichem|seitlicher|teilmeerblick)\b/i.test(
@@ -181,6 +195,7 @@ export function parseBookingQuotes(
 export async function collectBookingLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: BookingCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const debug = process.env.OTA_DEBUG === "true";
   const quotes: ProviderQuote[] = [];
@@ -206,7 +221,7 @@ export async function collectBookingLiveQuotes(
     for (const window of scope.windows) {
       let sourceHint = "";
       try {
-        sourceHint = buildBookingUrl(scope, window);
+        sourceHint = buildBookingUrl(scope, window, runtimeConfig);
         const page = handle.page;
 
         const response = await page.goto(sourceHint, {
@@ -299,7 +314,15 @@ export async function collectBookingLiveQuotes(
             rows,
           };
         });
-        quotes.push(...parseBookingQuotes(provider, scope, window, snapshot));
+        quotes.push(
+          ...parseBookingQuotes(
+            provider,
+            scope,
+            window,
+            snapshot,
+            runtimeConfig,
+          ),
+        );
       } catch (error) {
         let reason =
           error instanceof Error

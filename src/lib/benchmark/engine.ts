@@ -312,6 +312,7 @@ export function buildBenchmarkResult({
       label: scope.label,
       hotelKey: scope.hotelKey,
       hotelName: scope.hotelName,
+      hotelShortCode: scope.hotelShortCode,
       marketLabel: scope.marketLabel,
       currency: scope.currency,
       notes: scope.notes,

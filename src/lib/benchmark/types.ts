@@ -46,6 +46,7 @@ export interface ReportScopeDefinition {
   label: string;
   hotelKey: HotelKey;
   hotelName: string;
+  hotelShortCode?: string;
   marketLabel: string;
   currency: CurrencyCode;
 
@@ -323,6 +324,7 @@ export interface BenchmarkScopeResult {
   label: string;
   hotelKey: HotelKey;
   hotelName: string;
+  hotelShortCode?: string;
   marketLabel: string;
   currency: CurrencyCode;
   notes?: string;

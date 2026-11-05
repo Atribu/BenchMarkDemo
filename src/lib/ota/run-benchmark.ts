@@ -39,6 +39,10 @@ import { collectRestplatzboerseLiveQuotes } from "./live-restplatzboerse";
 import { collectStayforlongLiveQuotes } from "./live-stayforlong";
 import { collectPegasTourLiveQuotes } from "./live-pegastour";
 import { normalizeProviderCollectionResult } from "./collection-contract";
+import type {
+  DynamicOtaCollectorConfig,
+} from "@/src/lib/hotels/runtime-manifest";
+import type { DynamicHotelRuntimeContext } from "@/src/lib/hotels/runtime-store";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
 import {
@@ -338,20 +342,21 @@ async function collectProviderQuotes(
 async function collectLiveProviderQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeCollectorConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   switch (provider.key) {
     case "check24":
-  return collectCheck24LiveQuotes(provider, scope);
+      return collectCheck24LiveQuotes(provider, scope, runtimeCollectorConfig);
     case "schauinsland":
     return collectSchauinslandLiveQuotes(provider, scope);
     case "anextour":
     return collectAnexTourLiveQuotes(provider, scope);
     case "booking":
-      return collectBookingLiveQuotes(provider, scope);
+      return collectBookingLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "expedia":
-      return collectExpediaLiveQuotes(provider, scope);
+      return collectExpediaLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "holidaycheck":
-      return collectHolidayCheckLiveQuotes(provider, scope);
+      return collectHolidayCheckLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "loveholidays":
       return collectLoveholidaysLiveQuotes(provider, scope);
     case "onthebeach":
@@ -363,7 +368,7 @@ async function collectLiveProviderQuotes(
     case "stayforlong":
       return collectStayforlongLiveQuotes(provider, scope);
     case "tui":
-      return collectTuiLiveQuotes(provider, scope);
+      return collectTuiLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "coraltravel":
   return collectCoralTravelLiveQuotes(provider, scope);
     default:
@@ -379,7 +384,19 @@ async function collectLiveProviderQuotes(
 export async function runBenchmarkJob(
   request: Partial<BenchmarkRequest> = {},
   collectLive: typeof collectLiveProviderQuotes = collectLiveProviderQuotes,
+  runtimeContext?: Pick<
+    DynamicHotelRuntimeContext,
+    | "catalog"
+    | "providers"
+    | "bookingConfigs"
+    | "check24Configs"
+    | "expediaConfigs"
+    | "holidaycheckConfigs"
+    | "tuiConfigs"
+  >,
 ) {
+  const scopeCatalog = runtimeContext?.catalog ?? REPORT_SCOPES;
+  const providerCatalog = runtimeContext?.providers ?? OTA_PROVIDERS;
   const resolvedRequest: BenchmarkRequest = {
     mode: request.mode ?? DEFAULT_REQUEST.mode,
     providerKeys: request.providerKeys ?? DEFAULT_REQUEST.providerKeys,
@@ -387,20 +404,20 @@ export async function runBenchmarkJob(
     customWindow: request.customWindow ?? DEFAULT_REQUEST.customWindow,
   };
 
-  const baseScopes = REPORT_SCOPES.filter((scope) =>
+  const baseScopes = scopeCatalog.filter((scope) =>
     resolvedRequest.scopeKeys.includes(scope.id),
   );
   const customWindowResult = applyCustomWindow(
     baseScopes,
     resolvedRequest.customWindow,
   );
-  const selectedProviders = OTA_PROVIDERS.filter((provider) =>
+  const selectedProviders = providerCatalog.filter((provider) =>
     resolvedRequest.providerKeys.includes(provider.key),
   );
   const plan = buildCollectionPlan(
     customWindowResult.scopes,
     selectedProviders,
-    REPORT_SCOPES,
+    scopeCatalog,
   );
   const selectedScopes = plan.scopes;
 
@@ -442,7 +459,23 @@ export async function runBenchmarkJob(
             };
           } else if (resolvedRequest.mode === "live") {
             executed = true;
-            result = await collectLive(provider, scope).catch((error) => {
+            const runtimeCollectorConfig =
+              provider.key === "booking"
+                ? runtimeContext?.bookingConfigs[scope.id]
+                : provider.key === "check24"
+                  ? runtimeContext?.check24Configs[scope.id]
+                : provider.key === "expedia"
+                  ? runtimeContext?.expediaConfigs[scope.id]
+                  : provider.key === "holidaycheck"
+                    ? runtimeContext?.holidaycheckConfigs[scope.id]
+                    : provider.key === "tui"
+                      ? runtimeContext?.tuiConfigs[scope.id]
+                  : undefined;
+            result = await collectLive(
+              provider,
+              scope,
+              runtimeCollectorConfig,
+            ).catch((error) => {
               const detail = `${provider.name}: ${error instanceof Error ? error.message.split("\n")[0] : "Bağlantı hatası"}`;
               return buildManualReviewQuotes(
                 provider,
@@ -534,11 +567,14 @@ export async function runBenchmarkJob(
     if (task.provider.key === "holidaycheck")
       existingHolidayCheck[task.scope.id] = collectionResults[index];
   });
+  const staticSelectedScopes = selectedScopes.filter((scope) =>
+    REPORT_SCOPES.some((candidate) => candidate.id === scope.id),
+  );
   const supplementary =
     resolvedRequest.mode === "live" &&
     process.env.OTA_HOLIDAYCHECK_SECONDARY !== "false"
       ? await collectHolidayCheckSecondary({
-          scopes: selectedScopes,
+          scopes: staticSelectedScopes,
           catalog: REPORT_SCOPES,
           providers: selectedProviders,
           quotes,
@@ -587,7 +623,7 @@ export async function runBenchmarkJob(
   const secondaryResults =
     resolvedRequest.mode === "live" && process.env.OTA_GOOGLE_HOTELS !== "false"
       ? await collectInBatches(
-          selectedScopes
+          staticSelectedScopes
             .filter((scope) => missingProviders(scope).length > 0)
             .map(
               (scope) => () =>

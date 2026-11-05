@@ -19,6 +19,16 @@ import {
   createPatchrightBrowserPage,
   type PatchrightBrowserOptions,
 } from "./patchright-browser";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
+
+function expediaCollectorConfig(
+  scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
+): DynamicOtaCollectorConfig {
+  const config = runtimeConfig ?? EXPEDIA_HOTEL_CONFIG[scope.hotelKey];
+  if (!config) throw new Error("Expedia otel eşleştirmesi eksik.");
+  return config;
+}
 
 export const EXPEDIA_ROOM_CARD_SELECTORS = [
   '[data-stid="section-room-list"] [data-stid^="property-offer-"]',
@@ -153,9 +163,11 @@ export function parseExpediaQuotes(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: ExpediaSnapshot,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): ProviderQuote[] {
   const debug = process.env.OTA_DEBUG === "true";
-  const requested = new URL(EXPEDIA_HOTEL_CONFIG[scope.hotelKey]!.pageUrl);
+  const config = expediaCollectorConfig(scope, runtimeConfig);
+  const requested = new URL(config.pageUrl);
   const actual = new URL(snapshot.url);
   const hotelId = requested.pathname.match(/\.h(\d+)\./)?.[1];
 
@@ -297,7 +309,7 @@ export function parseExpediaQuotes(
       const rank = namedRoomRank(
         room.id,
         card.name,
-        EXPEDIA_HOTEL_CONFIG[scope.hotelKey]?.roomAliases[room.id] ?? [],
+        config.roomAliases[room.id] ?? [],
       );
       return rank !== null ? [{ ...card, rank }] : [];
     });
@@ -447,6 +459,7 @@ async function resolveExpediaRoomCards(page: Page, timeoutMs = 30000) {
 export async function collectExpediaLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const quotes: ProviderQuote[] = [];
   const warnings: string[] = [];
@@ -454,7 +467,7 @@ export async function collectExpediaLiveQuotes(
     let handle:
       | Awaited<ReturnType<typeof createPatchrightBrowserPage>>
       | undefined;
-    const base = EXPEDIA_HOTEL_CONFIG[scope.hotelKey]?.pageUrl;
+    const base = runtimeConfig?.pageUrl ?? EXPEDIA_HOTEL_CONFIG[scope.hotelKey]?.pageUrl;
 
     const sourceHint = base
       ? buildExpediaUrl(base, scope, window.checkIn, window.checkOut)
@@ -630,7 +643,15 @@ const snapshot = await page.evaluate((roomCardSelector) => ({
   },
 });
 
-      quotes.push(...parseExpediaQuotes(provider, scope, window, snapshot));
+      quotes.push(
+        ...parseExpediaQuotes(
+          provider,
+          scope,
+          window,
+          snapshot,
+          runtimeConfig,
+        ),
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "";
       console.error(

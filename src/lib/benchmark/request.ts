@@ -1,5 +1,6 @@
 import { REPORT_SCOPES } from "./sample-data";
 import type { BenchmarkRequest } from "./types";
+import type { ProviderDescriptor, ReportScopeDefinition } from "./types";
 import { OTA_PROVIDERS } from "../ota/registry";
 
 export function todayInIstanbul(now = new Date()): string {
@@ -30,6 +31,8 @@ export function nightCount(checkIn: string, checkOut: string): number | null {
 export function parseBenchmarkRequest(
   value: unknown,
   today = todayInIstanbul(),
+  scopeCatalog: readonly ReportScopeDefinition[] = REPORT_SCOPES,
+  providerCatalog: readonly ProviderDescriptor[] = OTA_PROVIDERS,
 ): BenchmarkRequest {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("Geçerli bir sorgu gönderin.");
@@ -44,14 +47,14 @@ export function parseBenchmarkRequest(
   if (
     !validKeys(
       input.providerKeys,
-      OTA_PROVIDERS.map((provider) => provider.key),
+      providerCatalog.map((provider) => provider.key),
     )
   )
     throw new Error("En az bir geçerli OTA seçin.");
   if (
     !validKeys(
       input.scopeKeys,
-      REPORT_SCOPES.map((scope) => scope.id),
+      scopeCatalog.map((scope) => scope.id),
     )
   )
     throw new Error("En az bir geçerli otel ve pazar seçin.");

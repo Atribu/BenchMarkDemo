@@ -22,6 +22,10 @@ import {
   type ManagedHotelRecord,
 } from "./model";
 import { createHotelReadRepository } from "./repository";
+import {
+  buildDynamicHotelRuntimeManifest,
+  DynamicHotelRuntimeError,
+} from "./runtime-manifest";
 
 export type HotelManagementErrorKind =
   | "validation"
@@ -708,6 +712,18 @@ export class HotelManagementService {
         );
       }
       assertStatusRequirements(existing, input.status);
+      if (input.status === "active") {
+        try {
+          buildDynamicHotelRuntimeManifest(existing);
+        } catch (error) {
+          throw new HotelManagementError(
+            "conflict",
+            error instanceof DynamicHotelRuntimeError
+              ? `Otel aktifleştirilemez. ${error.message}`
+              : "Otel için güvenli bir dinamik collector manifesti üretilemedi.",
+          );
+        }
+      }
 
       const index = hotels.findIndex((hotel) => hotel.id === parsedId);
       if (index < 0)

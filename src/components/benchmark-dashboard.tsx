@@ -814,6 +814,8 @@ export function BenchmarkDashboard({
   const visibleHotels = HOTEL_CATALOG.filter((hotel) =>
     scopeCatalog.some((scope) => scope.hotelKey === hotel.key),
   );
+  const visibleHotelCount = new Set(scopeCatalog.map((scope) => scope.hotelKey))
+    .size;
   const [section, setSection] = useState<Section>("benchmark");
   const [report, setReport] = useState<BenchmarkRunResult | null>(null);
   const [selectedProviders, setSelectedProviders] = useState(
@@ -1075,7 +1077,7 @@ export function BenchmarkDashboard({
                   <span>Farkı yönetin.</span>
                 </h1>
                 <p className="heroLead">
-                  {visibleHotels.length} otel. Tek bakış. Seçtiğiniz tarihlerdeki
+                  {visibleHotelCount} otel. Tek bakış. Seçtiğiniz tarihlerdeki
                   <br className="desktopBreak" /> uçaksız OTA fiyatlarını aynı
                   raporda karşılaştırın.
                 </p>
@@ -1484,7 +1486,8 @@ export function BenchmarkDashboard({
                       <header className="scopeHeading">
                         <div>
                           <span className="hotelIndex">
-                            {getHotelDefinition(scope.hotelKey).shortCode}
+                            {scope.hotelShortCode ??
+                              getHotelDefinition(scope.hotelKey).shortCode}
                           </span>
                           <div>
                             <h3>{scope.hotelName}</h3>

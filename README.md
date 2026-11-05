@@ -377,4 +377,30 @@ oldugunu veya canli fiyat dondurecegini garanti etmez.
 
 Bu adim kullanici otelinin kanal konfigurasyonunu kalici hale getirir; mevcut
 collector'larin statik sistem oteli ayarlarini degistirmez. Dinamik kaydin
-collector calisma zamaninda kullanilmasi ayri bir entegrasyon adimidir.
+collector calisma zamaninda kullanilmasi `src/lib/hotels/runtime-manifest.ts`
+ve `runtime-store.ts` sinirlarinda yapilir. Desteklenen dinamik collector'lar
+Booking.com, CHECK24 Almanya/EUR, Expedia, HolidayCheck ve TUI Almanya/EUR'dur. Otelin `active` durumuna gecebilmesi
+icin her pazarda bu kanallardan en az birinin dogrulanmis sayfa adresi ve otelde rapora
+giren her oda icin en az bir alias gerekir. Manifest uretilemezse aktivasyon
+kapali bicimde reddedilir.
+
+Aktif kullanici otellerinin pazar ve oda kayitlari sunucu tarafinda mevcut
+statik rapor kataloguyla birlestirilir. Yalnizca manifestte desteklenen OTA,
+ilgili dinamik scope'a eklenir; diger OTA'lar veya Google/HolidayCheck ikincil
+kaynaklari statik konfigurasyon olmadan dinamik otel icin calistirilmaz.
+Booking, CHECK24, Expedia, HolidayCheck ve TUI collector'lari sayfa adresi, oda alias'lari
+ve gerektiginde oda eslestirme politikasini manifestten
+alir. Mevcut sistem otelleri ise ayni statik `live-config.ts` yolunu kullanmaya
+devam eder.
+
+Dinamik CHECK24 eslestirmesinde CHECK24 sayfa adresi, sayisal otel kimligi
+(`externalHotelId`) ve tum rapor odalari icin alias zorunludur. Yalnizca EUR
+pazari calistirilabilir sayilir. Modern `hotels.check24.de/accommodation/...`
+adresi verilirse accommodation kimligi ve slug URL'den alinir; aksi halde
+dogrulanmis sayisal kimlikle tarihli eski otel arama yolu kullanilir.
+
+Dinamik TUI eslestirmesinde TUI Almanya sayfa adresi, sayisal GIATA kimligi
+(`externalHotelId`) ve tum rapor odalari icin alias zorunludur. Pazar EUR
+degilse eslestirme calistirilabilir sayilmaz. TUI UK/GBP akisinda gereken ek
+urun ve pazar kimlikleri bu adima dahil edilmemistir; bu nedenle eksik bir UK
+eslestirmesi aktivasyonu yanlislikla gecemez.

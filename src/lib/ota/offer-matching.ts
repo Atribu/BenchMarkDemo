@@ -9,6 +9,7 @@ import type {
 } from "../benchmark/types";
 import { getHotelDefinition } from "../hotels/catalog";
 import { hasCompatibleView } from "./room-matching";
+import type { ManagedHotelMatchingPolicy } from "../hotels/model";
 
 export type RoomAliasMap = Readonly<Record<string, readonly string[]>>;
 
@@ -81,8 +82,9 @@ export function classifyRoom(name: string, details = ""): RoomFeatures {
 export function matchOfferRoom(
   scope: ReportScopeDefinition,
   features: RoomFeatures,
+  runtimePolicy?: ManagedHotelMatchingPolicy,
 ) {
-  const policy = getHotelDefinition(scope.hotelKey).matchingPolicy;
+  const policy = runtimePolicy ?? getHotelDefinition(scope.hotelKey).matchingPolicy;
   if (features.category === "variant")
     return { matchReason: "Ekonomi, aile veya farklı oda kategorisi." };
   if (features.view === "partial-sea" && !policy.roomByView["partial-sea"])
@@ -117,6 +119,7 @@ export function resolveRoomMatch(
   roomName: string,
   aliases: RoomAliasMap = {},
   details = "",
+  runtimePolicy?: ManagedHotelMatchingPolicy,
 ): ResolvedRoomMatch {
   const roomFeatures = classifyRoom(roomName, details);
   const normalizedRoomName = normalize(roomName);
@@ -136,7 +139,10 @@ export function resolveRoomMatch(
 
   const exactRoomId = exactRoomIds[0];
   if (!exactRoomId) {
-    return { roomFeatures, ...matchOfferRoom(scope, roomFeatures) };
+    return {
+      roomFeatures,
+      ...matchOfferRoom(scope, roomFeatures, runtimePolicy),
+    };
   }
 
   if (!scope.rooms.some((room) => room.id === exactRoomId)) {
@@ -146,7 +152,7 @@ export function resolveRoomMatch(
     };
   }
 
-  const policy = getHotelDefinition(scope.hotelKey).matchingPolicy;
+  const policy = runtimePolicy ?? getHotelDefinition(scope.hotelKey).matchingPolicy;
   const expectedViews = Object.entries(policy.roomByView)
     .filter(([, roomId]) => roomId === exactRoomId)
     .map(([view]) => view);
