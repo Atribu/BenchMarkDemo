@@ -7,7 +7,8 @@ import type {
   ReportScopeDefinition,
   RoomFeatures,
 } from "../benchmark/types";
-import { classifyRoom } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
+import { classifyRoom, resolveRoomMatch } from "./offer-matching";
 
 const STAYFORLONG_ORIGIN = "https://www.stayforlong.de";
 const API_ORIGIN = "https://gw.stayforlong.de";
@@ -47,6 +48,8 @@ export interface StayforlongOffer {
   rooms: 1;
   providerCode: string;
   matchedRoomId?: string;
+  matchedRoomFeatures?: RoomFeatures;
+  matchReason?: string;
 }
 
 export interface VerifiedStayforlongOffer {
@@ -337,6 +340,7 @@ async function verifyOffer(
 }
 
 function roomFeatures(offer: StayforlongOffer): RoomFeatures {
+  if (offer.matchedRoomFeatures) return offer.matchedRoomFeatures;
   if (offer.matchedRoomId === "standard-land")
     return { category: "standard", view: "land", balcony: "unknown" };
   if (offer.matchedRoomId === "standard-side-sea")
@@ -350,12 +354,36 @@ function roomFeatures(offer: StayforlongOffer): RoomFeatures {
   return classifyRoom(offer.roomName, offer.roomCode);
 }
 
+export function applyDynamicStayforlongRoomMatch(
+  offers: StayforlongOffer[],
+  scope: ReportScopeDefinition,
+  runtimeConfig: DynamicOtaCollectorConfig,
+): StayforlongOffer[] {
+  return offers.map((offer) => {
+    const match = resolveRoomMatch(
+      scope,
+      offer.roomName,
+      runtimeConfig.roomAliases,
+      offer.roomCode,
+      runtimeConfig.matchingPolicy,
+    );
+    return {
+      ...offer,
+      matchedRoomId: match.matchedRoomId,
+      matchedRoomFeatures: match.roomFeatures,
+      matchReason: match.matchReason,
+    };
+  });
+}
+
 export async function collectStayforlongLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
   fetchImpl: typeof fetch = fetch,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const config =
+    runtimeConfig?.stayforlong ??
     STAYFORLONG_HOTEL_CONFIG[scope.hotelKey as StayforlongHotelKey];
   if (!config || scope.currency !== "EUR") {
     const reason = "Stayforlong Almanya için bu otel/EUR eşleştirmesi doğrulanmadı.";
@@ -390,12 +418,19 @@ export async function collectStayforlongLiveQuotes(
         fetchImpl,
         buildStayforlongAvailabilityUrl(config.propertyId, window),
       );
-      const candidates = parseStayforlongOffers(
+      const parsedCandidates = parseStayforlongOffers(
         data,
         config.propertyId,
         scope.hotelKey as StayforlongHotelKey,
         window.nights,
       );
+      const candidates = runtimeConfig
+        ? applyDynamicStayforlongRoomMatch(
+            parsedCandidates,
+            scope,
+            runtimeConfig,
+          )
+        : parsedCandidates;
       const groups = new Map<string, StayforlongOffer[]>();
       for (const candidate of candidates) {
         const key = candidate.matchedRoomId ?? "unmatched";
@@ -440,8 +475,10 @@ export async function collectStayforlongLiveQuotes(
                 observedAt,
                 matchedRoomId: candidate.matchedRoomId,
                 matchReason: candidate.matchedRoomId
-                  ? `Stayforlong oda adı ve kodu ${candidate.matchedRoomId} kategorisiyle eşleşti.`
-                  : "Stayforlong teklifi doğrulandı ancak oda kategorisi güvenle eşleştirilemedi.",
+                  ? candidate.matchReason ??
+                    `Stayforlong oda adı ve kodu ${candidate.matchedRoomId} kategorisiyle eşleşti.`
+                  : candidate.matchReason ??
+                    "Stayforlong teklifi doğrulandı ancak oda kategorisi güvenle eşleştirilemedi.",
                 sourceOfferId: candidate.availabilityId,
                 sourceProductCode: candidate.normalizedRoomCode,
                 sourceTravelType: "Accommodation",

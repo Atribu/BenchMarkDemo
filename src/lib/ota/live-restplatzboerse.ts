@@ -7,7 +7,8 @@ import type {
   ReportScopeDefinition,
   RoomFeatures,
 } from "../benchmark/types";
-import { classifyRoom } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
+import { classifyRoom, resolveRoomMatch } from "./offer-matching";
 
 const RESTPLATZBOERSE_ORIGIN = "https://www.restplatzboerse.at";
 const FLUX_ORIGIN = "https://ibe.flux.reisen";
@@ -52,6 +53,8 @@ export interface RestplatzboerseOffer {
   operatorCode: string;
   operatorName: string;
   matchedRoomId?: string;
+  matchedRoomFeatures?: RoomFeatures;
+  matchReason?: string;
 }
 
 type ExpectedStay = {
@@ -425,6 +428,7 @@ async function verifyOffer(
 }
 
 function roomFeatures(offer: RestplatzboerseOffer): RoomFeatures {
+  if (offer.matchedRoomFeatures) return offer.matchedRoomFeatures;
   if (offer.matchedRoomId === "standard-land")
     return { category: "standard", view: "land", balcony: "unknown" };
   if (offer.matchedRoomId === "standard-side-sea")
@@ -438,15 +442,37 @@ function roomFeatures(offer: RestplatzboerseOffer): RoomFeatures {
   return classifyRoom(offer.roomName, offer.roomView);
 }
 
+export function applyDynamicRestplatzboerseRoomMatch(
+  offers: RestplatzboerseOffer[],
+  scope: ReportScopeDefinition,
+  runtimeConfig: DynamicOtaCollectorConfig,
+): RestplatzboerseOffer[] {
+  return offers.map((offer) => {
+    const match = resolveRoomMatch(
+      scope,
+      offer.roomName,
+      runtimeConfig.roomAliases,
+      `${offer.roomCode} ${offer.roomType} ${offer.roomView}`,
+      runtimeConfig.matchingPolicy,
+    );
+    return {
+      ...offer,
+      matchedRoomId: match.matchedRoomId,
+      matchedRoomFeatures: match.roomFeatures,
+      matchReason: match.matchReason,
+    };
+  });
+}
+
 export async function collectRestplatzboerseLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
   fetchImpl: typeof fetch = fetch,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const config =
-    RESTPLATZBOERSE_HOTEL_CONFIG[
-      scope.hotelKey as RestplatzboerseHotelKey
-    ];
+    runtimeConfig?.restplatzboerse ??
+    RESTPLATZBOERSE_HOTEL_CONFIG[scope.hotelKey as RestplatzboerseHotelKey];
   if (!config || scope.currency !== "EUR") {
     return {
       quotes: scope.rooms.flatMap((room) =>
@@ -487,11 +513,18 @@ export async function collectRestplatzboerseLiveQuotes(
         checkOut: window.checkOut,
         nights: window.nights,
       };
-      const candidates = await fetchAllOffers(
+      const parsedCandidates = await fetchAllOffers(
         fetchImpl,
         buildRestplatzboersePayload(config.hotelIffCode, window),
         expected,
       );
+      const candidates = runtimeConfig
+        ? applyDynamicRestplatzboerseRoomMatch(
+            parsedCandidates,
+            scope,
+            runtimeConfig,
+          )
+        : parsedCandidates;
       const groups = new Map<string, RestplatzboerseOffer[]>();
       for (const candidate of candidates) {
         const key = candidate.matchedRoomId ?? "unmatched";
@@ -536,8 +569,10 @@ export async function collectRestplatzboerseLiveQuotes(
               observedAt,
               matchedRoomId: candidate.matchedRoomId,
               matchReason: candidate.matchedRoomId
-                ? `Restplatzbörse oda kodu ve manzara alanı ${candidate.matchedRoomId} kategorisiyle eşleşti.`
-                : "Restplatzbörse teklifi doğrulandı ancak oda manzarası güvenle eşleştirilemedi.",
+                ? candidate.matchReason ??
+                  `Restplatzbörse oda kodu ve manzara alanı ${candidate.matchedRoomId} kategorisiyle eşleşti.`
+                : candidate.matchReason ??
+                  "Restplatzbörse teklifi doğrulandı ancak oda manzarası güvenle eşleştirilemedi.",
               sourceOfferId: candidate.offerId,
               sourceProductCode: candidate.offerCode,
               sourceTravelType: "Accommodation",

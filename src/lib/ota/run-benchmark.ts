@@ -348,9 +348,9 @@ async function collectLiveProviderQuotes(
     case "check24":
       return collectCheck24LiveQuotes(provider, scope, runtimeCollectorConfig);
     case "schauinsland":
-    return collectSchauinslandLiveQuotes(provider, scope);
+      return collectSchauinslandLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "anextour":
-    return collectAnexTourLiveQuotes(provider, scope);
+    return collectAnexTourLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "booking":
       return collectBookingLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "expedia":
@@ -358,19 +358,39 @@ async function collectLiveProviderQuotes(
     case "holidaycheck":
       return collectHolidayCheckLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "loveholidays":
-      return collectLoveholidaysLiveQuotes(provider, scope);
+      return collectLoveholidaysLiveQuotes(
+        provider,
+        scope,
+        undefined,
+        runtimeCollectorConfig,
+      );
     case "onthebeach":
-      return collectOnTheBeachLiveQuotes(provider, scope);
+      return collectOnTheBeachLiveQuotes(
+        provider,
+        scope,
+        undefined,
+        runtimeCollectorConfig,
+      );
     case "pegastour":
-      return collectPegasTourLiveQuotes(provider, scope);
+      return collectPegasTourLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "restplatzboerse":
-      return collectRestplatzboerseLiveQuotes(provider, scope);
+      return collectRestplatzboerseLiveQuotes(
+        provider,
+        scope,
+        fetch,
+        runtimeCollectorConfig,
+      );
     case "stayforlong":
-      return collectStayforlongLiveQuotes(provider, scope);
+      return collectStayforlongLiveQuotes(
+        provider,
+        scope,
+        fetch,
+        runtimeCollectorConfig,
+      );
     case "tui":
       return collectTuiLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "coraltravel":
-  return collectCoralTravelLiveQuotes(provider, scope);
+      return collectCoralTravelLiveQuotes(provider, scope, runtimeCollectorConfig);
     default:
       return buildManualReviewQuotes(
         provider,
@@ -388,10 +408,18 @@ export async function runBenchmarkJob(
     DynamicHotelRuntimeContext,
     | "catalog"
     | "providers"
+    | "anextourConfigs"
     | "bookingConfigs"
     | "check24Configs"
+    | "coraltravelConfigs"
     | "expediaConfigs"
     | "holidaycheckConfigs"
+    | "loveholidaysConfigs"
+    | "onthebeachConfigs"
+    | "pegastourConfigs"
+    | "restplatzboerseConfigs"
+    | "schauinslandConfigs"
+    | "stayforlongConfigs"
     | "tuiConfigs"
   >,
 ) {
@@ -460,16 +488,32 @@ export async function runBenchmarkJob(
           } else if (resolvedRequest.mode === "live") {
             executed = true;
             const runtimeCollectorConfig =
-              provider.key === "booking"
+              provider.key === "anextour"
+                ? runtimeContext?.anextourConfigs[scope.id]
+                : provider.key === "booking"
                 ? runtimeContext?.bookingConfigs[scope.id]
                 : provider.key === "check24"
                   ? runtimeContext?.check24Configs[scope.id]
+                : provider.key === "coraltravel"
+                  ? runtimeContext?.coraltravelConfigs?.[scope.id]
                 : provider.key === "expedia"
                   ? runtimeContext?.expediaConfigs[scope.id]
                   : provider.key === "holidaycheck"
                     ? runtimeContext?.holidaycheckConfigs[scope.id]
+                    : provider.key === "loveholidays"
+                      ? runtimeContext?.loveholidaysConfigs[scope.id]
+                      : provider.key === "onthebeach"
+                        ? runtimeContext?.onthebeachConfigs[scope.id]
+                        : provider.key === "pegastour"
+                          ? runtimeContext?.pegastourConfigs[scope.id]
+                    : provider.key === "restplatzboerse"
+                      ? runtimeContext?.restplatzboerseConfigs[scope.id]
                     : provider.key === "tui"
                       ? runtimeContext?.tuiConfigs[scope.id]
+                      : provider.key === "schauinsland"
+                        ? runtimeContext?.schauinslandConfigs[scope.id]
+                        : provider.key === "stayforlong"
+                          ? runtimeContext?.stayforlongConfigs[scope.id]
                   : undefined;
             result = await collectLive(
               provider,

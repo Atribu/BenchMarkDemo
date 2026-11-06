@@ -26,6 +26,7 @@ import {
   resolveRoomMatch,
   selectOfferQuotes,
 } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 // Verified through the hotel's public "Hotel Only" navigation, not name guessing.
 const HOTEL_IDS: Partial<Record<ReportScopeDefinition["hotelKey"], string>> = {
@@ -110,8 +111,10 @@ async function assertNoLoveholidaysBotChallenge(page: Page) {
 export function buildLoveholidaysUrl(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ) {
-  const masterId = HOTEL_IDS[scope.hotelKey];
+  const masterId =
+    runtimeConfig?.loveholidays?.masterId ?? HOTEL_IDS[scope.hotelKey];
   if (!masterId)
     throw new Error("Loveholidays hotel-only otel kimligi henuz dogrulanmadi.");
   const url = new URL(
@@ -133,9 +136,10 @@ export function parseLoveholidaysOffers(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: LoveholidaysSnapshot,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
   const url = new URL(snapshot.url);
-  const expected = new URL(buildLoveholidaysUrl(scope, window));
+  const expected = new URL(buildLoveholidaysUrl(scope, window, runtimeConfig));
   const date = new Intl.DateTimeFormat(
     scope.currency === "EUR" ? "de-DE" : "en-GB",
     {
@@ -163,7 +167,7 @@ export function parseLoveholidaysOffers(
       (key) => url.searchParams.get(key) !== expected.searchParams.get(key),
     ) ||
     normalizeInlineText(snapshot.hotelName).toLowerCase() !==
-      scope.hotelName.toLowerCase() ||
+      normalizeInlineText(runtimeConfig?.cardName ?? scope.hotelName).toLowerCase() ||
     normalizeInlineText(snapshot.checkInLabel)
       .replace(/,/g, "")
       .replace(/\b0(\d)\b/g, "$1") !== date.replace(/\b0(\d)\b/g, "$1") ||
@@ -197,7 +201,10 @@ export function parseLoveholidaysOffers(
 const { roomFeatures, ...roomMatch } = resolveRoomMatch(
   scope,
   offer.name,
-  LOVEHOLIDAYS_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+  runtimeConfig?.roomAliases ??
+    LOVEHOLIDAYS_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+  "",
+  runtimeConfig?.matchingPolicy,
 );
 
 offers.push({
@@ -243,12 +250,13 @@ export function parseLoveholidaysQuotes(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: LoveholidaysSnapshot,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): ProviderQuote[] {
   return selectOfferQuotes(
     provider,
     scope,
     window,
-    parseLoveholidaysOffers(provider, scope, window, snapshot),
+    parseLoveholidaysOffers(provider, scope, window, snapshot, runtimeConfig),
     snapshot.url,
   );
 }
@@ -272,6 +280,7 @@ export async function collectLoveholidaysLiveQuotes(
   scope: ReportScopeDefinition,
   createPage: typeof createLoveholidaysBrowserPage =
     createLoveholidaysBrowserPage,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   
   const quotes: ProviderQuote[] = [];
@@ -295,7 +304,7 @@ await page.waitForTimeout(3000 + Math.random() * 2000);
     for (const window of scope.windows) {
       let sourceHint = "";
       try {
-        sourceHint = buildLoveholidaysUrl(scope, window);
+        sourceHint = buildLoveholidaysUrl(scope, window, runtimeConfig);
         const page = handle.page;
         page.setDefaultTimeout(10000);
         const response = await page.goto(sourceHint, {
@@ -441,7 +450,10 @@ console.log("[Loveholidays] Final room option count:", await options.count());
         const snapshot: LoveholidaysSnapshot = {
           url: page.url(),
           hotelName: await page
-            .getByRole("button", { name: scope.hotelName, exact: true })
+            .getByRole("button", {
+              name: runtimeConfig?.cardName ?? scope.hotelName,
+              exact: true,
+            })
             .getByRole("heading")
             .innerText(),
           checkInLabel: await page
@@ -464,6 +476,7 @@ console.log("[Loveholidays] Final room option count:", await options.count());
           scope,
           window,
           snapshot,
+          runtimeConfig,
         );
         offers.push(...windowOffers);
         quotes.push(

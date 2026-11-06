@@ -105,30 +105,68 @@ function providerPageUrl(
   providerKey: string,
 ): string | undefined {
   if (value === undefined || value === "") return undefined;
+
   const raw = text(value, "Kanal sayfa adresi", 1, 2000);
+
   let url: URL;
   let template: URL;
+
   try {
     url = new URL(raw);
+
     const descriptor = provider(providerKey);
-    if (!descriptor?.searchTemplate)
+
+    if (!descriptor?.searchTemplate) {
       throw new Error("Provider template missing");
+    }
+
     template = new URL(descriptor.searchTemplate);
   } catch {
-    throw new Error("Kanal sayfa adresi geçerli bir HTTPS adresi olmalıdır.");
+    throw new Error(
+      "Kanal sayfa adresi geçerli bir HTTPS adresi olmalıdır.",
+    );
   }
-  const root =
-    providerKey === "check24"
-      ? "check24.de"
-      : template.hostname.toLowerCase().replace(/^www\./, "");
+
+  const providerDomains: Record<string, string[]> = {
+    expedia: [
+      "expedia.com",
+      "expedia.de",
+      "expedia.co.uk",
+    ],
+    booking: [
+      "booking.com",
+    ],
+    check24: [
+      "check24.de",
+    ],
+  };
+
+  const defaultDomain = template.hostname
+    .toLowerCase()
+    .replace(/^www\./, "");
+
+  const allowedDomains =
+    providerDomains[providerKey] ?? [defaultDomain];
+
   const hostname = url.hostname.toLowerCase();
+
+  const isAllowedDomain = allowedDomains.some(
+    (domain) =>
+      hostname === domain ||
+      hostname.endsWith(`.${domain}`),
+  );
+
   if (
     url.protocol !== "https:" ||
     url.username ||
     url.password ||
-    (hostname !== root && !hostname.endsWith(`.${root}`))
-  )
-    throw new Error("Kanal sayfa adresi seçilen OTA alan adına ait olmalıdır.");
+    !isAllowedDomain
+  ) {
+    throw new Error(
+      "Kanal sayfa adresi seçilen OTA alan adına ait olmalıdır.",
+    );
+  }
+
   return url.toString();
 }
 

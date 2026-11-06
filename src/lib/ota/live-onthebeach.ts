@@ -25,6 +25,7 @@ import {
 } from "./offer-matching";
 import { assertPricePageAccessible } from "./browser-diagnostics";
 import { ONTHEBEACH_HOTEL_CONFIG } from "./live-config";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 const SEARCH_URL = "https://www.onthebeach.co.uk/hotels-in";
 const DESTINATION = "Antalya (Alanya, Belek, Lara Beach, Side), Turkey";
@@ -46,16 +47,23 @@ export interface OnTheBeachSnapshot {
 
 export function resolveOnTheBeachCardName(
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): string {
   return (
-    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.cardName ?? scope.hotelName
+    runtimeConfig?.onthebeach?.cardName ??
+    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.cardName ??
+    scope.hotelName
   ).trim();
 }
 
 export function resolveOnTheBeachPropertyId(
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): string | undefined {
-  return ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.propertyId;
+  return (
+    runtimeConfig?.onthebeach?.propertyId ??
+    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.propertyId
+  );
 }
 
 function dateLabel(date: string) {
@@ -72,6 +80,7 @@ export function parseOnTheBeachOffers(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: OnTheBeachSnapshot,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
   const url = new URL(snapshot.sourceUrl);
   if (
@@ -108,7 +117,10 @@ export function parseOnTheBeachOffers(
 const { roomFeatures, ...roomMatch } = resolveRoomMatch(
   scope,
   roomName,
-  ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+  runtimeConfig?.roomAliases ??
+    ONTHEBEACH_HOTEL_CONFIG[scope.hotelKey]?.roomAliases,
+  "",
+  runtimeConfig?.matchingPolicy,
 );
 
 offers.push({
@@ -145,12 +157,13 @@ export function parseOnTheBeachQuotes(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   snapshot: OnTheBeachSnapshot,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): ProviderQuote[] {
   return selectOfferQuotes(
     provider,
     scope,
     window,
-    parseOnTheBeachOffers(provider, scope, window, snapshot),
+    parseOnTheBeachOffers(provider, scope, window, snapshot, runtimeConfig),
     snapshot.sourceUrl,
   );
 }
@@ -202,6 +215,7 @@ async function runHotelSearch(
   scope: ReportScopeDefinition,
   window: BenchmarkWindowDefinition,
   onStep: (step: string) => void,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<OnTheBeachSnapshot> {
   if (window.nights < 2 || window.nights > 28)
     throw new Error(
@@ -478,7 +492,7 @@ onStep("Hotel Only Antalya destinasyonunu seçme");
 const antalyaOption = page
   .locator("button.input-select__option")
   .filter({
-    hasText: DESTINATION,
+    hasText: runtimeConfig?.onthebeach?.destination ?? DESTINATION,
   });
 
 await antalyaOption.waitFor({
@@ -824,8 +838,8 @@ await assertSearchAccessible(page);
 // render a different public name (for example SY Hotels Boutique Luxury).
 // Filtering and DOM verification must use the supplier name; the final
 // snapshot keeps the canonical name so strict report validation still works.
-const targetHotelName = resolveOnTheBeachCardName(scope);
-const targetHotelId = resolveOnTheBeachPropertyId(scope);
+const targetHotelName = resolveOnTheBeachCardName(scope, runtimeConfig);
+const targetHotelId = resolveOnTheBeachPropertyId(scope, runtimeConfig);
 const filteredResultsUrl = new URL(page.url());
 filteredResultsUrl.searchParams.set("filters[hotel_name]", targetHotelName);
 filteredResultsUrl.searchParams.set("pagination[page]", "1");
@@ -1313,6 +1327,7 @@ dependencies: {
   createPage?: typeof createOnTheBeachBrowserPage;
   search?: typeof runHotelSearch;
 } = {},
+runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const quotes: ProviderQuote[] = [];
   const warnings: string[] = [];
@@ -1342,12 +1357,14 @@ handle = await (
     checkOut: window.checkOut,
   });
 },
+        runtimeConfig,
       );
       const windowOffers = parseOnTheBeachOffers(
         provider,
         scope,
         window,
         snapshot,
+        runtimeConfig,
       );
 
       console.log("[OnTheBeach] Offer parsing:", {

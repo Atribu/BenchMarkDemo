@@ -108,6 +108,56 @@ test("Coral Travel maps the verified Beach corner room and uses total price", ()
   });
 });
 
+test("Coral Travel uses the dynamic GIATA identity and room aliases", () => {
+  const dynamicOffer = offer({
+    hotelOffer: {
+      ...offer().hotelOffer,
+      hotel: { giata: { hotelId: "998877" } },
+      roomType: {
+        originalCode: "DYN-STD",
+        originalName: "Dynamic Standard Land View",
+      },
+    },
+  });
+  const [parsed] = coralTravel.parseOffers(
+    { offerList: [dynamicOffer] },
+    provider,
+    {
+      ...scope,
+      rooms: [
+        {
+          id: "dynamic-land",
+          name: "Dinamik Kara Manzaralı",
+          occupancyLabel: "1 oda · 2 yetişkin",
+          referenceRates: {},
+        },
+      ],
+    },
+    window,
+    "https://coraltravel.de/offers/",
+    {
+      pageUrl: "https://coraltravel.de/hotels/dynamic-hotel/",
+      roomAliases: {
+        "dynamic-land": ["Dynamic Standard Land View"],
+      },
+      matchingPolicy: {
+        category: "standard",
+        requireBalcony: false,
+        roomByView: { land: "dynamic-land" },
+      },
+      coraltravel: {
+        market: "de",
+        giataId: "998877",
+        searchQuery: "Dynamic Hotel",
+        suggestion: "Dynamic Hotel",
+      },
+    },
+  );
+
+  assert.equal(parsed.matchedRoomId, "dynamic-land");
+  assert.equal(parsed.sourceProductCode, "DYN-STD");
+});
+
 test("Coral Travel accepts only the expected hotel-only COR offer contract", () => {
   const invalidOffers = [
     offer({ productType: "pauschal" }),

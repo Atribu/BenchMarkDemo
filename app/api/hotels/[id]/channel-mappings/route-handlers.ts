@@ -102,6 +102,7 @@ export function createChannelMappingRouteHandlers(
             { error: error.message },
             { status: errorStatus(error.kind), headers: responseHeaders },
           );
+          console.error("[ChannelMappings] Create failed:", error);
         return NextResponse.json(
           { error: "OTA kanal eşleştirmesi eklenemedi." },
           { status: 503, headers: responseHeaders },

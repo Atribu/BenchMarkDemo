@@ -17,10 +17,18 @@ export interface DynamicHotelRuntimeContext {
   scopes: ReportScopeDefinition[];
   catalog: ReportScopeDefinition[];
   providers: ProviderDescriptor[];
+  anextourConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   bookingConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   check24Configs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  coraltravelConfigs?: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   expediaConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   holidaycheckConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  loveholidaysConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  onthebeachConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  pegastourConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  restplatzboerseConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  schauinslandConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  stayforlongConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   tuiConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
 }
 
@@ -32,7 +40,20 @@ export async function loadDynamicHotelRuntimeContext(
     .map(buildDynamicHotelRuntimeManifest);
   const scopes = manifests.flatMap((manifest) => manifest.scopes);
   const configsFor = (
-    providerKey: "booking" | "check24" | "expedia" | "holidaycheck" | "tui",
+    providerKey:
+      | "anextour"
+      | "booking"
+      | "check24"
+      | "coraltravel"
+      | "expedia"
+      | "holidaycheck"
+      | "loveholidays"
+      | "onthebeach"
+      | "pegastour"
+      | "restplatzboerse"
+      | "schauinsland"
+      | "stayforlong"
+      | "tui",
   ) =>
     Object.assign(
       {},
@@ -45,10 +66,18 @@ export async function loadDynamicHotelRuntimeContext(
     scopes,
     catalog: [...REPORT_SCOPES, ...scopes],
     providers: addDynamicScopesToProviders(OTA_PROVIDERS, manifests),
+    anextourConfigs: configsFor("anextour"),
     bookingConfigs: configsFor("booking"),
     check24Configs: configsFor("check24"),
+    coraltravelConfigs: configsFor("coraltravel"),
     expediaConfigs: configsFor("expedia"),
     holidaycheckConfigs: configsFor("holidaycheck"),
+    loveholidaysConfigs: configsFor("loveholidays"),
+    onthebeachConfigs: configsFor("onthebeach"),
+    pegastourConfigs: configsFor("pegastour"),
+    restplatzboerseConfigs: configsFor("restplatzboerse"),
+    schauinslandConfigs: configsFor("schauinsland"),
+    stayforlongConfigs: configsFor("stayforlong"),
     tuiConfigs: configsFor("tui"),
   };
 }

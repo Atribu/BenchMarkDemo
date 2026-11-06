@@ -8,10 +8,12 @@ import type {
 import { createPatchrightBrowserPage } from "./patchright-browser";
 import { buildManualReviewQuotes } from "./live-helpers";
 import { deduplicateOffers, selectOfferQuotes } from "./offer-matching";
+import { resolveRoomMatch } from "./offer-matching";
 import { matchCoralTravelRoom } from "./coraltravel-rooms";
 import { searchCoralTravel } from "./coraltravel-search";
 import { createHash } from "node:crypto";
 import { CORALTRAVEL_HOTEL_CONFIG } from "./live-config";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 const HOME = "https://coraltravel.de/";
 const HOME_RU = "https://www.coral.ru/";
@@ -66,6 +68,27 @@ type CoralRuPayload = {
   };
 };
 
+export function matchCoralRuntimeRoom(
+  scope: ReportScopeDefinition,
+  roomCode: string,
+  roomName: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
+) {
+  if (!runtimeConfig) return matchCoralTravelRoom(scope, roomCode, roomName);
+  const resolved = resolveRoomMatch(
+    scope,
+    roomName,
+    runtimeConfig.roomAliases,
+    roomCode,
+    runtimeConfig.matchingPolicy,
+  );
+  return {
+    features: resolved.roomFeatures,
+    matchedRoomId: resolved.matchedRoomId,
+    reason: resolved.matchReason,
+  };
+}
+
 function coralRuIsoDate(value: string): string {
   return `${value}T00:00:00Z`;
 }
@@ -73,8 +96,17 @@ function coralRuIsoDate(value: string): string {
 function buildCoralRuSearchCriteria(
   scope: ReportScopeDefinition,
   window: ReportScopeDefinition["windows"][number],
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CoralRuSearchCriteria {
-  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const staticConfig = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const config =
+    runtimeCoral?.market === "ru"
+      ? {
+          hotelName: runtimeCoral.hotelName,
+          ruLocation: runtimeCoral.location,
+        }
+      : staticConfig;
   const location = config?.ruLocation;
   if (!config || !location) {
     throw new Error("Coral Travel Rusya otel konum kimliği eksik.");
@@ -115,8 +147,13 @@ function validateCoralRuDecryptedSearch(
   response: unknown,
   scope: ReportScopeDefinition,
   window: ReportScopeDefinition["windows"][number],
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): boolean {
-  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const config =
+    runtimeCoral?.market === "ru"
+      ? { ruLocation: runtimeCoral.location }
+      : CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
   const result = response as {
     result?: {
       searchCriterias?: {
@@ -157,8 +194,16 @@ function parseCoralRuOffers(
   scope: ReportScopeDefinition,
   window: ReportScopeDefinition["windows"][number],
   sourceHint: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
-  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const config =
+    runtimeCoral?.market === "ru"
+      ? {
+          hotelName: runtimeCoral.hotelName,
+          ruLocation: runtimeCoral.location,
+        }
+      : CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
   const result = (response as CoralRuPayload)?.result;
   if (!config?.ruLocation || !result?.products) return [];
   const expectedHotel = normalizeCoralRuName(config.hotelName);
@@ -190,7 +235,12 @@ function parseCoralRuOffers(
       if (!/all[\s-]*inclusive|все\s+включено|ультра|премиум/i.test(board)) {
         continue;
       }
-      const match = matchCoralTravelRoom(scope, sourceRoom.roomKey ?? "", roomName);
+      const match = matchCoralRuntimeRoom(
+        scope,
+        sourceRoom.roomKey ?? "",
+        roomName,
+        runtimeConfig,
+      );
       offers.push({
         id: `coraltravel-ru:${scope.id}:${window.id}:${productIndex}:${offerIndex}`,
         sourceProductCode: sourceRoom.roomKey,
@@ -228,8 +278,18 @@ function parseCoralRuOffers(
 async function collectCoralRuLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
-  const config = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const staticConfig = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const config =
+    runtimeCoral?.market === "ru"
+      ? {
+          pageUrl: runtimeConfig!.pageUrl,
+          hotelName: runtimeCoral.hotelName,
+          ruLocation: runtimeCoral.location,
+        }
+      : staticConfig;
   if (!config?.ruLocation || scope.currency !== "RUB") {
     return buildManualReviewQuotes(
       provider,
@@ -264,7 +324,7 @@ async function collectCoralRuLiveQuotes(
       const encrypted = await context.request.post(
         `${HOME_RU}endpoints/OnlyHotelProduct/PriceSearchEncrypt`,
         {
-          data: buildCoralRuSearchCriteria(scope, window),
+          data: buildCoralRuSearchCriteria(scope, window, runtimeConfig),
           headers: {
             Accept: "*/*",
             "Content-Type": "application/json",
@@ -317,6 +377,7 @@ async function collectCoralRuLiveQuotes(
           decryptedBody,
           scope,
           window,
+          runtimeConfig,
         )
       ) {
         throw new Error(
@@ -348,7 +409,14 @@ async function collectCoralRuLiveQuotes(
       const observedAt = new Date().toISOString();
       const products = priceBody.result?.products ?? [];
       const windowOffers = deduplicateOffers(
-        parseCoralRuOffers(priceBody, provider, scope, window, sourceHint),
+        parseCoralRuOffers(
+          priceBody,
+          provider,
+          scope,
+          window,
+          sourceHint,
+          runtimeConfig,
+        ),
       );
       if (!products.length) {
         quotes.push(
@@ -433,6 +501,7 @@ function parseOffers(
   scope: ReportScopeDefinition,
   window: ReportScopeDefinition["windows"][number],
   sourceHint: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
   if (
     !data ||
@@ -441,7 +510,11 @@ function parseOffers(
   )
     return [];
   const result = data as ApiPayload;
-  const expectedHotel = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey]?.giataId;
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const expectedHotel =
+    runtimeCoral?.market === "de"
+      ? runtimeCoral.giataId
+      : CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey]?.giataId;
   if (!expectedHotel) return [];
   const resultOffers: CollectedOffer[] = [];
   for (const [index, offer] of (result.offerList ?? []).entries()) {
@@ -480,7 +553,12 @@ function parseOffers(
     )
       continue;
 
-    const match = matchCoralTravelRoom(scope, roomCode, roomName);
+    const match = matchCoralRuntimeRoom(
+      scope,
+      roomCode,
+      roomName,
+      runtimeConfig,
+    );
     const observedAt = new Date().toISOString();
     resultOffers.push({
       id: `coraltravel:${scope.id}:${window.id}:${roomCode}:${index}`,
@@ -526,10 +604,27 @@ export const __coralTravelInternal = {
 export async function collectCoralTravelLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
-  const hotelConfig = CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
+  const runtimeCoral = runtimeConfig?.coraltravel;
+  const hotelConfig =
+    runtimeCoral?.market === "de"
+      ? {
+          ...runtimeCoral,
+          pageUrl: runtimeConfig!.pageUrl,
+          hotelName: scope.hotelName,
+          currency: "EUR" as const,
+        }
+      : runtimeCoral?.market === "ru"
+        ? {
+            ...runtimeCoral,
+            pageUrl: runtimeConfig!.pageUrl,
+            currency: "RUB" as const,
+            ruLocation: runtimeCoral.location,
+          }
+        : CORALTRAVEL_HOTEL_CONFIG[scope.hotelKey];
   if (hotelConfig?.market === "ru") {
-    return collectCoralRuLiveQuotes(provider, scope);
+    return collectCoralRuLiveQuotes(provider, scope, runtimeConfig);
   }
   if (
     scope.currency !== "EUR" ||
@@ -707,6 +802,7 @@ export async function collectCoralTravelLiveQuotes(
         scope.hotelKey,
         window.checkIn,
         window.checkOut,
+        runtimeConfig,
       );
       await firstOffers;
       sourceHint = page.url();
@@ -791,7 +887,14 @@ export async function collectCoralTravelLiveQuotes(
 
       const windowOffers = deduplicateOffers(
         payloads.flatMap((payload) =>
-          parseOffers(payload, provider, scope, window, sourceHint),
+          parseOffers(
+            payload,
+            provider,
+            scope,
+            window,
+            sourceHint,
+            runtimeConfig,
+          ),
         ),
       );
       if (!windowOffers.length)

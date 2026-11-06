@@ -11,7 +11,8 @@ import { createPatchrightBrowserPage } from "./patchright-browser";
 import { parseAnexTourOffers } from "./anextour-parser";
 import { buildManualReviewQuotes } from "./live-helpers";
 import { ANEX_HOTEL_CONFIG } from "./live-config";
-import { classifyRoom } from "./offer-matching";
+import { classifyRoom, resolveRoomMatch } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 function normalizeRoomName(value: string): string {
   return value
@@ -26,7 +27,18 @@ function normalizeRoomName(value: string): string {
 export function matchAnexRoom(
   scope: ReportScopeDefinition,
   roomName: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): ReportScopeDefinition["rooms"][number] | undefined {
+  if (runtimeConfig) {
+    const { matchedRoomId } = resolveRoomMatch(
+      scope,
+      roomName,
+      runtimeConfig.roomAliases,
+      "",
+      runtimeConfig.matchingPolicy,
+    );
+    return scope.rooms.find((room) => room.id === matchedRoomId);
+  }
   const config = ANEX_HOTEL_CONFIG[scope.hotelKey];
   if (!config) return undefined;
   const normalizedName = normalizeRoomName(roomName);
@@ -161,10 +173,16 @@ function buildAnexRuUrl(
 async function collectAnexRuLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const hotelConfig = ANEX_HOTEL_CONFIG[scope.hotelKey];
-  const hotelId = hotelConfig?.ruHotelId;
-  const hotelSlug = hotelConfig?.ruHotelSlug;
+  const runtimeAnex = runtimeConfig?.anextour;
+  const hotelId =
+    runtimeAnex?.market === "ru" ? runtimeAnex.hotelId : hotelConfig?.ruHotelId;
+  const hotelSlug =
+    runtimeAnex?.market === "ru"
+      ? runtimeAnex.hotelSlug
+      : hotelConfig?.ruHotelSlug;
   if (!hotelId || !hotelSlug) {
     return buildManualReviewQuotes(
       provider,
@@ -237,7 +255,7 @@ async function collectAnexRuLiveQuotes(
 
       const observedAt = new Date().toISOString();
       const windowOffers = parsed.map((offer, index): CollectedOffer => {
-        const matchedRoom = matchAnexRoom(scope, offer.roomName);
+        const matchedRoom = matchAnexRoom(scope, offer.roomName, runtimeConfig);
         return {
           id: `anextour-ru:${scope.id}:${window.id}:${index}`,
           providerKey: provider.key,
@@ -324,16 +342,21 @@ async function collectAnexRuLiveQuotes(
 export async function collectAnexTourLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   if (scope.currency === "RUB") {
-    return collectAnexRuLiveQuotes(provider, scope);
+    return collectAnexRuLiveQuotes(provider, scope, runtimeConfig);
   }
   const quotes: ProviderQuote[] = [];
   const offers: CollectedOffer[] = [];
   const warnings: string[] = [];
 
   const hotelConfig = ANEX_HOTEL_CONFIG[scope.hotelKey];
-  const accommodationId = hotelConfig?.accommodationId;
+  const runtimeAnex = runtimeConfig?.anextour;
+  const accommodationId =
+    runtimeAnex?.market === "de"
+      ? runtimeAnex.accommodationId
+      : hotelConfig?.accommodationId;
 
   if (!accommodationId || scope.currency !== "EUR") {
     return buildManualReviewQuotes(
@@ -455,7 +478,7 @@ export async function collectAnexTourLiveQuotes(
       const confirmedEmpty = parsedOffers.length === 0;
 
       const matchedOffers = parsedOffers.map((offer, index) => {
-        const matchedRoom = matchAnexRoom(scope, offer.roomName);
+        const matchedRoom = matchAnexRoom(scope, offer.roomName, runtimeConfig);
 
         const collected: CollectedOffer = {
           id: `anextour:${scope.id}:${window.id}:${index}`,

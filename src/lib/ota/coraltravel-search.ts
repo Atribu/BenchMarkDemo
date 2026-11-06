@@ -2,6 +2,7 @@
 import type { Page } from "patchright";
 import type { HotelKey } from "@/src/lib/benchmark/types";
 import { CORALTRAVEL_HOTEL_CONFIG } from "./live-config";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 const GERMAN_MONTHS = [
   "Januar",
@@ -155,8 +156,13 @@ export async function searchCoralTravel(
   hotelKey: HotelKey,
   checkIn: string,
   checkOut: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<void> {
-  const hotel = CORALTRAVEL_HOTEL_CONFIG[hotelKey];
+  const runtimeHotel = runtimeConfig?.coraltravel;
+  const hotel =
+    runtimeHotel?.market === "de"
+      ? runtimeHotel
+      : CORALTRAVEL_HOTEL_CONFIG[hotelKey];
 
   if (!hotel?.searchQuery || !hotel.suggestion) {
     throw new Error(`Coral Travel otel arama eşleştirmesi eksik: ${hotelKey}`);

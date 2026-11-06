@@ -8,6 +8,8 @@ import type {
   RoomFeatures,
 } from "../benchmark/types";
 import { createPatchrightBrowserPage } from "./patchright-browser";
+import { resolveRoomMatch } from "./offer-matching";
+import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 
 const PEGAS_ORIGIN = "https://pegast.ru";
 const SEARCH_ENDPOINT = "/hotelOnlyTours/search/searchByHotel";
@@ -130,6 +132,22 @@ export function matchPegasRoom(
   return undefined;
 }
 
+export function matchPegasRuntimeRoom(
+  scope: ReportScopeDefinition,
+  roomName: string,
+  runtimeConfig?: DynamicOtaCollectorConfig,
+): string | undefined {
+  if (!runtimeConfig)
+    return matchPegasRoom(roomName, scope.hotelKey as PegasHotelKey);
+  return resolveRoomMatch(
+    scope,
+    roomName,
+    runtimeConfig.roomAliases,
+    "",
+    runtimeConfig.matchingPolicy,
+  ).matchedRoomId;
+}
+
 export function buildPegasSearchPayload(
   hotelId: number,
   window: BenchmarkWindowDefinition,
@@ -197,6 +215,7 @@ export function parsePegasHotelOnlyOffers(
     checkOut: string;
     nights: number;
     hotelKey?: PegasHotelKey;
+    matchRoom?: (roomName: string) => string | undefined;
   },
 ): PegasHotelOnlyOffer[] {
   const root = asRecord(value);
@@ -311,7 +330,9 @@ export function parsePegasHotelOnlyOffers(
         roomCategoryId,
         boardName,
         boardCode,
-        matchedRoomId: matchPegasRoom(roomName, expected.hotelKey),
+        matchedRoomId: expected.matchRoom
+          ? expected.matchRoom(roomName)
+          : matchPegasRoom(roomName, expected.hotelKey),
       });
     });
   });
@@ -387,8 +408,16 @@ async function searchPegasHotelOnly(
 export async function collectPegasTourLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
-  const config = PEGAS_HOTEL_CONFIG[scope.hotelKey as PegasHotelKey];
+  const runtimePegas = runtimeConfig?.pegastour;
+  const config = runtimePegas
+    ? {
+        hotelId: runtimePegas.hotelId,
+        hotelName: runtimePegas.hotelName,
+        pageUrl: runtimeConfig.pageUrl,
+      }
+    : PEGAS_HOTEL_CONFIG[scope.hotelKey as PegasHotelKey];
   if (!config || scope.currency !== "RUB") {
     const reason = "Pegas Touristik Rusya için bu otel/RUB eşleştirmesi doğrulanmadı.";
     return {
@@ -435,6 +464,10 @@ export async function collectPegasTourLiveQuotes(
           checkOut: window.checkOut,
           nights: window.nights,
           hotelKey: scope.hotelKey as PegasHotelKey,
+          matchRoom: runtimeConfig
+            ? (roomName) =>
+                matchPegasRuntimeRoom(scope, roomName, runtimeConfig)
+            : undefined,
         });
         const observedAt = new Date().toISOString();
         const windowOffers = parsed.map((offer): CollectedOffer => ({

@@ -5,11 +5,13 @@ import type {
   ProviderQuote,
   ReportScopeDefinition,
 } from "@/src/lib/benchmark/types";
+import type { DynamicOtaCollectorConfig } from "@/src/lib/hotels/runtime-manifest";
 
 import { createPatchrightBrowserPage } from "./patchright-browser";
 import { buildManualReviewQuotes } from "./live-helpers";
 import { matchSchauinslandRoom } from "./schauinsland-rooms";
 import { SCHAUINSLAND_HOTEL_CONFIG } from "./live-config";
+import { resolveRoomMatch } from "./offer-matching";
 
 
 export interface SchauinslandOffer {
@@ -242,14 +244,28 @@ export function buildSchauinslandCollectedOffers(
   window: ReportScopeDefinition["windows"][number],
   sourceHint: string,
   collectedAt: string,
-  
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): CollectedOffer[] {
   return parsedOffers.map((offer, index) => {
-    const match = matchSchauinslandRoom(
-      scope,
-      offer.roomCode,
-      offer.roomName,
-    );
+    const match = runtimeConfig
+      ? (() => {
+          const resolved = resolveRoomMatch(
+            scope,
+            offer.roomName,
+            runtimeConfig.roomAliases,
+            `Schauinsland oda kodu: ${offer.roomCode}`,
+            runtimeConfig.matchingPolicy,
+          );
+          return {
+            room: resolved.matchedRoomId
+              ? scope.rooms.find((room) => room.id === resolved.matchedRoomId)
+              : undefined,
+            features: resolved.roomFeatures,
+            reason: resolved.matchReason,
+            confirmed: Boolean(resolved.matchedRoomId),
+          };
+        })()
+      : matchSchauinslandRoom(scope, offer.roomCode, offer.roomName);
 
     const confirmedRoom = match.confirmed
       ? match.room
@@ -656,13 +672,20 @@ function buildSchauinslandUrl(
 export async function collectSchauinslandLiveQuotes(
   provider: ProviderDescriptor,
   scope: ReportScopeDefinition,
+  runtimeConfig?: DynamicOtaCollectorConfig,
 ): Promise<ProviderCollectionResult> {
   const quotes: ProviderQuote[] = [];
   const offers: CollectedOffer[] = [];
   const warnings: string[] = [];
 
-const hotelConfig =
-  SCHAUINSLAND_HOTEL_CONFIG[scope.hotelKey];
+const hotelConfig = runtimeConfig?.schauinsland
+  ? {
+      giataId: runtimeConfig.schauinsland.giataId,
+      pageUrl: runtimeConfig.pageUrl,
+      market: "de" as const,
+      currency: "EUR" as const,
+    }
+  : SCHAUINSLAND_HOTEL_CONFIG[scope.hotelKey];
 
 if (
   !hotelConfig ||
@@ -1049,6 +1072,7 @@ const matchedOffers = buildSchauinslandCollectedOffers(
   window,
   sourceHint,
   collectedAt,
+  runtimeConfig,
 );
 
 

@@ -379,7 +379,11 @@ Bu adim kullanici otelinin kanal konfigurasyonunu kalici hale getirir; mevcut
 collector'larin statik sistem oteli ayarlarini degistirmez. Dinamik kaydin
 collector calisma zamaninda kullanilmasi `src/lib/hotels/runtime-manifest.ts`
 ve `runtime-store.ts` sinirlarinda yapilir. Desteklenen dinamik collector'lar
-Booking.com, CHECK24 Almanya/EUR, Expedia, HolidayCheck ve TUI Almanya/EUR'dur. Otelin `active` durumuna gecebilmesi
+ANEX Tour Almanya/EUR ve Rusya/RUB, Booking.com, CHECK24 Almanya/EUR,
+Expedia, HolidayCheck, Loveholidays EUR/GBP, On the Beach GBP/Antalya,
+PEGAS Touristik Rusya/RUB, Schauinsland Almanya/EUR, Restplatzborse EUR,
+Stayforlong Almanya/EUR ve TUI
+Almanya/EUR'dur. Otelin `active` durumuna gecebilmesi
 icin her pazarda bu kanallardan en az birinin dogrulanmis sayfa adresi ve otelde rapora
 giren her oda icin en az bir alias gerekir. Manifest uretilemezse aktivasyon
 kapali bicimde reddedilir.
@@ -388,7 +392,10 @@ Aktif kullanici otellerinin pazar ve oda kayitlari sunucu tarafinda mevcut
 statik rapor kataloguyla birlestirilir. Yalnizca manifestte desteklenen OTA,
 ilgili dinamik scope'a eklenir; diger OTA'lar veya Google/HolidayCheck ikincil
 kaynaklari statik konfigurasyon olmadan dinamik otel icin calistirilmaz.
-Booking, CHECK24, Expedia, HolidayCheck ve TUI collector'lari sayfa adresi, oda alias'lari
+ANEX Tour, Booking, CHECK24, Expedia, HolidayCheck, Loveholidays,
+On the Beach, PEGAS Touristik, Restplatzborse, Schauinsland, Stayforlong ve TUI
+collector'lari
+sayfa adresi, oda alias'lari
 ve gerektiginde oda eslestirme politikasini manifestten
 alir. Mevcut sistem otelleri ise ayni statik `live-config.ts` yolunu kullanmaya
 devam eder.
@@ -404,3 +411,64 @@ Dinamik TUI eslestirmesinde TUI Almanya sayfa adresi, sayisal GIATA kimligi
 degilse eslestirme calistirilabilir sayilmaz. TUI UK/GBP akisinda gereken ek
 urun ve pazar kimlikleri bu adima dahil edilmemistir; bu nedenle eksik bir UK
 eslestirmesi aktivasyonu yanlislikla gecemez.
+
+Dinamik Schauinsland eslestirmesinde resmi otel sayfa adresi, sayisal GIATA
+kimligi (`externalHotelId`) ve tum rapor odalari icin alias zorunludur. Yalnizca
+EUR pazari calistirilabilir sayilir. GraphQL teklifleri yine kesin otel, tarih,
+1 oda / 2 yetiskin, SLR operatoru ve EUR toplam kontrollerinden gecer; oda
+eslestirmesi dinamik otelin politikasini kullanir.
+
+Dinamik Stayforlong eslestirmesinde resmi Almanya otel sayfasi, sayisal
+property kimligi (`externalHotelId`) ve tum rapor odalari icin alias
+zorunludur. Yalnizca EUR pazari calistirilabilir sayilir. Availability
+teklifleri kesin tarih, 1 oda / 2 yetiskin, EUR ve All Inclusive kurallarindan
+gecer; yayinlanan toplam bookingRules servisiyle yeniden dogrulanir.
+
+Dinamik Restplatzborse eslestirmesinde `/hotel/{IFF}/` bicimindeki resmi sayfa,
+sayisal IFF otel kimligi (`externalHotelId`) ve tum rapor odalari icin alias
+zorunludur. Yalnizca EUR pazari calistirilabilir sayilir. Flux aramasi kesin
+tarih, 1 oda / 2 yetiskin, EUR ve All Inclusive tekliflerini kabul eder; kisi
+basi tutar yayinlanmaz ve son toplam `verify-offer` ile yeniden dogrulanir.
+
+Dinamik Loveholidays eslestirmesinde EUR icin `/de/hotels/l/`, GBP icin
+`/hotels/l/` bicimindeki resmi Hotel Only adresi, URL'deki degerle ayni sayisal
+`masterId` (`externalHotelId`) ve tum rapor odalari icin alias zorunludur.
+Yalnizca EUR ve GBP pazarlari calistirilabilir sayilir. Collector kesin otel,
+tarih, gece, 1 oda / 2 yetiskin ve konaklama toplamini dogrular; ucuslu paket
+ve gecelik fiyatlari oda toplami olarak kabul etmez.
+
+Dinamik On the Beach eslestirmesinde GBP pazari, resmi
+`/hotels/turkey/antalya/{otel}` sayfasi, sayisal sonuc karti `propertyId`
+(`externalHotelId`) ve tum rapor odalari icin alias zorunludur. Bu asamada
+yalnizca mevcut Hotel Only formunda dogrulanmis Antalya destinasyonu
+calistirilabilir sayilir. Collector hedef oteli propertyId ile bulur; kesin
+tarih, 2-28 gece, 1 oda / 2 yetiskin ve `Total Hotel Price / per party`
+kontrollerinden gecmeyen teklifleri oda fiyati olarak kabul etmez.
+
+Dinamik ANEX Tour eslestirmesinde yalnizca Turkiye otelleri calistirilabilir.
+EUR pazari icin `nurhotel.anextour.de/search/offer?aid={id}` adresindeki
+sayisal accommodation kimligi, RUB pazari icin
+`anextour.ru/hotels/turkey/{slug}` adresi ve sayisal ANEX otel kimligi
+`externalHotelId` alanina girilir. Her iki pazarda tum rapor odalari icin
+alias zorunludur. EUR akisi yalnizca ANEX operatorune ait kesin tarihli,
+1 oda / 2 yetiskin ve EUR parti toplamlarini; RUB akisi kesin otel, tarih,
+gece ve iki yetiskin kosullarini gecen hotel-only teklifleri kabul eder.
+
+Dinamik PEGAS Touristik eslestirmesinde yalnizca Turkiye otellerinin RUB pazari
+calistirilabilir. Resmi `pegast.ru/hotel/turkey/.../{otel}-{id}` sayfasinin
+sonundaki sayisal hotel ID ile `externalHotelId` ayni olmali ve tum rapor
+odalari icin alias bulunmalidir. Collector otel sayfasindaki adi, kesin tarih,
+gece, 1 oda / 2 yetiskin, RUB `pricePerStay` toplamlarini ve All Inclusive
+pansiyonu dogrular; gecelik, farkli para birimli veya farkli otel tekliflerini
+kabul etmez.
+
+Dinamik Coral Travel eslestirmesinde yalnizca Turkiye otellerinin EUR ve RUB
+pazarlari calistirilabilir. EUR icin resmi `coraltravel.de/hotels/{otel}`
+sayfasi, sayisal GIATA kimligi (`externalHotelId`), Coral onerilerinde gorunen
+kesin arama adi ve tum rapor odalari icin alias gerekir. RUB icin resmi
+`coral.ru/hotels/turkey/{otel}` sayfasi ile Coral konum servisindeki
+`otel-7-bolge-6` bicimli birlesik kimlik `externalHotelId` alanina girilir.
+Collector her iki akista da kesin otel, tarih, gece, 1 oda / 2 yetiskin, para
+birimi ve All Inclusive kosullarini dogrular; oda eslestirmesi dinamik otelin
+alias ve eslestirme politikasini kullanir. Mevcut sistem otellerinin statik
+Coral Travel yapilandirmasi degismez.
