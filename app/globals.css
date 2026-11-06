@@ -2144,6 +2144,40 @@ tbody th small {
   padding: 2px;
   font-size: 8px;
 }
+.mappingCard.editing {
+  border-color: #d9c9e2;
+  background: #fdfbfe;
+}
+.mappingEditForm {
+  grid-column: 1 / -1;
+  border-top: 1px solid #eee8f1;
+  padding: 16px 0 2px;
+}
+.mappingEditHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.mappingEditHeading strong,
+.mappingEditHeading small {
+  display: block;
+}
+.mappingEditHeading small {
+  max-width: 560px;
+  line-height: 1.5;
+}
+.mappingEditHeading button {
+  border: 0;
+  background: transparent;
+  color: #7c6589;
+  font-size: 8px;
+  white-space: nowrap;
+}
+.mappingEditForm .formActions {
+  gap: 8px;
+}
 .aliasGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

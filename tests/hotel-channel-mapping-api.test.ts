@@ -202,6 +202,28 @@ test("CHECK24 mapping accepts its verified legacy hotel subdomain", async () => 
   }
 });
 
+test("Stayforlong mapping accepts the German collector domain", async () => {
+  const { directory, collection } = await fixture();
+  try {
+    const response = await createMapping(collection, {
+      ...validMapping,
+      providerKey: "stayforlong",
+      externalHotelId: "20071",
+      pageUrl:
+        "https://www.stayforlong.de/de-de/hotel/tr/delphin-imperial-lara_antalya",
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.mapping.externalHotelId, "20071");
+    assert.equal(
+      payload.mapping.pageUrl,
+      "https://www.stayforlong.de/de-de/hotel/tr/delphin-imperial-lara_antalya",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("one OTA and market pair can have only one mapping", async () => {
   const { directory, collection } = await fixture();
   try {

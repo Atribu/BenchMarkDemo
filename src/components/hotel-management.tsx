@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { ProviderDescriptor } from "@/src/lib/benchmark/types";
 import type {
+  HotelChannelMappingRecord,
   HotelChannelMappingStatus,
   ManagedHotelRecord,
 } from "@/src/lib/hotels/model";
@@ -67,6 +68,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
   const [selectedId, setSelectedId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [editingMappingId, setEditingMappingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ type: "ok" | "error"; text: string } | null>(null);
 
   const selected = useMemo(
@@ -258,6 +260,45 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
     if (ok) formElement.reset();
   }
 
+  function mappingAliases(
+    data: FormData,
+    rooms: ManagedHotelRecord["rooms"],
+  ) {
+    return Object.fromEntries(
+      rooms
+        .map((room) => [
+          room.id,
+          field(data, `alias:${room.id}`)
+            .split(/[\n,]/)
+            .map((alias) => alias.trim())
+            .filter(Boolean),
+        ] as const)
+        .filter(([, aliases]) => aliases.length > 0),
+    );
+  }
+
+  async function updateMapping(
+    event: FormEvent<HTMLFormElement>,
+    mapping: HotelChannelMappingRecord,
+  ) {
+    event.preventDefault();
+    if (!selected) return;
+    const data = new FormData(event.currentTarget);
+    const ok = await request(
+      `/api/hotels/${selected.id}/channel-mappings/${mapping.id}`,
+      "PATCH",
+      {
+        version: selected.version,
+        externalHotelId: field(data, "externalHotelId") || null,
+        pageUrl: field(data, "pageUrl") || null,
+        searchName: field(data, "searchName") || null,
+        roomAliases: mappingAliases(data, selected.rooms),
+      },
+      "OTA kanal eşleştirmesi güncellendi; doğrulama durumu yeniden kontrol bekliyor.",
+    );
+    if (ok) setEditingMappingId(null);
+  }
+
   async function setMappingStatus(mappingId: string, status: HotelChannelMappingStatus) {
     if (!selected) return;
     await request(
@@ -428,10 +469,23 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
                     <div className="mappingList">
                       {selected.channelMappings.map((mapping) => {
                         const provider = providerCatalog.find((item) => item.key === mapping.providerKey);
-                        return <article className="mappingCard" key={mapping.id}>
+                        const isEditing = editingMappingId === mapping.id;
+                        return <article className={`mappingCard ${isEditing ? "editing" : ""}`} key={mapping.id}>
                           <div><span className="providerLetter">{provider?.shortName.slice(0, 1) ?? "?"}</span><div><strong>{provider?.name ?? mapping.providerKey}</strong><small>{selected.markets.find((market) => market.id === mapping.marketId)?.label ?? mapping.marketId} · {Object.keys(mapping.roomAliases).length} oda alias grubu</small></div></div>
                           <span className={`mappingStatus ${mapping.status}`}>{MAPPING_STATUS_LABELS[mapping.status]}{DYNAMIC_COLLECTOR_PROVIDERS.some((key) => key === mapping.providerKey) ? " · Collector destekli" : ""}</span>
-                          {editable && <div className="mappingActions"><button type="button" onClick={() => setMappingStatus(mapping.id, "verified")} disabled={busy || mapping.status === "verified"}>Doğrula</button><button type="button" onClick={() => setMappingStatus(mapping.id, "disabled")} disabled={busy || mapping.status === "disabled"}>Devre dışı</button></div>}
+                          {editable && <div className="mappingActions"><button type="button" aria-expanded={isEditing} onClick={() => setEditingMappingId(isEditing ? null : mapping.id)} disabled={busy}>{isEditing ? "Düzenlemeyi kapat" : "Düzenle"}</button><button type="button" onClick={() => setMappingStatus(mapping.id, "verified")} disabled={busy || mapping.status === "verified"}>Doğrula</button><button type="button" onClick={() => setMappingStatus(mapping.id, "disabled")} disabled={busy || mapping.status === "disabled"}>Devre dışı</button></div>}
+                          {editable && isEditing && (
+                            <form className="managerForm mappingEditForm" key={`${mapping.id}:${selected.version}`} onSubmit={(event) => updateMapping(event, mapping)}>
+                              <div className="mappingEditHeading"><div><strong>{provider?.name ?? mapping.providerKey} eşlemesini düzenle</strong><small>OTA ve pazar değiştirilemez. Kimlik veya oda adları değişirse kanal yeniden doğrulanmalıdır.</small></div><button type="button" onClick={() => setEditingMappingId(null)} disabled={busy}>Kapat</button></div>
+                              <div className="formGrid formGridThree">
+                                <label><span>Harici otel kimliği</span><input name="externalHotelId" defaultValue={mapping.externalHotelId ?? ""} /></label>
+                                <label><span>Kanal sayfa adresi</span><input name="pageUrl" type="url" defaultValue={mapping.pageUrl ?? ""} placeholder="https://…" /></label>
+                                <label><span>Kanal arama adı</span><input name="searchName" defaultValue={mapping.searchName ?? ""} placeholder={selected.name} /></label>
+                              </div>
+                              {selected.rooms.length > 0 && <div className="aliasGrid"><p>OTA oda adları <small>Her oda için kanaldaki gerçek adları virgül veya yeni satırla ayırın.</small></p>{selected.rooms.map((room) => <label key={room.id}><span>{room.name}</span><textarea name={`alias:${room.id}`} rows={3} defaultValue={(mapping.roomAliases[room.id] ?? []).join("\n")} placeholder="Standard Sea View, Standard Room Sea" /></label>)}</div>}
+                              <div className="formActions"><button type="button" className="managerSecondary" onClick={() => setEditingMappingId(null)} disabled={busy}>Vazgeç</button><button className="managerPrimary" disabled={busy}>Değişiklikleri kaydet</button></div>
+                            </form>
+                          )}
                         </article>;
                       })}
                     </div>

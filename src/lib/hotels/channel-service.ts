@@ -139,6 +139,14 @@ function providerPageUrl(
     check24: [
       "check24.de",
     ],
+
+    stayforlong: [
+      "stayforlong.com",
+      "stayforlong.de",
+    ],
+    coral: ["coraltravel.de", "coral.ru"],
+    coraltravel: ["coraltravel.de", "coral.ru"],
+    "coral-travel": ["coraltravel.de", "coral.ru"],
   };
 
   const defaultDomain = template.hostname
