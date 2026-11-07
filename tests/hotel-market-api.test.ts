@@ -169,10 +169,10 @@ test("changing currency resets stale channel verification", async () => {
             id: "mapping_01",
             providerKey: "booking",
             marketId: parseRuntimeScopeKey("example-eu"),
-            status: "verified" as const,
+            status: "configured" as const,
             externalHotelId: "example-123",
             roomAliases: {},
-            verifiedAt: "2026-11-05T09:30:00.000Z",
+            configurationCheckedAt: "2026-11-05T09:30:00.000Z",
           },
         ],
       })),
@@ -192,7 +192,7 @@ test("changing currency resets stale channel verification", async () => {
     assert.equal(hotel.markets[0].currency, "GBP");
     assert.equal(hotel.markets[0].requiredBoard, undefined);
     assert.equal(hotel.channelMappings[0].status, "draft");
-    assert.equal(hotel.channelMappings[0].verifiedAt, undefined);
+    assert.equal(hotel.channelMappings[0].configurationCheckedAt, undefined);
     assert.equal(hotel.version, 3);
   } finally {
     await rm(directory, { recursive: true, force: true });

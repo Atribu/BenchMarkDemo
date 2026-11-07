@@ -446,7 +446,10 @@ function resetChannelVerification(
   return hotel.channelMappings.map((mapping) => ({
     ...mapping,
     status: "draft",
-    verifiedAt: undefined,
+    configurationCheckedAt: undefined,
+    liveVerifiedAt: undefined,
+    lastLiveCheckAt: undefined,
+    lastLiveCheckSucceeded: undefined,
   }));
 }
 
@@ -490,25 +493,25 @@ function activationProblems(hotel: ManagedHotelRecord): string[] {
     Object.values(hotel.matchingPolicy?.roomByView ?? {}),
   );
   for (const market of hotel.markets) {
-    const verifiedMappings = hotel.channelMappings.filter(
+    const configuredMappings = hotel.channelMappings.filter(
       (mapping) =>
         mapping.marketId === market.id &&
-        mapping.status === "verified" &&
-        Boolean(mapping.verifiedAt) &&
+        mapping.status === "configured" &&
+        Boolean(mapping.configurationCheckedAt) &&
         Boolean(
           mapping.externalHotelId || mapping.pageUrl || mapping.searchName,
         ),
     );
-    if (verifiedMappings.length === 0)
-      problems.push(`${market.label} için doğrulanmış kanal eşleştirmesi`);
+    if (configuredMappings.length === 0)
+      problems.push(`${market.label} için kontrol edilmiş kanal yapılandırması`);
     for (const roomId of requiredRoomIds) {
       if (
-        !verifiedMappings.some(
+        !configuredMappings.some(
           (mapping) => (mapping.roomAliases[roomId]?.length ?? 0) > 0,
         )
       )
         problems.push(
-          `${market.label} / ${roomId} için doğrulanmış kanal oda alias'ı`,
+          `${market.label} / ${roomId} için kontrol edilmiş kanal oda alias'ı`,
         );
     }
   }
@@ -880,7 +883,14 @@ export class HotelManagementService {
         channelMappings: resetChannelVerification
           ? existing.channelMappings.map((mapping) =>
               mapping.marketId === parsedMarketId
-                ? { ...mapping, status: "draft", verifiedAt: undefined }
+                ? {
+                    ...mapping,
+                    status: "draft",
+                    configurationCheckedAt: undefined,
+                    liveVerifiedAt: undefined,
+                    lastLiveCheckAt: undefined,
+                    lastLiveCheckSucceeded: undefined,
+                  }
                 : mapping,
             )
           : existing.channelMappings,

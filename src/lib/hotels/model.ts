@@ -14,7 +14,7 @@ import {
 export type HotelRecordSource = "system" | "user";
 export type HotelCurrency = "EUR" | "GBP" | "RUB";
 export type HotelBoard = "all-inclusive" | "all-inclusive-plus";
-export type HotelChannelMappingStatus = "draft" | "verified" | "disabled";
+export type HotelChannelMappingStatus = "draft" | "configured" | "disabled";
 
 export interface HotelLocation {
   countryCode: string;
@@ -59,7 +59,11 @@ export interface HotelChannelMappingRecord {
   pageUrl?: string;
   searchName?: string;
   roomAliases: Record<string, readonly string[]>;
-  verifiedAt?: string;
+  configurationCheckedAt?: string;
+  /** Reserved for evidence produced by a successful live collector run. */
+  liveVerifiedAt?: string;
+  lastLiveCheckAt?: string;
+  lastLiveCheckSucceeded?: boolean;
 }
 
 export interface HotelAuditFields {

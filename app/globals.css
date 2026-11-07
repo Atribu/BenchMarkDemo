@@ -2122,9 +2122,13 @@ tbody th small {
   padding: 5px 8px;
   font-size: 8px;
 }
-.mappingStatus.verified {
+.mappingStatus.configured {
   color: #34766c;
   background: #eaf5f2;
+}
+.mappingStatus.liveFailed {
+  color: #a24a52;
+  background: #faecee;
 }
 .mappingStatus.disabled {
   color: #8f8792;

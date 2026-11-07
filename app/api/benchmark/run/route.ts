@@ -5,6 +5,8 @@ import { checkAccess, checkRequestOrigin } from "@/src/lib/server/access";
 import { readBoundedJson } from "@/src/lib/server/bounded-json";
 import { acquireQuery } from "@/src/lib/server/query-gate";
 import { loadDynamicHotelRuntimeContext } from "@/src/lib/hotels/runtime-store";
+import { createFileHotelStore } from "@/src/lib/hotels/file-store";
+import { recordLiveCollectorEvidence } from "@/src/lib/hotels/live-verification";
 
 export const runtime = "nodejs";
 
@@ -23,8 +25,9 @@ export async function POST(request: Request) {
     );
   let payload;
   let runtimeContext;
+  const hotelStore = createFileHotelStore();
   try {
-    runtimeContext = await loadDynamicHotelRuntimeContext();
+    runtimeContext = await loadDynamicHotelRuntimeContext(hotelStore);
   } catch {
     return NextResponse.json(
       { error: "Aktif otel collector yapılandırması okunamadı." },
@@ -70,8 +73,23 @@ export async function POST(request: Request) {
       },
     );
   try {
+    const report = await runBenchmarkJob(payload, undefined, runtimeContext);
+    if (payload.mode === "live") {
+      try {
+        await recordLiveCollectorEvidence({
+          store: hotelStore,
+          manifests: runtimeContext.manifests,
+          attempts: report.collectionAttempts ?? [],
+        });
+      } catch {
+        report.warnings = [
+          ...report.warnings,
+          "Canlı kanal doğrulama kanıtı otel kaydına yazılamadı; fiyat raporu etkilenmedi.",
+        ];
+      }
+    }
     return NextResponse.json(
-      await runBenchmarkJob(payload, undefined, runtimeContext),
+      report,
       {
       headers: { "Cache-Control": "no-store" },
       },

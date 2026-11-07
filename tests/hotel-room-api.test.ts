@@ -152,10 +152,10 @@ test("room changes reset stale channel verification", async () => {
             id: "mapping_01",
             providerKey: "booking",
             marketId: parseRuntimeScopeKey("example-eu"),
-            status: "verified" as const,
+            status: "configured" as const,
             externalHotelId: "example-123",
             roomAliases: { "standard-land": ["Standard Land View"] },
-            verifiedAt: "2026-11-05T09:30:00.000Z",
+            configurationCheckedAt: "2026-11-05T09:30:00.000Z",
           },
         ],
       })),
@@ -179,7 +179,7 @@ test("room changes reset stale channel verification", async () => {
     assert.equal(payload.room.name, "Standard Garden Room");
     assert.equal(payload.room.occupancy.children, 1);
     assert.equal(payload.hotel.channelMappings[0].status, "draft");
-    assert.equal(payload.hotel.channelMappings[0].verifiedAt, undefined);
+    assert.equal(payload.hotel.channelMappings[0].configurationCheckedAt, undefined);
     assert.equal(payload.hotel.version, 3);
   } finally {
     await rm(directory, { recursive: true, force: true });

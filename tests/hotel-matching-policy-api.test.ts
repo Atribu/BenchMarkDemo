@@ -42,13 +42,13 @@ async function fixture() {
             id: "mapping_01",
             providerKey: "booking",
             marketId: parseRuntimeScopeKey("example-eu"),
-            status: "verified" as const,
+            status: "configured" as const,
             externalHotelId: "example-123",
             roomAliases: {
               "standard-land": ["Standard Land View"],
               "standard-sea": ["Standard Sea View"],
             },
-            verifiedAt: "2026-11-05T09:30:00.000Z",
+            configurationCheckedAt: "2026-11-05T09:30:00.000Z",
           },
         ],
       },
@@ -117,7 +117,7 @@ test("matching policy API stores only references to existing rooms", async () =>
     assert.equal(payload.hotel.version, 2);
     assert.equal(payload.hotel.audit.updatedBy, "local-development");
     assert.equal(payload.hotel.channelMappings[0].status, "draft");
-    assert.equal(payload.hotel.channelMappings[0].verifiedAt, undefined);
+    assert.equal(payload.hotel.channelMappings[0].configurationCheckedAt, undefined);
     assert.equal((await store.load())[0].matchingPolicy?.roomByView.sea, "standard-sea");
 
     const stale = await handlers.PUT(
@@ -166,8 +166,8 @@ test("matching policy can be removed and invalidates channel verification", asyn
         ...hotel,
         channelMappings: hotel.channelMappings.map((mapping) => ({
           ...mapping,
-          status: "verified" as const,
-          verifiedAt: "2026-11-05T10:15:00.000Z",
+          status: "configured" as const,
+          configurationCheckedAt: "2026-11-05T10:15:00.000Z",
         })),
       })),
       result: undefined,

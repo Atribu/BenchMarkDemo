@@ -65,6 +65,12 @@ function optionalString(value: unknown, maximum = 1000): string | undefined {
   return value === undefined ? undefined : string(value, maximum);
 }
 
+function optionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") throw new Error("Boolean alanı geçersiz.");
+  return value;
+}
+
 function nullableString(value: unknown, maximum = 300): string | null {
   return value === null ? null : string(value, maximum);
 }
@@ -138,7 +144,7 @@ function parseMatchingPolicy(value: unknown): ManagedHotelMatchingPolicy {
 
 function parseChannelMapping(value: unknown): HotelChannelMappingRecord {
   const input = object(value);
-  if (!["draft", "verified", "disabled"].includes(String(input.status)))
+  if (!["draft", "configured", "verified", "disabled"].includes(String(input.status)))
     throw new Error("Kanal eşleştirme durumu geçersiz.");
   const aliases = object(input.roomAliases);
   const roomAliases: Record<string, readonly string[]> = {};
@@ -148,16 +154,30 @@ function parseChannelMapping(value: unknown): HotelChannelMappingRecord {
       throw new Error("Oda alias listesi geçersiz.");
     roomAliases[roomId] = values.map((alias) => string(alias));
   }
+  const liveVerifiedAt = optionalString(input.liveVerifiedAt);
+  const lastLiveCheckAt =
+    optionalString(input.lastLiveCheckAt) ?? liveVerifiedAt;
+  const lastLiveCheckSucceeded =
+    optionalBoolean(input.lastLiveCheckSucceeded) ??
+    (liveVerifiedAt ? true : undefined);
   return {
     id: parseRuntimeHotelId(input.id),
     providerKey: parseRuntimeHotelKey(input.providerKey),
     marketId: parseRuntimeScopeKey(input.marketId),
-    status: input.status as HotelChannelMappingRecord["status"],
+    // `verified` was the pre-v2 name for a configuration-only check. Reading
+    // it as `configured` preserves existing hotels without claiming that a
+    // live collector request succeeded.
+    status: input.status === "verified" ? "configured" : input.status as HotelChannelMappingRecord["status"],
     externalHotelId: optionalString(input.externalHotelId),
     pageUrl: optionalString(input.pageUrl, 2000),
     searchName: optionalString(input.searchName),
     roomAliases,
-    verifiedAt: optionalString(input.verifiedAt),
+    configurationCheckedAt:
+      optionalString(input.configurationCheckedAt) ??
+      optionalString(input.verifiedAt),
+    liveVerifiedAt,
+    lastLiveCheckAt,
+    lastLiveCheckSucceeded,
   };
 }
 

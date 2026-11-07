@@ -141,7 +141,7 @@ test("channel mapping API creates an isolated draft for an existing OTA", async 
     assert.equal(payload.mapping.providerKey, "booking");
     assert.equal(payload.mapping.marketId, "example-eu");
     assert.equal(payload.mapping.status, "draft");
-    assert.equal(payload.mapping.verifiedAt, undefined);
+    assert.equal(payload.mapping.configurationCheckedAt, undefined);
     assert.equal(payload.hotel.version, 2);
     assert.equal(
       response.headers.get("location"),
@@ -260,7 +260,7 @@ test("one OTA and market pair can have only one mapping", async () => {
   }
 });
 
-test("verification requires aliases for every policy room", async () => {
+test("configuration check requires aliases for every policy room", async () => {
   const { directory, collection, mappingStatus, store } = await fixture();
   try {
     const created = await createMapping(collection, {
@@ -272,7 +272,7 @@ test("verification requires aliases for every policy room", async () => {
       jsonRequest(
         `http://localhost/api/hotels/hotel_01/channel-mappings/${mappingId}/status`,
         "PATCH",
-        { version: 2, status: "verified" },
+        { version: 2, status: "configured" },
       ),
       mappingContext(),
     );
@@ -284,7 +284,7 @@ test("verification requires aliases for every policy room", async () => {
   }
 });
 
-test("a complete mapping can be verified and enables controlled activation", async () => {
+test("a complete mapping can be checked and enables controlled activation", async () => {
   const { directory, collection, mappingStatus, hotelStatus } = await fixture();
   try {
     await createMapping(collection);
@@ -292,14 +292,20 @@ test("a complete mapping can be verified and enables controlled activation", asy
       jsonRequest(
         `http://localhost/api/hotels/hotel_01/channel-mappings/${mappingId}/status`,
         "PATCH",
-        { version: 2, status: "verified" },
+        { version: 2, status: "configured" },
       ),
       mappingContext(),
     );
     assert.equal(verifiedResponse.status, 200);
     const verified = (await verifiedResponse.json()).mapping;
-    assert.equal(verified.status, "verified");
-    assert.equal(verified.verifiedAt, "2026-11-05T10:00:00.000Z");
+    assert.equal(verified.status, "configured");
+    assert.equal(
+      verified.configurationCheckedAt,
+      "2026-11-05T10:00:00.000Z",
+    );
+    assert.equal(verified.liveVerifiedAt, undefined);
+    assert.equal(verified.lastLiveCheckAt, undefined);
+    assert.equal(verified.lastLiveCheckSucceeded, undefined);
 
     const ready = await hotelStatus.PATCH(
       jsonRequest(
@@ -325,7 +331,7 @@ test("a complete mapping can be verified and enables controlled activation", asy
   }
 });
 
-test("mapping detail changes clear verification and deletion is versioned", async () => {
+test("mapping detail changes clear configuration evidence and deletion is versioned", async () => {
   const { directory, collection, detail, mappingStatus } = await fixture();
   try {
     await createMapping(collection);
@@ -333,7 +339,7 @@ test("mapping detail changes clear verification and deletion is versioned", asyn
       jsonRequest(
         `http://localhost/api/hotels/hotel_01/channel-mappings/${mappingId}/status`,
         "PATCH",
-        { version: 2, status: "verified" },
+        { version: 2, status: "configured" },
       ),
       mappingContext(),
     );
@@ -349,7 +355,10 @@ test("mapping detail changes clear verification and deletion is versioned", asyn
     const updated = await updatedResponse.json();
     assert.equal(updated.mapping.searchName, "Example Resort Hotel");
     assert.equal(updated.mapping.status, "draft");
-    assert.equal(updated.mapping.verifiedAt, undefined);
+    assert.equal(updated.mapping.configurationCheckedAt, undefined);
+    assert.equal(updated.mapping.liveVerifiedAt, undefined);
+    assert.equal(updated.mapping.lastLiveCheckAt, undefined);
+    assert.equal(updated.mapping.lastLiveCheckSucceeded, undefined);
     assert.equal(updated.hotel.version, 4);
 
     const staleDelete = await detail.DELETE(

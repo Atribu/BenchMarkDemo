@@ -74,6 +74,42 @@ test("file hotel store rejects corrupt and unsupported data instead of resetting
   }
 });
 
+test("file hotel store migrates legacy configuration verification without inventing live evidence", async () => {
+  const { directory, store } = await temporaryStore();
+  try {
+    const legacy = {
+      ...draft(),
+      channelMappings: [
+        {
+          id: "mapping_00000000000040008000000000000001",
+          providerKey: "booking",
+          marketId: "example-eu",
+          status: "verified",
+          externalHotelId: "example-123",
+          roomAliases: { "standard-land": ["Standard Land View"] },
+          verifiedAt: "2026-11-05T09:30:00.000Z",
+        },
+      ],
+    };
+    await writeFile(
+      path.join(directory, "user-hotels.json"),
+      JSON.stringify({ schemaVersion: 1, hotels: [legacy] }),
+    );
+
+    const [loaded] = await store.load();
+    assert.equal(loaded.channelMappings[0].status, "configured");
+    assert.equal(
+      loaded.channelMappings[0].configurationCheckedAt,
+      "2026-11-05T09:30:00.000Z",
+    );
+    assert.equal(loaded.channelMappings[0].liveVerifiedAt, undefined);
+    assert.equal(loaded.channelMappings[0].lastLiveCheckAt, undefined);
+    assert.equal(loaded.channelMappings[0].lastLiveCheckSucceeded, undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("file hotel store rejects system records and invalid persisted identities", async () => {
   const { directory, store } = await temporaryStore();
   try {

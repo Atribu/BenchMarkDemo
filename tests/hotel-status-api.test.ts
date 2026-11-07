@@ -50,11 +50,11 @@ function draft(configured = false): ManagedHotelRecord {
         id: "mapping_01",
         providerKey: "booking",
         marketId,
-        status: "verified",
+        status: "configured",
         externalHotelId: "example-123",
         pageUrl: "https://www.booking.com/hotel/tr/example-resort.html",
         roomAliases: { "standard-land": ["Standard Land View"] },
-        verifiedAt: "2026-11-05T09:30:00.000Z",
+        configurationCheckedAt: "2026-11-05T09:30:00.000Z",
       },
     ],
   };
@@ -150,7 +150,7 @@ test("configured hotels transition from draft to ready and active", async () => 
   }
 });
 
-test("activation requires a verified channel for every market", async () => {
+test("activation requires a checked channel configuration for every market", async () => {
   const { directory, handlers, store } = await fixture(true);
   try {
     await store.update((hotels) => ({
@@ -160,7 +160,7 @@ test("activation requires a verified channel for every market", async () => {
         channelMappings: hotel.channelMappings.map((mapping) => ({
           ...mapping,
           status: "draft" as const,
-          verifiedAt: undefined,
+          configurationCheckedAt: undefined,
         })),
       })),
       result: undefined,
@@ -170,7 +170,7 @@ test("activation requires a verified channel for every market", async () => {
       context("hotel_01"),
     );
     assert.equal(response.status, 409);
-    assert.match((await response.json()).error, /doğrulanmış kanal/);
+    assert.match((await response.json()).error, /kontrol edilmiş kanal/);
     assert.equal((await store.load())[0].status, "ready");
   } finally {
     await rm(directory, { recursive: true, force: true });

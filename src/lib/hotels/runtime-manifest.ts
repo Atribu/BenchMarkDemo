@@ -122,7 +122,7 @@ function occupancyLabel(hotel: ManagedHotelRecord, roomId: string): string {
   return `${room.occupancy.rooms} oda · ${room.occupancy.adults} yetişkin${childLabel}`;
 }
 
-function verifiedSupportedMappings(
+function configuredSupportedMappings(
   hotel: ManagedHotelRecord,
   marketId: string,
 ) {
@@ -132,8 +132,8 @@ function verifiedSupportedMappings(
       DYNAMIC_COLLECTOR_PROVIDERS.some(
         (providerKey) => providerKey === mapping.providerKey,
       ) &&
-      mapping.status === "verified" &&
-      Boolean(mapping.verifiedAt),
+      mapping.status === "configured" &&
+      Boolean(mapping.configurationCheckedAt),
   );
 }
 
@@ -322,7 +322,7 @@ export function buildDynamicHotelRuntimeManifest(
 
   for (const market of hotel.markets) {
     let executableCount = 0;
-    for (const mapping of verifiedSupportedMappings(hotel, market.id)) {
+    for (const mapping of configuredSupportedMappings(hotel, market.id)) {
       if (
         !mapping.pageUrl ||
         !hasExecutablePageUrl(

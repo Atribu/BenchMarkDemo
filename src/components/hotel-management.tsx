@@ -25,7 +25,7 @@ const STATUS_LABELS: Record<HotelLifecycleStatus, string> = {
 
 const MAPPING_STATUS_LABELS: Record<HotelChannelMappingStatus, string> = {
   draft: "Kontrol bekliyor",
-  verified: "Doğrulandı",
+  configured: "Yapılandırma kontrol edildi",
   disabled: "Devre dışı",
 };
 
@@ -223,7 +223,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
         requireBalcony: data.get("requireBalcony") === "on",
         roomByView,
       },
-      "Oda eşleştirme politikası kaydedildi; kanal doğrulamaları yeniden kontrol edilecek.",
+      "Oda eşleştirme politikası kaydedildi; kanal yapılandırmaları yeniden kontrol edilecek.",
     );
   }
 
@@ -294,7 +294,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
         searchName: field(data, "searchName") || null,
         roomAliases: mappingAliases(data, selected.rooms),
       },
-      "OTA kanal eşleştirmesi güncellendi; doğrulama durumu yeniden kontrol bekliyor.",
+      "OTA kanal eşleştirmesi güncellendi; yapılandırma yeniden kontrol bekliyor.",
     );
     if (ok) setEditingMappingId(null);
   }
@@ -305,7 +305,9 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
       `/api/hotels/${selected.id}/channel-mappings/${mappingId}/status`,
       "PATCH",
       { version: selected.version, status },
-      status === "verified" ? "OTA eşleştirmesi doğrulandı." : "OTA eşleştirme durumu güncellendi.",
+      status === "configured"
+        ? "OTA eşleştirme yapılandırması kontrol edildi. Bu işlem canlı kanal erişimi kanıtı değildir."
+        : "OTA eşleştirme durumu güncellendi.",
     );
   }
 
@@ -331,7 +333,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
           <p className="eyebrow">HOTEL ONBOARDING</p>
           <h1>Yeni oteli ekleyin.<br /><span>Mevcut yapıyı koruyun.</span></h1>
           <p className="pageLead">
-            Kayıtlar önce taslakta hazırlanır. Sistem otelleri salt okunurdur; yeni otel yalnızca collector yapılandırması doğrulanıp aktifleştirildikten sonra canlı benchmark listesine eklenir.
+            Kayıtlar önce taslakta hazırlanır. Sistem otelleri salt okunurdur; yeni otel yalnızca collector yapılandırması kontrol edilip aktifleştirildikten sonra canlı benchmark listesine eklenir.
           </p>
         </div>
         <div className="isolationNote">
@@ -472,11 +474,11 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
                         const isEditing = editingMappingId === mapping.id;
                         return <article className={`mappingCard ${isEditing ? "editing" : ""}`} key={mapping.id}>
                           <div><span className="providerLetter">{provider?.shortName.slice(0, 1) ?? "?"}</span><div><strong>{provider?.name ?? mapping.providerKey}</strong><small>{selected.markets.find((market) => market.id === mapping.marketId)?.label ?? mapping.marketId} · {Object.keys(mapping.roomAliases).length} oda alias grubu</small></div></div>
-                          <span className={`mappingStatus ${mapping.status}`}>{MAPPING_STATUS_LABELS[mapping.status]}{DYNAMIC_COLLECTOR_PROVIDERS.some((key) => key === mapping.providerKey) ? " · Collector destekli" : ""}</span>
-                          {editable && <div className="mappingActions"><button type="button" aria-expanded={isEditing} onClick={() => setEditingMappingId(isEditing ? null : mapping.id)} disabled={busy}>{isEditing ? "Düzenlemeyi kapat" : "Düzenle"}</button><button type="button" onClick={() => setMappingStatus(mapping.id, "verified")} disabled={busy || mapping.status === "verified"}>Doğrula</button><button type="button" onClick={() => setMappingStatus(mapping.id, "disabled")} disabled={busy || mapping.status === "disabled"}>Devre dışı</button></div>}
+                          <span className={`mappingStatus ${mapping.status} ${mapping.lastLiveCheckSucceeded === false ? "liveFailed" : ""}`}>{mapping.lastLiveCheckSucceeded === false ? "Son canlı kontrol başarısız" : mapping.liveVerifiedAt ? "Canlı sorguda doğrulandı" : MAPPING_STATUS_LABELS[mapping.status]}{DYNAMIC_COLLECTOR_PROVIDERS.some((key) => key === mapping.providerKey) ? " · Collector destekli" : ""}</span>
+                          {editable && <div className="mappingActions"><button type="button" aria-expanded={isEditing} onClick={() => setEditingMappingId(isEditing ? null : mapping.id)} disabled={busy}>{isEditing ? "Düzenlemeyi kapat" : "Düzenle"}</button><button type="button" onClick={() => setMappingStatus(mapping.id, "configured")} disabled={busy || mapping.status === "configured"}>Yapılandırmayı kontrol et</button><button type="button" onClick={() => setMappingStatus(mapping.id, "disabled")} disabled={busy || mapping.status === "disabled"}>Devre dışı</button></div>}
                           {editable && isEditing && (
                             <form className="managerForm mappingEditForm" key={`${mapping.id}:${selected.version}`} onSubmit={(event) => updateMapping(event, mapping)}>
-                              <div className="mappingEditHeading"><div><strong>{provider?.name ?? mapping.providerKey} eşlemesini düzenle</strong><small>OTA ve pazar değiştirilemez. Kimlik veya oda adları değişirse kanal yeniden doğrulanmalıdır.</small></div><button type="button" onClick={() => setEditingMappingId(null)} disabled={busy}>Kapat</button></div>
+                              <div className="mappingEditHeading"><div><strong>{provider?.name ?? mapping.providerKey} eşlemesini düzenle</strong><small>OTA ve pazar değiştirilemez. Kimlik veya oda adları değişirse yapılandırma yeniden kontrol edilmelidir.</small></div><button type="button" onClick={() => setEditingMappingId(null)} disabled={busy}>Kapat</button></div>
                               <div className="formGrid formGridThree">
                                 <label><span>Harici otel kimliği</span><input name="externalHotelId" defaultValue={mapping.externalHotelId ?? ""} /></label>
                                 <label><span>Kanal sayfa adresi</span><input name="pageUrl" type="url" defaultValue={mapping.pageUrl ?? ""} placeholder="https://…" /></label>
@@ -506,11 +508,11 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
                     <div><span className="stepKicker">05 / DURUM</span><h2>Kontrollü yayın akışı</h2><p>“Hazır”, yapılandırmanın tamamlandığını belirtir. Canlı benchmark’a otomatik dahil etmez.</p></div>
                     <div className="releaseActions">
                       {selected.status === "draft" && <><button className="managerPrimary" onClick={() => setHotelStatus("ready")} disabled={busy}>Hazıra al</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
-                      {selected.status === "ready" && <><button className="managerPrimary" onClick={() => setHotelStatus("active")} disabled={busy}>Doğrula ve aktifleştir</button><button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslağa dön</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
+                      {selected.status === "ready" && <><button className="managerPrimary" onClick={() => setHotelStatus("active")} disabled={busy}>Aktifleştir</button><button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslağa dön</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
                       {selected.status === "active" && <><button className="managerSecondary" onClick={() => setHotelStatus("ready")} disabled={busy}>Hazıra çek</button><button className="managerDanger" onClick={() => setHotelStatus("archived")} disabled={busy}>Arşivle</button></>}
                       {selected.status === "archived" && <button className="managerSecondary" onClick={() => setHotelStatus("draft")} disabled={busy}>Taslak olarak geri aç</button>}
                     </div>
-                      {selected.status === "ready" && <div className="runtimeGuard"><strong>Collector doğrulaması zorunlu</strong><span>Aktivasyon için her pazarda ANEX Tour (EUR/RUB), Booking.com, CHECK24 (EUR), Coral Travel (EUR/RUB), Expedia, HolidayCheck, Loveholidays (EUR/GBP), On the Beach (GBP/Antalya), PEGAS Touristik (RUB), Restplatzbörse (EUR), Schauinsland (EUR), Stayforlong (EUR) veya TUI (EUR) kanallarından en az birinin doğrulanmış sayfa adresi ve kapsamdaki tüm odaların alias kayıtları gerekir. Coral Travel için EUR pazarında sayısal GIATA, RUB pazarında `otel-7-bölge-6` biçimli konum kimliği; ANEX, CHECK24, Loveholidays, On the Beach, PEGAS, Restplatzbörse ve Stayforlong için ilgili sayısal kimlik; Schauinsland ve TUI için sayısal GIATA kimliği “Harici otel kimliği” alanına girilir. Eksik yapılandırma kapalı biçimde reddedilir.</span></div>}
+                      {selected.status === "ready" && <div className="runtimeGuard"><strong>Collector yapılandırma kontrolü zorunlu</strong><span>Aktivasyon için her pazarda desteklenen kanallardan en az birinin kimlik/sayfa bilgisi ve kapsamdaki tüm odaların alias kayıtları kontrol edilmiş olmalıdır. Bu kontrol canlı OTA erişiminin veya fiyat alınacağının kanıtı değildir; canlı sonuçlar benchmark sorgusunda ayrıca raporlanır. Eksik yapılandırma kapalı biçimde reddedilir.</span></div>}
                   </section>
                 </>
               )}

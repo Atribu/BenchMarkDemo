@@ -280,7 +280,7 @@ function parseUpdate(
 function parseStatus(value: unknown): SetChannelMappingStatusPayload {
   const input = record(value, "Kanal eşleştirme durumu");
   onlyKeys(input, ["version", "status"], "Kanal eşleştirme durumu");
-  if (!['draft', 'verified', 'disabled'].includes(String(input.status)))
+  if (!['draft', 'configured', 'disabled'].includes(String(input.status)))
     throw new Error("Kanal eşleştirme durumu geçersiz.");
   return {
     version: version(input.version),
@@ -466,7 +466,10 @@ export class HotelChannelManagementService {
             : input.searchName ?? mapping.searchName,
         roomAliases: input.roomAliases ?? mapping.roomAliases,
         status: "draft",
-        verifiedAt: undefined,
+        configurationCheckedAt: undefined,
+        liveVerifiedAt: undefined,
+        lastLiveCheckAt: undefined,
+        lastLiveCheckSucceeded: undefined,
       };
       try {
         assertIdentity(updatedMapping);
@@ -518,7 +521,7 @@ export class HotelChannelManagementService {
       const mapping = hotel.channelMappings.find((item) => item.id === parsedMappingId);
       if (!mapping)
         throw new HotelManagementError("not_found", "Kanal eşleştirmesi bulunamadı.");
-      if (input.status === "verified") {
+      if (input.status === "configured") {
         try {
           assertIdentity(mapping);
         } catch (error) {
@@ -530,7 +533,7 @@ export class HotelChannelManagementService {
         if (!hotel.matchingPolicy)
           throw new HotelManagementError(
             "conflict",
-            "Kanal doğrulanmadan önce oda eşleştirme politikası oluşturulmalıdır.",
+            "Kanal yapılandırması kontrol edilmeden önce oda eşleştirme politikası oluşturulmalıdır.",
           );
         const missingAlias = Object.values(hotel.matchingPolicy.roomByView).find(
           (roomId) => (mapping.roomAliases[roomId]?.length ?? 0) === 0,
@@ -545,7 +548,16 @@ export class HotelChannelManagementService {
       const updatedMapping: HotelChannelMappingRecord = {
         ...mapping,
         status: input.status,
-        verifiedAt: input.status === "verified" ? now : undefined,
+        configurationCheckedAt:
+          input.status === "configured" ? now : undefined,
+        liveVerifiedAt:
+          input.status === "configured" ? mapping.liveVerifiedAt : undefined,
+        lastLiveCheckAt:
+          input.status === "configured" ? mapping.lastLiveCheckAt : undefined,
+        lastLiveCheckSucceeded:
+          input.status === "configured"
+            ? mapping.lastLiveCheckSucceeded
+            : undefined,
       };
       const updated: ManagedHotelRecord = {
         ...hotel,
