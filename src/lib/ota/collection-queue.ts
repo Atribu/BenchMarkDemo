@@ -16,3 +16,34 @@ export async function collectInBatches<T>(
   );
   return results;
 }
+
+export interface TypedCollectionJob<T> {
+  collectionType: "browser" | "api";
+  run: () => Promise<T>;
+}
+
+export async function collectByCollectionType<T>(
+  jobs: TypedCollectionJob<T>[],
+  apiConcurrency = 3,
+): Promise<T[]> {
+  if (!Number.isInteger(apiConcurrency) || apiConcurrency < 1)
+    throw new Error("Invalid API concurrency");
+
+  const results: T[] = new Array(jobs.length);
+  const indexedJobs = jobs.map((job, index) => ({ ...job, index }));
+  const runGroup = (
+    collectionType: TypedCollectionJob<T>["collectionType"],
+    concurrency: number,
+  ) =>
+    collectInBatches(
+      indexedJobs
+        .filter((job) => job.collectionType === collectionType)
+        .map((job) => async () => {
+          results[job.index] = await job.run();
+        }),
+      concurrency,
+    );
+
+  await Promise.all([runGroup("browser", 1), runGroup("api", apiConcurrency)]);
+  return results;
+}

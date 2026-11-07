@@ -21,8 +21,14 @@ import {
 import { matchAnexRoom } from "../src/lib/ota/live-anextour";
 import { matchPegasRuntimeRoom } from "../src/lib/ota/live-pegastour";
 import { matchCoralRuntimeRoom } from "../src/lib/ota/live-coraltravel";
-import { parseRuntimeScopeKey } from "../src/lib/hotels/identifiers";
+import {
+  parseRuntimeHotelId,
+  parseRuntimeHotelKey,
+  parseRuntimeScopeKey,
+} from "../src/lib/hotels/identifiers";
+import type { HotelStore } from "../src/lib/hotels/file-store";
 import { createHotelDraft, type ManagedHotelRecord } from "../src/lib/hotels/model";
+import { loadDynamicHotelRuntimeContext } from "../src/lib/hotels/runtime-store";
 import {
   addDynamicScopesToProviders,
   buildDynamicHotelRuntimeManifest,
@@ -81,6 +87,34 @@ function readyHotel(
   };
 }
 
+function activeHotelWithMarket(
+  hotel: ManagedHotelRecord,
+  input: { id: string; key: string; name: string; marketId: string },
+): ManagedHotelRecord {
+  const marketId = parseRuntimeScopeKey(input.marketId);
+  return {
+    ...hotel,
+    id: parseRuntimeHotelId(input.id),
+    key: parseRuntimeHotelKey(input.key),
+    name: input.name,
+    status: "active",
+    markets: hotel.markets.map((market) => ({ ...market, id: marketId })),
+    channelMappings: hotel.channelMappings.map((mapping) => ({
+      ...mapping,
+      marketId,
+    })),
+  };
+}
+
+function readOnlyHotelStore(hotels: ManagedHotelRecord[]): HotelStore {
+  return {
+    load: async () => hotels,
+    update: async () => {
+      throw new Error("Test store is read-only.");
+    },
+  };
+}
+
 test("verified Booking mappings become an executable runtime manifest", () => {
   const manifest = buildDynamicHotelRuntimeManifest(readyHotel());
   assert.equal(manifest.scopes.length, 1);
@@ -97,6 +131,126 @@ test("verified Booking mappings become an executable runtime manifest", () => {
       "standard-land"
     ],
     ["Standard Room with Land View"],
+  );
+});
+
+test("an invalid active hotel is quarantined without hiding valid dynamic hotels", async () => {
+  const validHotel: ManagedHotelRecord = {
+    ...readyHotel(),
+    status: "active",
+  };
+  const invalidHotel: ManagedHotelRecord = {
+    ...readyHotel(),
+    id: parseRuntimeHotelId("hotel_runtime_invalid"),
+    key: parseRuntimeHotelKey("invalid-resort"),
+    name: "Invalid Resort",
+    status: "active",
+    matchingPolicy: undefined,
+  };
+  const store = readOnlyHotelStore([validHotel, invalidHotel]);
+
+  const context = await loadDynamicHotelRuntimeContext(store);
+  assert.equal(context.manifests.length, 1);
+  assert.equal(context.manifests[0].hotelKey, "example-resort");
+  assert.ok(
+    context.catalog.some(
+      (scope) => String(scope.hotelKey) === "example-resort",
+    ),
+  );
+  assert.equal(
+    context.catalog.some(
+      (scope) => String(scope.hotelKey) === "invalid-resort",
+    ),
+    false,
+  );
+  assert.equal(context.manifestWarnings.length, 1);
+  assert.match(context.manifestWarnings[0], /Invalid Resort/);
+  assert.match(context.manifestWarnings[0], /politikası eksik/);
+
+  const report = await runBenchmarkJob(
+    {
+      mode: "mock",
+      providerKeys: ["booking"],
+      scopeKeys: [context.scopes[0].id],
+      customWindow: { checkIn: "2026-12-10", checkOut: "2026-12-15" },
+    },
+    undefined,
+    context,
+  );
+  assert.ok(report.warnings.some((warning) => warning.includes("Invalid Resort")));
+});
+
+test("a dynamic hotel cannot replace a static market scope at runtime", async () => {
+  const validHotel = activeHotelWithMarket(readyHotel(), {
+    id: "hotel_runtime_valid",
+    key: "valid-resort",
+    name: "Valid Resort",
+    marketId: "valid-eu",
+  });
+  const conflictingHotel = activeHotelWithMarket(readyHotel(), {
+    id: "hotel_runtime_static_conflict",
+    key: "static-conflict-resort",
+    name: "Static Conflict Resort",
+    marketId: "beach-eu",
+  });
+
+  const context = await loadDynamicHotelRuntimeContext(
+    readOnlyHotelStore([validHotel, conflictingHotel]),
+  );
+  assert.deepEqual(
+    context.manifests.map((manifest) => manifest.hotelKey),
+    ["valid-resort"],
+  );
+  assert.ok(
+    context.manifestWarnings.some(
+      (warning) =>
+        warning.includes("Static Conflict Resort") &&
+        warning.includes("beach-eu"),
+    ),
+  );
+  assert.equal(
+    context.catalog.filter((scope) => scope.id === "beach-eu").length,
+    1,
+  );
+});
+
+test("all dynamic hotels sharing one market scope are quarantined", async () => {
+  const first = activeHotelWithMarket(readyHotel(), {
+    id: "hotel_runtime_shared_first",
+    key: "shared-first-resort",
+    name: "Shared First Resort",
+    marketId: "shared-eu",
+  });
+  const second = activeHotelWithMarket(readyHotel(), {
+    id: "hotel_runtime_shared_second",
+    key: "shared-second-resort",
+    name: "Shared Second Resort",
+    marketId: "shared-eu",
+  });
+
+  const context = await loadDynamicHotelRuntimeContext(
+    readOnlyHotelStore([first, second]),
+  );
+  assert.equal(context.manifests.length, 0);
+  assert.equal(context.manifestWarnings.length, 2);
+  assert.ok(
+    context.manifestWarnings.every((warning) => warning.includes("shared-eu")),
+  );
+});
+
+test("runtime hotel storage failures are not mistaken for one invalid manifest", async () => {
+  const store: HotelStore = {
+    load: async () => {
+      throw new Error("Hotel storage is unavailable.");
+    },
+    update: async () => {
+      throw new Error("Test store is read-only.");
+    },
+  };
+
+  await assert.rejects(
+    loadDynamicHotelRuntimeContext(store),
+    /Hotel storage is unavailable/,
   );
 });
 

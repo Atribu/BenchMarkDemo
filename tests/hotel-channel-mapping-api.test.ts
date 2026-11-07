@@ -224,6 +224,28 @@ test("Stayforlong mapping accepts the German collector domain", async () => {
   }
 });
 
+test("ANEX Tour mapping accepts the German hotel-only collector domain", async () => {
+  const { directory, collection } = await fixture();
+  try {
+    const response = await createMapping(collection, {
+      ...validMapping,
+      providerKey: "anextour",
+      externalHotelId: "96396",
+      pageUrl: "https://nurhotel.anextour.de/search/offer?aid=96396",
+      searchName: "Delphin Imperial Hotel",
+    });
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.mapping.externalHotelId, "96396");
+    assert.equal(
+      payload.mapping.pageUrl,
+      "https://nurhotel.anextour.de/search/offer?aid=96396",
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("one OTA and market pair can have only one mapping", async () => {
   const { directory, collection } = await fixture();
   try {

@@ -128,6 +128,10 @@ function providerPageUrl(
   }
 
   const providerDomains: Record<string, string[]> = {
+    anextour: [
+      "anextour.de",
+      "anextour.ru",
+    ],
     expedia: [
       "expedia.com",
       "expedia.de",

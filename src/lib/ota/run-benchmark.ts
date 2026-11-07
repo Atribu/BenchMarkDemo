@@ -28,7 +28,10 @@ import {
   collectOnTheBeachLiveQuotes,
 } from "@/src/lib/ota/live-uk-ota";
 import { OTA_PROVIDERS } from "@/src/lib/ota/registry";
-import { collectInBatches } from "./collection-queue";
+import {
+  collectByCollectionType,
+  collectInBatches,
+} from "./collection-queue";
 import { collectGoogleHotelPrices } from "./live-google-hotels";
 import { collectHolidayCheckSecondary } from "./holidaycheck-secondary";
 import { collectSerpApiHotelPrices, serpApiEnabled } from "./live-serpapi";
@@ -401,6 +404,18 @@ async function collectLiveProviderQuotes(
   }
 }
 
+function shouldRetryCheck24(
+  provider: ProviderDescriptor,
+  result: ProviderCollectionResult,
+): boolean {
+  return (
+    provider.key === "check24" &&
+    !result.quotes.some((quote) => quote.status === "available") &&
+    (result.offers?.length ?? 0) === 0 &&
+    result.quotes.some((quote) => quote.errorCode === "timeout")
+  );
+}
+
 export async function runBenchmarkJob(
   request: Partial<BenchmarkRequest> = {},
   collectLive: typeof collectLiveProviderQuotes = collectLiveProviderQuotes,
@@ -421,7 +436,8 @@ export async function runBenchmarkJob(
     | "schauinslandConfigs"
     | "stayforlongConfigs"
     | "tuiConfigs"
-  >,
+  > &
+    Partial<Pick<DynamicHotelRuntimeContext, "manifestWarnings">>,
 ) {
   const scopeCatalog = runtimeContext?.catalog ?? REPORT_SCOPES;
   const providerCatalog = runtimeContext?.providers ?? OTA_PROVIDERS;
@@ -449,7 +465,11 @@ export async function runBenchmarkJob(
   );
   const selectedScopes = plan.scopes;
 
-  const warnings: string[] = [...customWindowResult.warnings, ...plan.warnings];
+  const warnings: string[] = [
+    ...(runtimeContext?.manifestWarnings ?? []),
+    ...customWindowResult.warnings,
+    ...plan.warnings,
+  ];
 
   if (resolvedRequest.mode === "live") {
     warnings.push(
@@ -461,10 +481,10 @@ export async function runBenchmarkJob(
     warnings.push("Hic scope secilmedigi icin rapor bos olustu.");
   }
 
-  const collectionResults = await collectInBatches(
-    plan.tasks.map(
-      ({ provider, scope, supported, reason }) =>
-        async (): Promise<ProviderCollectionResult> => {
+  const collectionJobs = plan.tasks.map(
+    ({ provider, scope, supported, reason }) => ({
+      collectionType: provider.collectionType,
+      run: async (): Promise<ProviderCollectionResult> => {
           const startedAt = new Date().toISOString();
           const startedMs = Date.now();
           let result: ProviderCollectionResult;
@@ -515,20 +535,36 @@ export async function runBenchmarkJob(
                         : provider.key === "stayforlong"
                           ? runtimeContext?.stayforlongConfigs[scope.id]
                   : undefined;
-            result = await collectLive(
-              provider,
-              scope,
-              runtimeCollectorConfig,
-            ).catch((error) => {
-              const detail = `${provider.name}: ${error instanceof Error ? error.message.split("\n")[0] : "Bağlantı hatası"}`;
-              return buildManualReviewQuotes(
-                provider,
-                scope,
-                "",
-                detail,
-                detail,
+            const collectOnce = () =>
+              collectLive(provider, scope, runtimeCollectorConfig).catch(
+                (error) => {
+                  const detail = `${provider.name}: ${
+                    error instanceof Error
+                      ? error.message.split("\n")[0]
+                      : "Bağlantı hatası"
+                  }`;
+                  return buildManualReviewQuotes(
+                    provider,
+                    scope,
+                    "",
+                    detail,
+                    detail,
+                  );
+                },
               );
-            });
+            result = await collectOnce();
+            if (shouldRetryCheck24(provider, result)) {
+              const firstWarnings = result.warnings;
+              result = await collectOnce();
+              result = {
+                ...result,
+                warnings: [
+                  ...firstWarnings,
+                  `CHECK24 / ${scope.hotelName}: ilk sorgu zaman aşımına uğradığı için bir kez yeniden denendi.`,
+                  ...result.warnings,
+                ],
+              };
+            }
           } else {
             result = {
               quotes: await collectProviderQuotes(
@@ -552,9 +588,13 @@ export async function runBenchmarkJob(
             completedAt,
             durationMs: Date.now() - startedMs,
           });
-        },
-    ),
+      },
+    }),
   );
+  const collectionResults =
+    resolvedRequest.mode === "live"
+      ? await collectByCollectionType(collectionJobs)
+      : await collectInBatches(collectionJobs.map((job) => job.run));
 
   let quotes = collectionResults.flatMap((result) => result.quotes);
   const collectionAttempts = collectionResults.flatMap(

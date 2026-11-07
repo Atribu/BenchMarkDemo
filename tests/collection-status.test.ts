@@ -168,6 +168,66 @@ test("collector errors reach report cells with structured status labels", async 
   }
 });
 
+test("CHECK24 retries once after a timeout and keeps the successful result", async () => {
+  const previousGoogle = process.env.OTA_GOOGLE_HOTELS;
+  const previousSecondary = process.env.OTA_HOLIDAYCHECK_SECONDARY;
+  process.env.OTA_GOOGLE_HOTELS = "false";
+  process.env.OTA_HOLIDAYCHECK_SECONDARY = "false";
+  let calls = 0;
+
+  try {
+    const report = await runBenchmarkJob(
+      {
+        mode: "live",
+        providerKeys: ["check24"],
+        scopeKeys: ["queen-eu"],
+        customWindow: {
+          checkIn: "2027-05-10",
+          checkOut: "2027-05-15",
+        },
+      },
+      async (provider, scope) => {
+        calls++;
+        return {
+          quotes: scope.rooms.map((room) => ({
+            providerKey: provider.key,
+            scopeKey: scope.id,
+            roomId: room.id,
+            windowId: scope.windows[0].id,
+            price: calls === 1 ? null : 1400,
+            currency: scope.currency,
+            status:
+              calls === 1
+                ? ("manual-review" as const)
+                : ("available" as const),
+            errorCode: calls === 1 ? ("timeout" as const) : undefined,
+            dataMode: "live" as const,
+            sourceHint: "https://hotels.check24.de/",
+            reason: calls === 1 ? "Timeout 60000ms exceeded." : undefined,
+          })),
+          warnings: calls === 1 ? ["İlk CHECK24 çağrısı zaman aşımı."] : [],
+        };
+      },
+    );
+
+    assert.equal(calls, 2);
+    assert.ok(
+      report.scopes[0].windows[0].rows.every(
+        (row) => row.entries[0].status === "available",
+      ),
+    );
+    assert.ok(
+      report.warnings.some((warning) => warning.includes("yeniden denendi")),
+    );
+  } finally {
+    if (previousGoogle === undefined) delete process.env.OTA_GOOGLE_HOTELS;
+    else process.env.OTA_GOOGLE_HOTELS = previousGoogle;
+    if (previousSecondary === undefined)
+      delete process.env.OTA_HOLIDAYCHECK_SECONDARY;
+    else process.env.OTA_HOLIDAYCHECK_SECONDARY = previousSecondary;
+  }
+});
+
 test("real, demo, manual and no-offer results retain their provenance", () => {
   assert.equal(
     benchmarkStatusLabel({

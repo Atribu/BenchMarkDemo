@@ -96,7 +96,7 @@ test("market API adds a normalized market to a draft hotel", async () => {
 });
 
 test("market IDs cannot collide with system or user scopes", async () => {
-  const { directory, collection } = await fixture();
+  const { directory, collection, store } = await fixture();
   try {
     const systemConflict = await collection.POST(
       jsonRequest(
@@ -121,13 +121,28 @@ test("market IDs cannot collide with system or user scopes", async () => {
       ).status,
       201,
     );
+    await store.update((hotels) => ({
+      hotels: [
+        ...hotels,
+        createHotelDraft({
+          id: "hotel_02",
+          key: "second-resort",
+          name: "Second Resort",
+          shortCode: "SR",
+          location: { countryCode: "TR", city: "Antalya" },
+          createdBy: "creator",
+          now: "2026-11-05T09:30:00.000Z",
+        }),
+      ],
+      result: undefined,
+    }));
     const userConflict = await collection.POST(
       jsonRequest(
-        "http://localhost/api/hotels/hotel_01/markets",
+        "http://localhost/api/hotels/hotel_02/markets",
         "POST",
-        { ...validMarket, version: 2 },
+        validMarket,
       ),
-      collectionContext(),
+      collectionContext("hotel_02"),
     );
     assert.equal(userConflict.status, 409);
   } finally {

@@ -10,7 +10,10 @@ import {
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { collectInBatches } from "../src/lib/ota/collection-queue";
+import {
+  collectByCollectionType,
+  collectInBatches,
+} from "../src/lib/ota/collection-queue";
 import { pricePageAccessError } from "../src/lib/ota/browser-diagnostics";
 import { resolveProviderLiveConfig } from "../src/lib/ota/live-helpers";
 import {
@@ -36,6 +39,44 @@ test("Collection queue bounds active jobs and preserves request order", async ()
   assert.deepEqual(await collectInBatches([]), []);
   await assert.rejects(collectInBatches([], 0));
   await assert.rejects(collectInBatches([], 1.5));
+});
+
+test("Live collection serializes browser jobs while API jobs stay parallel", async () => {
+  let activeBrowsers = 0;
+  let peakBrowsers = 0;
+  let activeApis = 0;
+  let peakApis = 0;
+  const jobs = [
+    { collectionType: "browser" as const, value: "browser-1" },
+    { collectionType: "api" as const, value: "api-1" },
+    { collectionType: "browser" as const, value: "browser-2" },
+    { collectionType: "api" as const, value: "api-2" },
+    { collectionType: "api" as const, value: "api-3" },
+  ].map(({ collectionType, value }) => ({
+    collectionType,
+    run: async () => {
+      if (collectionType === "browser") {
+        peakBrowsers = Math.max(peakBrowsers, ++activeBrowsers);
+      } else {
+        peakApis = Math.max(peakApis, ++activeApis);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      if (collectionType === "browser") activeBrowsers--;
+      else activeApis--;
+      return value;
+    },
+  }));
+
+  assert.deepEqual(await collectByCollectionType(jobs, 3), [
+    "browser-1",
+    "api-1",
+    "browser-2",
+    "api-2",
+    "api-3",
+  ]);
+  assert.equal(peakBrowsers, 1);
+  assert.equal(peakApis, 3);
+  await assert.rejects(collectByCollectionType([], 0));
 });
 
 test("Anonymous session keys isolate provider, currency, market and proxy without exposing credentials", () => {
