@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import ExcelJS from "exceljs";
 import {
   parsePriceFromText,
   resolveProviderLiveConfig,
@@ -16,6 +17,10 @@ import { REPORT_SCOPES } from "../src/lib/benchmark/sample-data";
 import { OTA_PROVIDERS } from "../src/lib/ota/registry";
 import { buildBenchmarkResult } from "../src/lib/benchmark/engine";
 import { benchmarkCsv } from "../src/lib/benchmark/export";
+import {
+  buildBenchmarkXlsxWorkbook,
+  parseBenchmarkXlsxPayload,
+} from "../src/lib/benchmark/xlsx-export";
 import type { CurrencyCode, ProviderQuote } from "../src/lib/benchmark/types";
 
 const priceCases: [string, CurrencyCode, number | null][] = [
@@ -521,6 +526,102 @@ test("CSV includes context, escapes quotes and neutralizes formulas", () => {
   assert.ok(!csv.includes("Referans"));
   assert.ok(!csv.includes("Fark (%)"));
   assert.ok(csv.includes(`'=HYPERLINK(""https://example.com"")`));
+});
+
+test("XLSX export keeps numeric prices, formulas and unavailable channel labels", async () => {
+  const payload = parseBenchmarkXlsxPayload({
+    runId: "run-test",
+    generatedAt: "2026-11-09T12:00:00.000Z",
+    groups: [
+      {
+        hotelName: "Miramare Beach",
+        marketLabel: "Almanya",
+        currency: "EUR",
+        checkIn: "2027-05-10",
+        checkOut: "2027-05-15",
+        nights: 5,
+        rooms: [
+          {
+            roomName: "Superior Kara Manzaralı",
+            referencePrice: 1000,
+            entries: [
+              {
+                providerName: "TUI",
+                price: 1100,
+                status: "available",
+                sourceHint: "https://example.com/offer",
+                reason: { unexpected: true },
+              },
+              {
+                providerName: "Booking.com",
+                price: null,
+                status: "missing",
+                sourceHint: "",
+                reason: "Site erişimi engellendi",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  const workbook = buildBenchmarkXlsxWorkbook(payload);
+  const sheet = workbook.getWorksheet("Fiyat Karşılaştırma")!;
+  assert.equal(sheet.getCell("B4").value, 1000);
+  assert.equal(sheet.getCell("B4").numFmt, '"€"#,##0.00;[Red]-"€"#,##0.00');
+  assert.equal(sheet.getCell("B5").value, 1100);
+  assert.equal(sheet.getCell("B5").numFmt, '"€"#,##0.00;[Red]-"€"#,##0.00');
+  assert.deepEqual(sheet.getCell("C5").value, {
+    formula: "(B5-B4)/B4",
+    result: 0.1,
+  });
+  assert.equal(sheet.getCell("C5").numFmt, "0.00%");
+  assert.equal(sheet.getCell("B6").value, "Site erişimi engellendi");
+  assert.equal(sheet.getCell("C6").value, "—");
+  assert.deepEqual(sheet.getCell("A5").value, {
+    text: "TUI",
+    hyperlink: "https://example.com/offer",
+    tooltip: "Kanal aramasını aç",
+  });
+  const bytes = await workbook.xlsx.writeBuffer();
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(bytes);
+  assert.deepEqual(
+    reopened.getWorksheet("Fiyat Karşılaştırma")?.getCell("C5").value,
+    { formula: "(B5-B4)/B4", result: 0.1 },
+  );
+  assert.equal(
+    reopened.getWorksheet("Fiyat Karşılaştırma")?.getCell("B5").numFmt,
+    '"€"#,##0.00;[Red]-"€"#,##0.00',
+  );
+});
+
+test("XLSX export rejects invalid reference prices", () => {
+  assert.throws(
+    () =>
+      parseBenchmarkXlsxPayload({
+        runId: "run-test",
+        generatedAt: "2026-11-09T12:00:00.000Z",
+        groups: [
+          {
+            hotelName: "Miramare Beach",
+            marketLabel: "Almanya",
+            currency: "EUR",
+            checkIn: "2027-05-10",
+            checkOut: "2027-05-15",
+            nights: 5,
+            rooms: [
+              {
+                roomName: "Superior Kara Manzaralı",
+                referencePrice: 0,
+                entries: [],
+              },
+            ],
+          },
+        ],
+      }),
+    /Referans fiyat geçersiz/,
+  );
 });
 
 test("blank provider proxy inherits shared proxy; explicit stealth=false is respected", (t) => {

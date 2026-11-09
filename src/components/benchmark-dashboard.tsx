@@ -24,6 +24,7 @@ import type {
 } from "@/src/lib/benchmark/types";
 import { nightCount } from "@/src/lib/benchmark/request";
 import { benchmarkCsv } from "@/src/lib/benchmark/export";
+import type { BenchmarkXlsxPayload } from "@/src/lib/benchmark/xlsx-export";
 import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
 import {
   benchmarkErrorLabel,
@@ -45,6 +46,8 @@ interface BenchmarkDashboardProps {
 }
 
 type Section = "benchmark" | "hotels" | "channels";
+type ExcelReferencePrices = Record<string, string>;
+type ExcelSelectedRooms = Record<string, boolean>;
 type IconName =
   "grid" | "hotel" | "channels" | "arrow" | "download" | "check" | "clock" | "external";
 
@@ -246,6 +249,14 @@ function shortDate(date: string) {
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${date}T00:00:00Z`));
+}
+
+function excelReferenceKey(
+  scopeId: string,
+  windowId: string,
+  roomId: string,
+) {
+  return [scopeId, windowId, roomId].join("::");
 }
 
 function sourceUrl(hint: string) {
@@ -833,6 +844,14 @@ export function BenchmarkDashboard({
   const [runningMode, setRunningMode] = useState<CollectionMode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastSelection, setLastSelection] = useState("");
+  const [excelDialogOpen, setExcelDialogOpen] = useState(false);
+  const [excelReferencePrices, setExcelReferencePrices] =
+    useState<ExcelReferencePrices>({});
+  const [excelSelectedRooms, setExcelSelectedRooms] =
+    useState<ExcelSelectedRooms>({});
+  const [excelPricesConfirmed, setExcelPricesConfirmed] = useState(false);
+  const [excelExporting, setExcelExporting] = useState(false);
+  const [excelExportError, setExcelExportError] = useState<string | null>(null);
   const runLock = useRef(false);
   function navigate(nextSection: Section) {
     setSection(nextSection);
@@ -874,6 +893,33 @@ export function BenchmarkDashboard({
         ),
       0,
     ) ?? 0;
+
+  const excelReferenceFields =
+    report?.scopes.flatMap((scope) =>
+      scope.windows.flatMap((window) =>
+        window.rows.map((room) => ({
+          key: excelReferenceKey(scope.id, window.id, room.roomId),
+          hotelName: scope.hotelName,
+          marketLabel: scope.marketLabel,
+          currency: scope.currency,
+          checkIn: window.checkIn,
+          checkOut: window.checkOut,
+          nights: window.nights,
+          roomName: room.roomName,
+        })),
+      ),
+    ) ?? [];
+  const excelPricesValid =
+    excelReferenceFields.some(({ key }) => excelSelectedRooms[key]) &&
+    excelReferenceFields
+      .filter(({ key }) => excelSelectedRooms[key])
+      .every(({ key }) => {
+      const value = Number(excelReferencePrices[key]);
+      return Number.isFinite(value) && value > 0;
+    });
+  const selectedExcelRoomCount = excelReferenceFields.filter(
+    ({ key }) => excelSelectedRooms[key],
+  ).length;
 
   const check24MatchedCount =
     report?.scopes.reduce(
@@ -935,6 +981,11 @@ export function BenchmarkDashboard({
     const mode: CollectionMode = "live";
     if (!canRun || runLock.current) return;
     runLock.current = true;
+    setExcelDialogOpen(false);
+    setExcelReferencePrices({});
+    setExcelSelectedRooms({});
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
     setRunningMode(mode);
     setError(null);
     try {
@@ -969,6 +1020,113 @@ export function BenchmarkDashboard({
     link.download = `dgtlface-benchmark-${report.mode}-${report.runId}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function openExcelDialog() {
+    if (!report) return;
+    setExcelReferencePrices({});
+    setExcelSelectedRooms(
+      Object.fromEntries(excelReferenceFields.map(({ key }) => [key, true])),
+    );
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
+    setExcelDialogOpen(true);
+  }
+
+  function updateExcelReferencePrice(key: string, value: string) {
+    setExcelReferencePrices((current) => ({ ...current, [key]: value }));
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
+  }
+
+  function updateExcelRoomSelection(key: string, selected: boolean) {
+    setExcelSelectedRooms((current) => ({ ...current, [key]: selected }));
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
+  }
+
+  function selectAllExcelRooms(selected: boolean) {
+    setExcelSelectedRooms(
+      Object.fromEntries(
+        excelReferenceFields.map(({ key }) => [key, selected]),
+      ),
+    );
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
+  }
+
+  async function exportExcelReport() {
+    if (!report || !excelPricesValid || excelExporting) return;
+    setExcelExporting(true);
+    setExcelPricesConfirmed(false);
+    setExcelExportError(null);
+    const payload = {
+      runId: report.runId,
+      generatedAt: report.generatedAt,
+      groups: report.scopes.flatMap((scope) =>
+        scope.windows.map((window) => ({
+          hotelName: scope.hotelName,
+          marketLabel: scope.marketLabel,
+          currency: scope.currency,
+          checkIn: window.checkIn,
+          checkOut: window.checkOut,
+          nights: window.nights,
+          rooms: window.rows
+            .filter((room) =>
+              Boolean(
+                excelSelectedRooms[
+                  excelReferenceKey(scope.id, window.id, room.roomId)
+                ],
+              ),
+            )
+            .map((room) => ({
+              roomName: room.roomName,
+              referencePrice: Number(
+                excelReferencePrices[
+                  excelReferenceKey(scope.id, window.id, room.roomId)
+                ],
+              ),
+              entries: room.entries.map((entry) => ({
+                providerName: entry.providerName,
+                price: entry.scrapedPrice,
+                status: entry.status,
+                sourceHint: entry.sourceHint,
+              ...(typeof entry.reason === "string"
+                ? { reason: entry.reason }
+                : {}),
+              })),
+            })),
+        })),
+      ).filter((group) => group.rooms.length > 0),
+    } satisfies BenchmarkXlsxPayload;
+
+    try {
+      const response = await fetch("/api/benchmark/export/xlsx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error ?? "Excel dosyası oluşturulamadı.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `dgtlface-fiyat-karsilastirma-${report.runId}.xlsx`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExcelPricesConfirmed(true);
+    } catch (cause) {
+      setExcelExportError(
+        cause instanceof Error
+          ? cause.message
+          : "Excel dosyası oluşturulamadı.",
+      );
+    } finally {
+      setExcelExporting(false);
+    }
   }
 
   const navItems: {
@@ -1275,13 +1433,22 @@ export function BenchmarkDashboard({
                   <p className="eyebrow">THE BIG PICTURE</p>
                   <h2 id="results-heading">Benchmark raporu</h2>
                 </div>
-                <button
-                  className="exportButton"
-                  onClick={exportReport}
-                  disabled={!report || isRunning}
-                >
-                  <Icon name="download" /> CSV indir
-                </button>
+                <div className="resultExportActions">
+                  <button
+                    className="exportButton"
+                    onClick={exportReport}
+                    disabled={!report || isRunning}
+                  >
+                    <Icon name="download" /> CSV indir
+                  </button>
+                  <button
+                    className="exportButton excelExportButton"
+                    onClick={openExcelDialog}
+                    disabled={!report || isRunning}
+                  >
+                    <Icon name="download" /> Excel çıktısı al
+                  </button>
+                </div>
               </div>
               {report && (
                 <div
@@ -1813,6 +1980,174 @@ export function BenchmarkDashboard({
 
         {section === "hotels" && (
           <HotelManagement providerCatalog={providerCatalog} />
+        )}
+
+        {excelDialogOpen && report && (
+          <div
+            className="excelDialogBackdrop"
+            role="presentation"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                setExcelDialogOpen(false);
+              }
+            }}
+          >
+            <section
+              className="excelDialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="excel-dialog-title"
+            >
+              <header className="excelDialogHeader">
+                <div>
+                  <p className="eyebrow">FİYAT KARŞILAŞTIRMA RAPORU</p>
+                  <h2 id="excel-dialog-title">Excel çıktısı al</h2>
+                  <p>
+                    Her oda için otelin kendi satış fiyatını girin. OTA farkları
+                    bu fiyatlara göre hesaplanacaktır.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="excelDialogClose"
+                  onClick={() => setExcelDialogOpen(false)}
+                  aria-label="Excel penceresini kapat"
+                >
+                  ×
+                </button>
+              </header>
+
+              <form
+                className="excelReferenceForm"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void exportExcelReport();
+                }}
+              >
+                <div className="excelRoomSelectionToolbar">
+                  <span>
+                    <strong>{selectedExcelRoomCount}</strong> /{" "}
+                    {excelReferenceFields.length} oda Excel'e dahil
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      className="textButton"
+                      onClick={() => selectAllExcelRooms(true)}
+                      disabled={
+                        selectedExcelRoomCount === excelReferenceFields.length
+                      }
+                    >
+                      Tümünü seç
+                    </button>
+                    <button
+                      type="button"
+                      className="textButton"
+                      onClick={() => selectAllExcelRooms(false)}
+                      disabled={selectedExcelRoomCount === 0}
+                    >
+                      Temizle
+                    </button>
+                  </div>
+                </div>
+                <div className="excelReferenceList">
+                  {excelReferenceFields.map((field) => {
+                    const selected = Boolean(excelSelectedRooms[field.key]);
+                    return (
+                    <div
+                      className={`excelReferenceField ${selected ? "selected" : "excluded"}`}
+                      key={field.key}
+                    >
+                      <label className="excelRoomToggle">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) =>
+                            updateExcelRoomSelection(
+                              field.key,
+                              event.target.checked,
+                            )
+                          }
+                        />
+                        <span aria-hidden="true" />
+                        <small>Excel'e dahil et</small>
+                      </label>
+                      <span className="excelRoomDetails">
+                        <strong>{field.roomName}</strong>
+                        <small>
+                          {field.hotelName} · {field.marketLabel} ·{" "}
+                          {shortDate(field.checkIn)} – {shortDate(field.checkOut)} ·{" "}
+                          {field.nights} gece
+                        </small>
+                      </span>
+                      <span className="excelPriceInput">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0.01"
+                          step="0.01"
+                          required={selected}
+                          disabled={!selected}
+                          placeholder="0,00"
+                          value={excelReferencePrices[field.key] ?? ""}
+                          onChange={(event) =>
+                            updateExcelReferencePrice(
+                              field.key,
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`${field.roomName} referans fiyatı`}
+                        />
+                        <b>{field.currency}</b>
+                      </span>
+                    </div>
+                    );
+                  })}
+                </div>
+
+                <p className="excelReferenceHelp">
+                  Yalnızca işaretli odalar dosyaya eklenir. Para birimi pazar
+                  sonucundan otomatik alınır. Fiyat; 1 oda, 2 yetişkin ve seçilen
+                  konaklama süresinin toplamı olmalıdır.
+                </p>
+                {excelPricesConfirmed && (
+                  <p className="excelReferenceSuccess" role="status">
+                    Excel dosyası oluşturuldu ve indirme başlatıldı. Dosyayı
+                    Google Sheets ile de açabilirsiniz.
+                  </p>
+                )}
+                {excelExportError && (
+                  <p className="excelReferenceError" role="alert">
+                    {excelExportError}
+                  </p>
+                )}
+                <footer className="excelDialogActions">
+                  <button
+                    type="button"
+                    className="secondaryButton"
+                    onClick={() => setExcelDialogOpen(false)}
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    className="primaryButton"
+                    disabled={!excelPricesValid || excelExporting}
+                  >
+                    {excelExporting ? (
+                      <>
+                        <span className="spinner" /> Excel hazırlanıyor…
+                      </>
+                    ) : (
+                      <>
+                        Excel dosyasını indir <Icon name="download" />
+                      </>
+                    )}
+                  </button>
+                </footer>
+              </form>
+            </section>
+          </div>
         )}
 
         <footer className="workspaceFooter">
