@@ -31,6 +31,26 @@ const SEARCH_URL = "https://www.onthebeach.co.uk/hotels-in";
 const DESTINATION = "Antalya (Alanya, Belek, Lara Beach, Side), Turkey";
 const VERIFICATION_FRAME = 'iframe[title="Verification system"]';
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function buildOnTheBeachLocationPattern(
+  cityName: string,
+  regionNames: readonly string[],
+): RegExp {
+  const city = escapeRegex(cityName.trim());
+  const regions = regionNames.map((region) => region.trim()).filter(Boolean);
+  if (regions.length === 0) return new RegExp(`\\b${city}\\b`, "i");
+
+  return new RegExp(
+    `(?=[\\s\\S]*\\b${city}\\b)(?=[\\s\\S]*\\b(?:${regions
+      .map(escapeRegex)
+      .join("|")})\\b)`,
+    "i",
+  );
+}
+
 export interface OnTheBeachSnapshot {
   sourceUrl: string;
   hotelName: string;
@@ -933,13 +953,30 @@ console.log("[OnTheBeach] Results structure inspection:", {
 
 onStep("Hotel Only hedef oteli sonuç sayfalarında arama");
 
-const targetHotelResult = targetHotelId
+const resultCards = page.locator(".hotel-result.search-result");
+const targetHotelById = targetHotelId
   ? page.locator(
       `.hotel-result.search-result[data-hotel-id="${targetHotelId}"]`,
     )
-  : page.locator(".hotel-result.search-result").filter({
-      has: page.getByText(targetHotelName, { exact: true }),
-    });
+  : page.locator(".__missing-onthebeach-hotel-id");
+const exactHotelName = new RegExp(
+  `^\\s*${escapeRegex(targetHotelName)}\\s*$`,
+  "i",
+);
+const locationPattern = buildOnTheBeachLocationPattern(
+  runtimeConfig?.onthebeach?.cityName ?? "Antalya",
+  runtimeConfig?.onthebeach?.regionNames ?? [],
+);
+const targetHotelByNameAndLocation = resultCards
+  .filter({
+    has: page
+      .locator("h3.hotel-result__title")
+      .filter({ hasText: exactHotelName }),
+  })
+  .filter({ hasText: locationPattern });
+const targetHotelResult = targetHotelId
+  ? targetHotelById.or(targetHotelByNameAndLocation)
+  : targetHotelByNameAndLocation;
 
 const currentResultsUrl = new URL(page.url());
 
@@ -989,6 +1026,11 @@ while (currentPage <= lastResultPage) {
       hotel: targetHotelName,
       page: currentPage,
       url: page.url(),
+      matchedById: targetHotelId
+        ? (await targetHotelById.count()) > 0
+        : false,
+      matchedByNameAndLocation:
+        (await targetHotelByNameAndLocation.count()) > 0,
     });
 
     break;

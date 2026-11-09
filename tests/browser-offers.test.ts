@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   parseOnTheBeachQuotes,
   parseOnTheBeachOffers,
+  buildOnTheBeachLocationPattern,
   collectOnTheBeachLiveQuotes,
   resolveOnTheBeachCardName,
   resolveOnTheBeachPropertyId,
@@ -23,6 +24,16 @@ const uk = REPORT_SCOPES.find((scope) => scope.id === "beach-uk")!;
 const eu = REPORT_SCOPES.find((scope) => scope.id === "beach-eu")!;
 const otb = OTA_PROVIDERS.find((provider) => provider.key === "onthebeach")!;
 const expedia = OTA_PROVIDERS.find((provider) => provider.key === "expedia")!;
+const syEu = REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-eu")!;
+
+test("On the Beach name fallback requires the configured city and one configured region", () => {
+  const location = buildOnTheBeachLocationPattern("Antalya", ["Lara", "Kundu"]);
+
+  assert.match("Delphin Imperial (Lara, Antalya, Turkey)", location);
+  assert.match("Delphin Imperial (Kundu, Antalya, Turkey)", location);
+  assert.doesNotMatch("Delphin Imperial (Alanya, Antalya, Turkey)", location);
+  assert.doesNotMatch("Delphin Imperial (Lara, Dalaman, Turkey)", location);
+});
 
 test("On the Beach uses the supplier card name without changing the canonical hotel identity", () => {
   const sy = REPORT_SCOPES.find((scope) => scope.id === "sy-hotels-uk")!;
@@ -467,7 +478,7 @@ test("Expedia production browser uses the requested market, persistent state and
   assert.equal(config.proxyUrl, "http://user:secret@proxy.test:8080");
   assert.equal(
     config.profilePath,
-    "/tmp/benchmark-expedia-test/expedia-browser-profile-beach-eu",
+    "/tmp/benchmark-expedia-test/expedia-browser-profile",
   );
 
   environment.EXPEDIA_HEADLESS = "false";
@@ -483,6 +494,54 @@ test("Expedia reads current stay total, never previous or nightly price, and rec
   assert.equal(land.status, "sold_out");
   assert.equal(sea.price, 1883);
   assert.equal(sea.captureMethod, "automated");
+});
+
+test("Expedia accepts verified SY Hotels aliases containing deluxe room categories", () => {
+  const pageUrl =
+    "https://www.expedia.com/Serik-Hotels-Sy-Hotels-Belek.h112329850.Hotel-Information";
+  const snapshot: ExpediaSnapshot = {
+    url: buildExpediaUrl(pageUrl, syEu, window.checkIn, window.checkOut),
+    hotelName: "Sy Hotels Belek - All inclusive",
+    travellers: "Travellers, 2 travellers, 1 room",
+    startLabel: "Start date, 16 Oct",
+    endLabel: "End date, 21 Oct",
+    currencyLabel: "EUR Germany",
+    cards: [
+      {
+        name: "Deluxe Superior",
+        text: "All-inclusive",
+        priceText:
+          "The current price is €1,450\nfor 5 nights, 1 room\nincludes taxes & fees",
+      },
+      {
+        name: "Deluxe Family Swim-Up Room",
+        text: "All-inclusive",
+        priceText:
+          "The current price is €1,850\nfor 5 nights, 1 room\nincludes taxes & fees",
+      },
+      {
+        name: "Deluxe Shallow Pool Room",
+        text: "All-inclusive",
+        priceText:
+          "The current price is €1,650\nfor 5 nights, 1 room\nincludes taxes & fees",
+      },
+    ],
+  };
+
+  const quotes = parseExpediaQuotes(expedia, syEu, window, snapshot);
+
+  assert.equal(
+    quotes.find((quote) => quote.roomId === "deluxe-superior")?.price,
+    1450,
+  );
+  assert.equal(
+    quotes.find((quote) => quote.roomId === "deluxe-family-swim-up")?.price,
+    1850,
+  );
+  assert.equal(
+    quotes.find((quote) => quote.roomId === "deluxe-shallow-pool")?.price,
+    1650,
+  );
 });
 
 test("Expedia reads German stay totals with the currency after the amount", () => {

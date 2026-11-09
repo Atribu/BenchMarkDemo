@@ -92,6 +92,10 @@ test("collector reasons are classified centrally when no explicit code exists", 
     ["Servis API anahtarı eksik.", "configuration_missing"],
     ["İstenen oda için fiyat eşleşmedi.", "room_mapping_failed"],
     ["Teklif bulunamadı.", "no_inventory"],
+    [
+      "Delphin Imperial seçili tarihlerde Hotel Only envanterinde listelenmedi.",
+      "no_inventory",
+    ],
     ["Kaynak yanıtı ayrıştırılamadı.", "invalid_response"],
   ] as const;
 

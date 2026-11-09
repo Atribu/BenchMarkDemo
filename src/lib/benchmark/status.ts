@@ -69,7 +69,7 @@ export function classifyBenchmarkErrorCode(
   )
     return "configuration_missing";
   if (
-    /teklif bulunamadi|no availability|no inventory|sold out|musaitlik (?:yok|bulunamadi)|secilen tarih.*fiyat alinamadi/.test(
+    /teklif bulunamadi|no availability|no inventory|sold out|envanterinde listelenmedi|musaitlik (?:yok|bulunamadi)|secilen tarih.*fiyat alinamadi/.test(
       reason,
     )
   )

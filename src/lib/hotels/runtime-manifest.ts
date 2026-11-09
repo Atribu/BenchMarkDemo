@@ -63,6 +63,8 @@ export interface DynamicOtaCollectorConfig {
     propertyId: string;
     cardName: string;
     destination: string;
+    cityName: string;
+    regionNames: readonly string[];
   };
   anextour?:
     | {
@@ -203,7 +205,9 @@ function hasExecutablePageUrl(
       return (
         currency === "GBP" &&
         url.origin === "https://www.onthebeach.co.uk" &&
-        /^\/hotels\/turkey\/antalya\/[^/?]+\/?$/i.test(url.pathname)
+        /^\/hotels\/turkey\/antalya\/(?:[^/?]+\/)*[^/?]+\/?$/i.test(
+          url.pathname,
+        )
       );
     } catch {
       return false;
@@ -315,13 +319,35 @@ export function buildDynamicHotelRuntimeManifest(
   if (!hotel.matchingPolicy)
     throw new DynamicHotelRuntimeError("Oda eşleştirme politikası eksik.");
 
-  const requiredRoomIds = new Set(hotel.rooms.map((room) => room.id));
+  const requiredRoomIds = new Set(
+  Object.values(hotel.matchingPolicy.roomByView)
+    .filter((roomId): roomId is string => Boolean(roomId))
+);
+
   const collectorConfigs: Partial<
     Record<OtaKey, Record<string, DynamicOtaCollectorConfig>>
   > = {};
 
   for (const market of hotel.markets) {
     let executableCount = 0;
+
+    console.log("[DynamicManifest] Mapping diagnostics:", {
+  hotel: hotel.key,
+  market: market.id,
+  currency: market.currency,
+
+  mappings: hotel.channelMappings
+    .filter((mapping) => mapping.marketId === market.id)
+    .map((mapping) => ({
+      provider: mapping.providerKey,
+      status: mapping.status,
+      configurationCheckedAt: mapping.configurationCheckedAt,
+      externalHotelId: mapping.externalHotelId,
+      pageUrl: mapping.pageUrl,
+      roomAliases: mapping.roomAliases,
+    })),
+});
+
     for (const mapping of configuredSupportedMappings(hotel, market.id)) {
       if (
         !mapping.pageUrl ||
@@ -457,12 +483,14 @@ export function buildDynamicHotelRuntimeManifest(
           (market.currency !== "EUR" && market.currency !== "RUB"))
       )
         continue;
-      if (
-        [...requiredRoomIds].some(
-          (roomId) => (mapping.roomAliases[roomId]?.length ?? 0) === 0,
-        )
-      )
-        continue;
+     const hasMappedRoomAlias = [...requiredRoomIds].some(
+  (roomId) =>
+    (mapping.roomAliases[roomId]?.length ?? 0) > 0
+);
+
+if (!hasMappedRoomAlias) {
+  continue;
+}
       const providerConfigs = (collectorConfigs[
         mapping.providerKey as OtaKey
       ] ??= {});
@@ -534,6 +562,12 @@ export function buildDynamicHotelRuntimeManifest(
                 cardName: mapping.searchName ?? hotel.name,
                 destination:
                   "Antalya (Alanya, Belek, Lara Beach, Side), Turkey",
+                cityName: hotel.location.city,
+                regionNames:
+                  hotel.location.region
+                    ?.split(/[\/,]/)
+                    .map((region) => region.trim())
+                    .filter(Boolean) ?? [],
               },
             }
           : {}),

@@ -1262,7 +1262,7 @@ test("On the Beach GBP mapping uses property identity and dynamic room aliases",
     providerKey: "onthebeach",
     externalHotelId: "3149999",
     pageUrl:
-      "https://www.onthebeach.co.uk/hotels/turkey/antalya/example-resort",
+      "https://www.onthebeach.co.uk/hotels/turkey/antalya/alanya/example-resort",
   });
   const manifest = buildDynamicHotelRuntimeManifest({
     ...base,
@@ -1274,6 +1274,8 @@ test("On the Beach GBP mapping uses property identity and dynamic room aliases",
   const config = manifest.collectorConfigs.onthebeach?.["example-eu"];
   assert.equal(config?.onthebeach?.propertyId, "3149999");
   assert.equal(config?.onthebeach?.cardName, "Example Resort");
+  assert.equal(config?.onthebeach?.cityName, "Antalya");
+  assert.deepEqual(config?.onthebeach?.regionNames, []);
   assert.equal(
     resolveOnTheBeachPropertyId(manifest.scopes[0], config),
     "3149999",
@@ -1403,6 +1405,28 @@ test("On the Beach dynamic mapping rejects non-GBP, non-Antalya and invalid prop
         }),
       /On the Beach \(GBP\/Antalya\)/,
     );
+});
+
+test("On the Beach accepts official Antalya URLs with an intermediate resort path", () => {
+  const base = readyHotel({
+    providerKey: "onthebeach",
+    externalHotelId: "3122983",
+    pageUrl:
+      "https://www.onthebeach.co.uk/hotels/turkey/antalya/alanya/delphin-imperial",
+  });
+  const manifest = buildDynamicHotelRuntimeManifest({
+    ...base,
+    markets: base.markets.map((market) => ({
+      ...market,
+      currency: "GBP" as const,
+    })),
+  });
+
+  assert.equal(
+    manifest.collectorConfigs.onthebeach?.["example-eu"]?.onthebeach
+      ?.propertyId,
+    "3122983",
+  );
 });
 
 test("Restplatzbörse EUR mapping uses IFF identity and dynamic room aliases", async () => {

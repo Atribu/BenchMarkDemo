@@ -784,7 +784,7 @@ export async function collectCoralTravelLiveQuotes(
           new URL(response.url()).pathname === "/api/trafics/offers" &&
           response.status() === 200,
         { timeout: 45_000 },
-      );
+      ).catch((error: unknown) => error);
 
       const navigation = await page.goto(HOME, {
         waitUntil: "domcontentloaded",
@@ -804,7 +804,8 @@ export async function collectCoralTravelLiveQuotes(
         window.checkOut,
         runtimeConfig,
       );
-      await firstOffers;
+      const firstOffersResult = await firstOffers;
+      if (firstOffersResult instanceof Error) throw firstOffersResult;
       sourceHint = page.url();
       // Both 12-item and 10-item partial results were observed after search.
       // Wait briefly for both without relying on networkidle (analytics never idles).

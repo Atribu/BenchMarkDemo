@@ -306,11 +306,19 @@ export function parseExpediaQuotes(
 });
 
     const matched = snapshot.cards.flatMap((card) => {
-      const rank = namedRoomRank(
-        room.id,
+      const aliases = config.roomAliases[room.id] ?? [];
+      const normalizedCardName = normalizeInlineText(
         card.name,
-        config.roomAliases[room.id] ?? [],
+      ).toLocaleLowerCase("en");
+      const exactAliasRank = aliases.findIndex(
+        (alias) =>
+          normalizeInlineText(alias).toLocaleLowerCase("en") ===
+          normalizedCardName,
       );
+      const rank =
+        exactAliasRank >= 0
+          ? exactAliasRank
+          : namedRoomRank(room.id, card.name, aliases);
       return rank !== null ? [{ ...card, rank }] : [];
     });
 
@@ -427,10 +435,10 @@ export function resolveExpediaBrowserConfig(
   );
 
   return {
-    profilePath: path.join(
-      stateRoot,
-      `expedia-browser-profile-${scope.id}`,
-    ),
+    // Expedia's access verification is tied to the browser session as well as
+    // the network. Reuse one established session across hotel scopes instead
+    // of looking like a brand-new browser for every hotel.
+    profilePath: path.join(stateRoot, "expedia-browser-profile"),
     browserChannel: providerConfig.browserChannel,
     market: scope.currency === "EUR" ? "de" : "uk",
     proxyUrl: providerConfig.proxyUrl,
@@ -506,6 +514,8 @@ export async function collectExpediaLiveQuotes(
         );
       }
 
+      if (response?.status() === 429)
+        throw new Error("EXPEDIA_RATE_LIMITED");
       await assertNoExpediaBotChallenge(page);
       await assertPricePageAccessible(page, response?.status());
 
@@ -669,20 +679,25 @@ const snapshot = await page.evaluate((roomCardSelector) => ({
           .locator("body")
           .innerText({ timeout: 2000 })
           .catch(() => "")) ?? "";
-     const blocked =
-  (error instanceof Error &&
-    error.message === "EXPEDIA_BOT_CHALLENGE") ||
-  /HTTP\s+(?:403|429)/i.test(errorMessage) ||
-  /human or a bot|bot or not|verify.*human|captcha|are you a human|security check/i.test(
-    body,
-  );
-      const reason = blocked
-        ? "Expedia erişim doğrulaması istedi; otomatik oda fiyatı alınamadı."
+      const rateLimited =
+        errorMessage === "EXPEDIA_RATE_LIMITED" ||
+        /HTTP\s+429/i.test(errorMessage);
+      const blocked =
+        !rateLimited &&
+        (errorMessage === "EXPEDIA_BOT_CHALLENGE" ||
+          /HTTP\s+403/i.test(errorMessage) ||
+          /human or a bot|bot or not|verify.*human|captcha|are you a human|security check/i.test(
+            body,
+          ));
+      const reason = rateLimited
+        ? "Expedia sorgu hız sınırına ulaşıldı; otomatik oda fiyatı alınamadı."
+        : blocked
+          ? "Expedia erişim doğrulaması istedi; otomatik oda fiyatı alınamadı."
         : /EXPEDIA_ROOM_CARDS_NOT_FOUND/.test(errorMessage)
           ? "Expedia oda listesi açıldı ancak desteklenen oda kartı yapılarından hiçbiri bulunamadı; sayfa yapısı değişmiş olabilir."
         : "Expedia oda fiyatı veya arama koşulları doğrulanamadı.";
       warnings.push(
-        `Expedia / ${scope.hotelName} / ${window.checkIn}: ${blocked ? reason : error instanceof Error ? error.message.split("\n")[0] : reason}`,
+        `Expedia / ${scope.hotelName} / ${window.checkIn}: ${rateLimited || blocked ? reason : error instanceof Error ? error.message.split("\n")[0] : reason}`,
       );
       quotes.push(
         ...scope.rooms.map((room): ProviderQuote => ({
@@ -698,6 +713,11 @@ const snapshot = await page.evaluate((roomCardSelector) => ({
           observedAt: new Date().toISOString(),
           sourceHint,
           reason,
+          errorCode: rateLimited
+            ? "rate_limited"
+            : blocked
+              ? "access_blocked"
+              : undefined,
         })),
       );
     } finally {

@@ -250,13 +250,20 @@ export const EXPEDIA_HOTEL_CONFIG: Partial<Record<HotelKey, OtaHotelConfig>> = {
     pageUrl:
       "https://www.expedia.com/Serik-Hotels-Sy-Hotels-Belek.h112329850.Hotel-Information",
     roomAliases: {
-      "deluxe-land": ["Deluxe Room, Land View", "Deluxe Land View"],
+      "deluxe-land": [
+        "Deluxe Room, Land View",
+        "Deluxe Room Land view",
+        "Deluxe Land View",
+      ],
       "deluxe-pool": ["Deluxe Room, Pool View", "Deluxe Pool View"],
-      "deluxe-superior": ["Deluxe Superior Room"],
+      "deluxe-superior": ["Deluxe Superior Room", "Deluxe Superior"],
       "deluxe-family": ["Deluxe Family Room"],
       "deluxe-duplex-family": ["Deluxe Duplex Family Room"],
       "deluxe-swim-up": ["Deluxe Swim-Up Room", "Deluxe Swim Up Room"],
-      "deluxe-family-swim-up": ["Deluxe Swim-Up Family Room"],
+      "deluxe-family-swim-up": [
+        "Deluxe Swim-Up Family Room",
+        "Deluxe Family Swim-Up Room",
+      ],
       "deluxe-shallow-pool": ["Deluxe Shallow Pool Room"],
     },
   },
