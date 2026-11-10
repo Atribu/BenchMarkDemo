@@ -70,6 +70,10 @@ test("hotel catalog generates unique report scopes and complete hotel metadata",
 });
 
 test("Port Nature routes Russian providers to the RUB scope", () => {
+  assert.match(
+    portNatureRu.notes ?? "",
+    /ANEX Tour, PEGAS Touristik ve Coral Travel/,
+  );
   const europeanProviders = OTA_PROVIDERS.filter((provider) =>
     provider.supportedScopes.includes("port-nature-eu"),
   );

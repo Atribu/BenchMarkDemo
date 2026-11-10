@@ -95,6 +95,11 @@ export interface CreateHotelRoomPayload {
   occupancy: HotelRoomOccupancy;
 }
 
+interface CreateHotelRoomsPayload {
+  version: number;
+  rooms: Array<Omit<CreateHotelRoomPayload, "version">>;
+}
+
 export interface UpdateHotelRoomPayload {
   version: number;
   name?: string;
@@ -374,6 +379,38 @@ export function parseCreateHotelRoomPayload(
     name: text(input.name, "Oda adı", 2, 150),
     occupancy: occupancy(input.occupancy),
   };
+}
+
+function parseCreateHotelRoomsPayload(value: unknown): CreateHotelRoomsPayload {
+  const input = record(value, "Oda ekleme isteği");
+  if (!Array.isArray(input.rooms)) {
+    const room = parseCreateHotelRoomPayload(value);
+    return {
+      version: room.version,
+      rooms: [{ id: room.id, name: room.name, occupancy: room.occupancy }],
+    };
+  }
+
+  onlyKeys(input, ["version", "rooms"], "Toplu oda ekleme isteği");
+  if (input.rooms.length < 1 || input.rooms.length > 20)
+    throw new Error("Tek işlemde 1-20 oda tipi eklenebilir.");
+
+  const rooms = input.rooms.map((value, index) => {
+    const room = record(value, `Oda ${index + 1}`);
+    onlyKeys(room, ["id", "name", "occupancy"], `Oda ${index + 1}`);
+    return {
+      id: parseRuntimeScopeKey(room.id),
+      name: text(room.name, `Oda ${index + 1} adı`, 2, 150),
+      occupancy: occupancy(room.occupancy),
+    };
+  });
+  const duplicateId = rooms.find(
+    (room, index) => rooms.findIndex((candidate) => candidate.id === room.id) !== index,
+  )?.id;
+  if (duplicateId)
+    throw new Error(`Toplu listede oda kimliği tekrarlanıyor: ${duplicateId}`);
+
+  return { version: version(input.version), rooms };
 }
 
 export function parseUpdateHotelRoomPayload(
@@ -976,10 +1013,10 @@ export class HotelManagementService {
     actor: string,
   ): Promise<ManagedHotelRecord> {
     let parsedId: ReturnType<typeof parseRuntimeHotelId>;
-    let input: CreateHotelRoomPayload;
+    let input: CreateHotelRoomsPayload;
     try {
       parsedId = parseRuntimeHotelId(id);
-      input = parseCreateHotelRoomPayload(value);
+      input = parseCreateHotelRoomsPayload(value);
     } catch (error) {
       throw new HotelManagementError(
         "validation",
@@ -999,21 +1036,24 @@ export class HotelManagementService {
           "conflict",
           "Otel başka bir işlem tarafından güncellendi. Güncel kaydı yeniden yükleyin.",
         );
-      if (existing.rooms.some((room) => room.id === input.id))
+      const duplicateRoom = input.rooms.find((room) =>
+        existing.rooms.some((candidate) => candidate.id === room.id),
+      );
+      if (duplicateRoom)
         throw new HotelManagementError(
           "conflict",
-          `Oda kimliği bu otelde zaten kullanılıyor: ${input.id}`,
+          `Oda kimliği bu otelde zaten kullanılıyor: ${duplicateRoom.id}`,
         );
 
-      const room: ManagedHotelRoomRecord = {
-        id: parseRuntimeScopeKey(input.id),
-        name: input.name,
-        occupancy: input.occupancy,
-      };
+      const rooms: ManagedHotelRoomRecord[] = input.rooms.map((room) => ({
+        id: parseRuntimeScopeKey(room.id),
+        name: room.name,
+        occupancy: room.occupancy,
+      }));
       const now = this.now().toISOString();
       const updated: ManagedHotelRecord = {
         ...existing,
-        rooms: [...existing.rooms, room],
+        rooms: [...existing.rooms, ...rooms],
         channelMappings: resetChannelVerification(existing),
         version: existing.version + 1,
         audit: { ...existing.audit, updatedBy, updatedAt: now },

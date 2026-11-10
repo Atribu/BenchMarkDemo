@@ -2184,6 +2184,29 @@ tbody th small {
 .spanTwo {
   grid-column: span 2;
 }
+.channelIdentityAssist {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.channelIdentityAssist .managerSecondary {
+  flex: 0 0 auto;
+}
+.channelIdentityNotice {
+  font-size: 9px;
+  line-height: 1.45;
+}
+.channelIdentityNotice.ok {
+  color: #447b68;
+}
+.channelIdentityNotice.neutral {
+  color: #876f43;
+}
+.channelIdentityNotice.error {
+  color: #a55765;
+}
 .formActions {
   display: flex;
   justify-content: flex-end;
@@ -2257,12 +2280,18 @@ tbody th small {
   margin-top: 18px;
   padding-top: 15px;
 }
-.setupProgress span {
+.setupProgress button {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: #a39aa8;
   font-size: 8px;
+  padding: 5px;
+  text-align: left;
 }
 .setupProgress b {
   display: grid;
@@ -2273,12 +2302,57 @@ tbody th small {
   border-radius: 50%;
   font-weight: 400;
 }
-.setupProgress span.done {
+.setupProgress button:hover:not(:disabled),
+.setupProgress button.active {
+  background: #f6f2f8;
+}
+.setupProgress button.active {
+  box-shadow: inset 2px 0 #aa75c2;
+  color: #735c80;
+}
+.setupProgress button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+.setupProgress button.done {
   color: #4c8279;
 }
-.setupProgress span.done b {
+.setupProgress button.done b {
   border-color: #bad9d3;
   background: #ecf7f4;
+}
+.setupWizardControls {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr) minmax(120px, auto);
+  align-items: center;
+  gap: 14px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.setupWizardControls > span:not(.setupWizardResult) {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+}
+.setupWizardControls small {
+  color: #9a91a1;
+  font-size: 8px;
+}
+.setupWizardControls strong {
+  color: #665b6e;
+  font-size: 10px;
+  font-weight: 500;
+}
+.setupWizardControls > button:last-child,
+.setupWizardResult {
+  justify-self: end;
+}
+.setupWizardResult {
+  color: #967748;
+  font-size: 9px;
+}
+.setupWizardResult.done {
+  color: #447b68;
 }
 .protectedRecord {
   border-left: 3px solid #a5b9c4;
@@ -2324,6 +2398,95 @@ tbody th small {
   color: #98909f;
   font-size: 8px;
   margin-top: 3px;
+}
+.roomPresetPanel {
+  border-top: 1px solid #eeeaf1;
+  margin: 18px -22px 0;
+  padding: 16px 22px 0;
+}
+.roomPresetPanel > div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.roomPresetPanel strong {
+  color: #665b6e;
+  font-size: 10px;
+  font-weight: 500;
+}
+.roomPresetPanel small {
+  color: #9d94a5;
+  font-size: 8px;
+}
+.roomPresetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+.roomPresetGrid button {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid #e4dce9;
+  border-radius: 7px;
+  background: #fbf9fc;
+  color: #735c80;
+  padding: 9px;
+  text-align: left;
+}
+.roomPresetGrid button:hover:not(:disabled) {
+  border-color: #cdb5da;
+  background: #f7f1fa;
+}
+.roomPresetGrid button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.roomPresetGrid span {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roomPresetGrid small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roomSingleForm {
+  margin-bottom: 0;
+}
+.roomBulkEntry {
+  margin: 0 -22px -22px;
+  border-top: 1px solid #eeeaf1;
+}
+.roomBulkEntry summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  color: #735c80;
+  cursor: pointer;
+  font-size: 10px;
+}
+.roomBulkEntry summary small {
+  color: #9d94a5;
+  font-size: 8px;
+}
+.roomBulkEntry[open] summary {
+  border-bottom: 1px solid #eeeaf1;
+}
+.roomBulkForm {
+  padding-top: 16px;
+}
+.roomBulkForm p {
+  color: #918898;
+  font-size: 8px;
+  line-height: 1.5;
+  margin-top: 7px;
 }
 .configuredBadge {
   color: #3c7c72;
@@ -2395,6 +2558,85 @@ tbody th small {
   color: #8f8792;
   background: #efedef;
 }
+.mappingStatus.ineligible {
+  color: #a24a52;
+  background: #faecee;
+}
+.channelEligibilityGrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid #e8e1ec;
+  border-radius: 8px;
+  background: #fcfafd;
+  padding: 12px;
+}
+.channelEligibilityHeading {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+.channelEligibilityHeading strong {
+  color: #665b6e;
+  font-size: 10px;
+  font-weight: 500;
+}
+.channelEligibilityHeading small {
+  color: #99909f;
+  font-size: 8px;
+}
+.channelEligibilityGrid > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  min-width: 0;
+  border: 1px solid #e5dfe9;
+  border-radius: 7px;
+  background: #fff;
+  color: #756b7f;
+  padding: 9px;
+  text-align: left;
+}
+.channelEligibilityGrid > button > span {
+  overflow: hidden;
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channelEligibilityGrid > button > b {
+  color: #9b5966;
+  font-size: 7px;
+  font-weight: 500;
+}
+.channelEligibilityGrid > button > small {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #a39aa9;
+  font-size: 7px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channelEligibilityGrid > button.eligible > b {
+  color: #447b68;
+}
+.channelEligibilityGrid > button.eligible:hover:not(:disabled),
+.channelEligibilityGrid > button.selected {
+  border-color: #cdb5da;
+  background: #f7f1fa;
+}
+.channelEligibilityGrid > button.selected {
+  box-shadow: inset 2px 0 #9866b0;
+}
+.channelEligibilityGrid > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.57;
+}
 .mappingActions {
   grid-column: 1 / -1;
   display: flex;
@@ -2442,6 +2684,103 @@ tbody th small {
 }
 .mappingEditForm .formActions {
   gap: 8px;
+}
+.roomAliasDiscovery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 10px;
+  border-top: 1px solid #eeeaf1;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+.roomAliasDiscovery > div:first-child {
+  grid-column: 1 / -1;
+}
+.roomAliasDiscovery strong,
+.roomAliasDiscovery > div:first-child small {
+  display: block;
+}
+.roomAliasDiscovery strong {
+  color: #665b6e;
+  font-size: 10px;
+  font-weight: 500;
+}
+.roomAliasDiscovery > div:first-child small {
+  color: #99909f;
+  font-size: 8px;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+.roomAliasDiscovery label > span {
+  display: block;
+  color: #756b7f;
+  font-size: 8px;
+  margin-bottom: 6px;
+}
+.roomAliasDiscovery > button {
+  min-height: 36px;
+  white-space: nowrap;
+}
+.roomDiscoveryNotice,
+.unassignedRooms {
+  grid-column: 1 / -1;
+}
+.roomDiscoveryNotice {
+  border-radius: 6px;
+  background: #f7f4f9;
+  color: #806d89;
+  font-size: 8px;
+  line-height: 1.5;
+  padding: 8px 10px;
+}
+.roomDiscoveryNotice.ok {
+  background: #eef7f4;
+  color: #447b68;
+}
+.roomDiscoveryNotice.error {
+  background: #fff1f3;
+  color: #a55765;
+}
+.unassignedRooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.unassignedRooms > span {
+  width: 100%;
+  color: #876f43;
+  font-size: 8px;
+}
+.unassignedRooms > span small {
+  color: #a18e72;
+  margin-left: 4px;
+}
+.unassignedRooms > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #eadfc9;
+  border-radius: 7px;
+  background: #fbf7ef;
+  padding: 5px 6px;
+}
+.unassignedRooms > div > small {
+  border: 1px solid #eadfc9;
+  border-radius: 99px;
+  background: #fff;
+  color: #876f43;
+  font-size: 7px;
+  padding: 4px 7px;
+}
+.managerForm .unassignedRooms select {
+  width: auto;
+  min-width: 120px;
+  height: 26px;
+  border-color: #eadfc9;
+  background: #fff;
+  font-size: 7px;
+  padding: 4px 7px;
 }
 .aliasGrid {
   display: grid;
@@ -2782,6 +3121,30 @@ tbody th small {
   .setupProgress {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .channelEligibilityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roomPresetGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .roomAliasDiscovery {
+    grid-template-columns: 1fr 1fr;
+  }
+  .roomAliasDiscovery > button {
+    grid-column: 1 / -1;
+  }
+  .setupWizardControls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .setupWizardControls > span:not(.setupWizardResult) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .setupWizardControls > button:last-child,
+  .setupWizardResult {
+    justify-self: stretch;
+    text-align: right;
+  }
   .releaseCard {
     grid-template-columns: 1fr;
   }
@@ -2864,6 +3227,33 @@ tbody th small {
   }
 }
 @media (max-width: 480px) {
+  .channelEligibilityGrid {
+    grid-template-columns: 1fr;
+  }
+  .channelEligibilityHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .roomPresetPanel {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .roomPresetPanel > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .roomPresetGrid {
+    grid-template-columns: 1fr;
+  }
+  .roomBulkEntry {
+    margin-left: -16px;
+    margin-right: -16px;
+  }
+  .roomAliasDiscovery {
+    grid-template-columns: 1fr;
+  }
   .workspace {
     padding: 0 14px;
   }

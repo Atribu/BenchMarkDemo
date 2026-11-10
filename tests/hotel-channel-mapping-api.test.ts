@@ -185,6 +185,45 @@ test("channel mapping validation rejects unknown providers and unsafe references
   }
 });
 
+test("channel mapping API rejects a collector that cannot run in the selected market", async () => {
+  const { directory, collection, store } = await fixture();
+  try {
+    await store.update((hotels) => ({
+      hotels: hotels.map((hotel) =>
+        hotel.id === "hotel_01"
+          ? {
+              ...hotel,
+              markets: [
+                ...hotel.markets,
+                {
+                  id: parseRuntimeScopeKey("example-uk"),
+                  label: "Example Birleşik Krallık",
+                  marketLabel: "Birleşik Krallık",
+                  currency: "GBP" as const,
+                  requiredBoard: "all-inclusive" as const,
+                },
+              ],
+            }
+          : hotel,
+      ),
+      result: undefined,
+    }));
+
+    const response = await createMapping(collection, {
+      ...validMapping,
+      providerKey: "check24",
+      marketId: "example-uk",
+      externalHotelId: "7654321",
+      pageUrl: "https://hotel.check24.de/hotel/turkey/7654321",
+    });
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /seçilen pazar için uygun değil/);
+    assert.equal((await store.load())[0].channelMappings.length, 0);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("CHECK24 mapping accepts its verified legacy hotel subdomain", async () => {
   const { directory, collection } = await fixture();
   try {

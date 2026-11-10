@@ -13,6 +13,7 @@ import type {
 import { createHotelReadRepository } from "./repository";
 import { HotelManagementError } from "./service";
 import { OTA_PROVIDERS } from "../ota/registry";
+import { getChannelMarketEligibility } from "./channel-eligibility";
 
 interface HotelChannelManagementServiceOptions {
   store: HotelStore;
@@ -368,8 +369,19 @@ export class HotelChannelManagementService {
       if (!hotel) throw new HotelManagementError("not_found", "Otel bulunamadı.");
       assertDraftHotel(hotel);
       assertVersion(hotel, input.version);
-      if (!hotel.markets.some((market) => market.id === input.marketId))
+      const market = hotel.markets.find((candidate) => candidate.id === input.marketId);
+      if (!market)
         throw new HotelManagementError("conflict", "Pazar bu otele ait değil.");
+      const eligibility = getChannelMarketEligibility(
+        input.providerKey,
+        market.currency,
+        hotel.location,
+      );
+      if (!eligibility.eligible)
+        throw new HotelManagementError(
+          "conflict",
+          `OTA seçilen pazar için uygun değil. ${eligibility.reason}`,
+        );
       assertAliasRooms(hotel, input.roomAliases);
       if (
         hotel.channelMappings.some(

@@ -68,10 +68,10 @@ export function createHotelRoomRouteHandlers(
 
       let payload: unknown;
       try {
-        payload = await readBoundedJson(request, 4096);
+        payload = await readBoundedJson(request, 16_384);
       } catch {
         return NextResponse.json(
-          { error: "Geçerli ve en fazla 4 KB büyüklüğünde JSON gönderin." },
+          { error: "Geçerli ve en fazla 16 KB büyüklüğünde JSON gönderin." },
           { status: 400, headers: responseHeaders },
         );
       }

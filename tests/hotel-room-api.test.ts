@@ -102,6 +102,54 @@ test("room API adds a structured room type to a draft hotel", async () => {
   }
 });
 
+test("room API adds multiple rooms atomically with one version change", async () => {
+  const { directory, collection, store } = await fixture();
+  try {
+    const duplicateBatch = await collection.POST(
+      jsonRequest(
+        "http://localhost/api/hotels/hotel_01/rooms",
+        "POST",
+        {
+          version: 1,
+          rooms: [
+            { id: "superior-land", name: "Superior Kara", occupancy: { rooms: 1, adults: 2, children: 0 } },
+            { id: "superior-land", name: "Superior Deniz", occupancy: { rooms: 1, adults: 2, children: 0 } },
+          ],
+        },
+      ),
+      collectionContext(),
+    );
+    assert.equal(duplicateBatch.status, 400);
+    assert.equal((await store.load())[0].rooms.length, 0);
+
+    const response = await collection.POST(
+      jsonRequest(
+        "http://localhost/api/hotels/hotel_01/rooms",
+        "POST",
+        {
+          version: 1,
+          rooms: [
+            { id: "superior-land", name: "Superior Kara", occupancy: { rooms: 1, adults: 2, children: 0 } },
+            { id: "superior-sea", name: "Superior Deniz", occupancy: { rooms: 1, adults: 2, children: 0 } },
+          ],
+        },
+      ),
+      collectionContext(),
+    );
+    assert.equal(response.status, 201);
+    const payload = await response.json();
+    assert.equal(payload.hotel.rooms.length, 2);
+    assert.equal(payload.hotel.version, 2);
+    assert.equal(payload.room.id, "superior-sea");
+    assert.deepEqual(
+      (await store.load())[0].rooms.map((room) => room.id),
+      ["superior-land", "superior-sea"],
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("room API validates occupancy and rejects duplicate room IDs", async () => {
   const { directory, collection } = await fixture();
   try {

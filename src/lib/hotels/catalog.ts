@@ -225,7 +225,7 @@ export const HOTEL_CATALOG = [
         currency: "RUB",
         requiredBoard: "all-inclusive",
         notes:
-          "ANEX Tour ve Coral Travel için Rusya hotel-only kapsamı; kaynak RUB fiyatı korunur ve panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
+          "ANEX Tour, PEGAS Touristik ve Coral Travel için Rusya hotel-only kapsamı; kaynak RUB fiyatı korunur ve panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
       },
     ],
     rooms: [
