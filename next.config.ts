@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+   basePath: "/benchmark",
+  assetPrefix: "/benchmark-static",
   reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
