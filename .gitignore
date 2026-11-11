@@ -1,6 +1,7 @@
 node_modules
 .next
 .next-*
+.next.stale-*
 .benchmark-state/
 out
 dist

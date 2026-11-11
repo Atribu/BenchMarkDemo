@@ -143,6 +143,9 @@ svg {
   display: grid;
   gap: 8px;
 }
+.mainNav a {
+  text-decoration: none;
+}
 .navItem {
   border: 1px solid transparent;
   background: none;
@@ -177,6 +180,10 @@ svg {
 .navItem:hover {
   color: #fff;
   background-color: #ffffff08;
+}
+.mainPanelNav {
+  border-bottom-color: #ffffff12;
+  margin-bottom: 10px;
 }
 .portfolioCard {
   margin: 39px 8px 0;
@@ -263,6 +270,37 @@ svg {
 }
 .topbar strong {
   font-weight: 500;
+}
+.topbarActions,
+.mainPanelLink {
+  display: inline-flex;
+  align-items: center;
+}
+.topbarActions {
+  gap: 10px;
+}
+.mainPanelLink {
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #ffffff99;
+  color: #6f627b;
+  padding: 6px 10px;
+  font-size: 10px;
+  text-decoration: none;
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    background 0.2s;
+}
+.mainPanelLink:hover {
+  border-color: #bca8c8;
+  background: #fff;
+  color: #3f304a;
+}
+.mainPanelLink .icon {
+  width: 13px;
+  height: 13px;
 }
 .breadcrumb {
   color: var(--muted);
@@ -3108,6 +3146,10 @@ tbody th small {
     font-size: 8px;
     padding: 5px 7px;
   }
+  .mainPanelLink {
+    font-size: 8px;
+    padding: 5px 7px;
+  }
   .hotelManagerIntro {
     align-items: stretch;
     flex-direction: column;
@@ -3280,6 +3322,9 @@ tbody th small {
   }
   .topbar {
     font-size: 9px;
+  }
+  .environmentBadge {
+    display: none;
   }
   .hotelDirectoryItem {
     width: 100%;

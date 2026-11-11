@@ -26,6 +26,7 @@ import { nightCount } from "@/src/lib/benchmark/request";
 import { benchmarkCsv } from "@/src/lib/benchmark/export";
 import type { BenchmarkXlsxPayload } from "@/src/lib/benchmark/xlsx-export";
 import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
+import { withBasePath } from "@/src/lib/base-path";
 import {
   benchmarkErrorLabel,
   benchmarkStatusLabel,
@@ -48,8 +49,17 @@ interface BenchmarkDashboardProps {
 type Section = "benchmark" | "hotels" | "channels";
 type ExcelReferencePrices = Record<string, string>;
 type ExcelSelectedRooms = Record<string, boolean>;
+const MAIN_PANEL_URL = process.env.NEXT_PUBLIC_MAIN_PANEL_URL || "/";
 type IconName =
-  "grid" | "hotel" | "channels" | "arrow" | "download" | "check" | "clock" | "external";
+  | "grid"
+  | "hotel"
+  | "channels"
+  | "arrow"
+  | "download"
+  | "check"
+  | "clock"
+  | "external"
+  | "back";
 
 function Icon({
   name,
@@ -90,6 +100,7 @@ function Icon({
       </>
     ),
     external: <path d="M14 3h7v7m0-7L10 14M10 4H4v16h16v-6" />,
+    back: <path d="m15 18-6-6 6-6M9 12h11" />,
   };
   return (
     <svg
@@ -989,13 +1000,30 @@ export function BenchmarkDashboard({
     setRunningMode(mode);
     setError(null);
     try {
-      const response = await fetch("/api/benchmark/run", {
+      const response = await fetch(withBasePath("/api/benchmark/run"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...criteria, mode } satisfies BenchmarkRequest),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Rapor tamamlanamadı.");
+      const responseText = await response.text();
+      let result: BenchmarkRunResult | { error?: string };
+      try {
+        result = JSON.parse(responseText) as
+          | BenchmarkRunResult
+          | { error?: string };
+      } catch {
+        throw new Error(
+          response.status >= 500
+            ? "Ana panelin Benchmark bağlantısı sorgu tamamlanmadan kesildi. Proxy zaman aşımı ayarını kontrol edin."
+            : "Benchmark sunucusu geçersiz bir yanıt döndürdü.",
+        );
+      }
+      if (!response.ok)
+        throw new Error(
+          "error" in result && result.error
+            ? result.error
+            : "Rapor tamamlanamadı.",
+        );
       setReport(result as BenchmarkRunResult);
       setLastSelection(selectionKey);
     } catch (cause) {
@@ -1101,7 +1129,7 @@ export function BenchmarkDashboard({
     } satisfies BenchmarkXlsxPayload;
 
     try {
-      const response = await fetch("/api/benchmark/export/xlsx", {
+      const response = await fetch(withBasePath("/api/benchmark/export/xlsx"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1161,7 +1189,7 @@ export function BenchmarkDashboard({
           aria-label="DGTLFACE web sitesi"
         >
           <Image
-            src="/brand/dgtlface-logo.svg"
+            src={withBasePath("/brand/dgtlface-logo.svg")}
             alt="DGTLFACE"
             width={220}
             height={55}
@@ -1172,6 +1200,11 @@ export function BenchmarkDashboard({
           <span className="tinyRule" /> HOSPITALITY INTELLIGENCE
         </div>
         <nav className="mainNav" aria-label="Ana menü">
+          <a className="navItem mainPanelNav" href={MAIN_PANEL_URL}>
+            <Icon name="back" />
+            <span>Ana panel</span>
+            <small>00</small>
+          </a>
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -1219,9 +1252,18 @@ export function BenchmarkDashboard({
               {navItems.find((item) => item.id === section)?.label}
             </strong>
           </div>
-          <span className="environmentBadge">
-            <span className="statusDot" /> Geliştirme sürümü
-          </span>
+          <div className="topbarActions">
+            <a
+              className="mainPanelLink"
+              href={MAIN_PANEL_URL}
+            >
+              <Icon name="back" />
+              Ana panele dön
+            </a>
+            <span className="environmentBadge">
+              <span className="statusDot" /> Geliştirme sürümü
+            </span>
+          </div>
         </header>
 
         {section === "benchmark" && (

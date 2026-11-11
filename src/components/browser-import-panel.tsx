@@ -7,6 +7,7 @@ import type {
 } from "../lib/benchmark/types";
 import { BROWSER_CAPTURE_MAX_BYTES } from "../lib/benchmark/browser-import-merge";
 import { formatCurrency, formatDateTime } from "../lib/utils/format";
+import { withBasePath } from "../lib/base-path";
 
 export function BrowserImportPanel({
   request,
@@ -39,7 +40,7 @@ export function BrowserImportPanel({
         throw new Error("Dosya en fazla 250 KB olabilir.");
       const capture = JSON.parse(raw);
       setText(raw);
-      const response = await fetch("/api/benchmark/browser-import", {
+      const response = await fetch(withBasePath("/api/benchmark/browser-import"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ request, capture }),
@@ -84,7 +85,7 @@ export function BrowserImportPanel({
         <summary>İlk kullanım: tarayıcı yardımcısını kur</summary>
         <ol>
           <li>
-            <a href="/dgtlface-ota-helper.zip" download>
+            <a href={withBasePath("/dgtlface-ota-helper.zip")} download>
               Chrome / Edge yardımcısını indir
             </a>{" "}
             ve ZIP&apos;i aç.

@@ -10,6 +10,7 @@ import type {
 import type { HotelLifecycleStatus } from "@/src/lib/hotels/lifecycle";
 import { extractChannelPageInfo } from "@/src/lib/hotels/channel-page-info";
 import { getChannelMarketEligibility } from "@/src/lib/hotels/channel-eligibility";
+import { withBasePath } from "@/src/lib/base-path";
 
 interface HotelManagementProps {
   providerCatalog: ProviderDescriptor[];
@@ -243,7 +244,9 @@ function MappingRoomAliases({
     setUnassigned([]);
     try {
       const response = await fetch(
-        `/api/hotels/${hotelId}/channel-mappings/${mapping.id}/room-suggestions`,
+        withBasePath(
+          `/api/hotels/${hotelId}/channel-mappings/${mapping.id}/room-suggestions`,
+        ),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -356,7 +359,10 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
     let active = true;
     void (async () => {
       try {
-        const response = await fetch("/api/hotels?includeArchived=true", { cache: "no-store" });
+        const response = await fetch(
+          withBasePath("/api/hotels?includeArchived=true"),
+          { cache: "no-store" },
+        );
         const result = (await response.json()) as ApiResult;
         if (!response.ok) throw new Error(result.error ?? "Oteller yüklenemedi.");
         if (!active) return;
@@ -394,7 +400,7 @@ export function HotelManagement({ providerCatalog }: HotelManagementProps) {
     setBusy(true);
     setNotice(null);
     try {
-      const response = await fetch(url, {
+      const response = await fetch(withBasePath(url), {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
