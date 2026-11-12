@@ -10,6 +10,8 @@ test("currency-specific collectors expose supported markets", () => {
   assert.equal(getChannelMarketEligibility("onthebeach", "GBP", turkey).eligible, true);
   assert.equal(getChannelMarketEligibility("pegastour", "RUB", turkey).eligible, true);
   assert.equal(getChannelMarketEligibility("pegastour", "EUR", turkey).eligible, false);
+  assert.equal(getChannelMarketEligibility("dertour", "EUR", turkey).eligible, true);
+  assert.equal(getChannelMarketEligibility("dertour", "GBP", turkey).eligible, false);
 });
 
 test("a market is required before eligibility can be decided", () => {

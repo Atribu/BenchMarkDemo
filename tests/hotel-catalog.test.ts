@@ -118,6 +118,7 @@ test("SY Hotels exposes only channels with a verified hotel identity", () => {
       "restplatzboerse",
       "tui",
       "schauinsland",
+      "dertour",
     ],
   );
   assert.deepEqual(

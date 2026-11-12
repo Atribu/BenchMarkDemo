@@ -12,6 +12,7 @@ export const DYNAMIC_COLLECTOR_PROVIDERS = [
   "booking",
   "check24",
   "coraltravel",
+  "dertour",
   "expedia",
   "holidaycheck",
   "loveholidays",
@@ -98,6 +99,10 @@ export interface DynamicOtaCollectorConfig {
           parentName: string;
         };
       };
+  dertour?: {
+    coreId: string;
+    slug: string;
+  };
 }
 
 export interface DynamicHotelRuntimeManifest {
@@ -245,6 +250,18 @@ function hasExecutablePageUrl(
       return false;
     }
   }
+  if (providerKey === "dertour") {
+    try {
+      const url = new URL(pageUrl);
+      return (
+        currency === "EUR" &&
+        url.origin === "https://www.dertour.de" &&
+        /^\/hotel\/[^/?]+-[a-z0-9]+\/?$/i.test(url.pathname)
+      );
+    } catch {
+      return false;
+    }
+  }
   return providerKey === "booking";
 }
 
@@ -285,6 +302,13 @@ function coralRuLocation(pageUrl: string, externalHotelId: string) {
         parentId: parts[2],
       }
     : undefined;
+}
+
+function dertourPageIdentity(pageUrl: string) {
+  const match = new URL(pageUrl).pathname.match(
+    /^\/hotel\/(.+)-([a-z0-9]+)\/?$/i,
+  );
+  return match ? { slug: match[1], coreId: match[2] } : undefined;
 }
 
 function tuiOfferSlug(pageUrl: string, hotelName: string, giataId: number) {
@@ -483,6 +507,18 @@ export function buildDynamicHotelRuntimeManifest(
           (market.currency !== "EUR" && market.currency !== "RUB"))
       )
         continue;
+      const dertourIdentity =
+        mapping.providerKey === "dertour"
+          ? dertourPageIdentity(mapping.pageUrl)
+          : undefined;
+      if (
+        mapping.providerKey === "dertour" &&
+        (market.currency !== "EUR" ||
+          !dertourIdentity ||
+          mapping.externalHotelId?.toLowerCase() !==
+            dertourIdentity.coreId.toLowerCase())
+      )
+        continue;
      const hasMappedRoomAlias = [...requiredRoomIds].some(
   (roomId) =>
     (mapping.roomAliases[roomId]?.length ?? 0) > 0
@@ -614,12 +650,20 @@ if (!hasMappedRoomAlias) {
                     },
             }
           : {}),
+        ...(mapping.providerKey === "dertour"
+          ? {
+              dertour: {
+                coreId: dertourIdentity!.coreId,
+                slug: dertourIdentity!.slug,
+              },
+            }
+          : {}),
       };
       executableCount += 1;
     }
     if (executableCount === 0)
       throw new DynamicHotelRuntimeError(
-        `${market.label} için ANEX Tour (EUR/RUB), Booking.com, CHECK24 (EUR), Coral Travel (EUR/RUB), Expedia, HolidayCheck, Loveholidays (EUR/GBP), On the Beach (GBP/Antalya), PEGAS Touristik (RUB), Restplatzbörse (EUR), Schauinsland (EUR), Stayforlong (EUR) veya TUI (EUR) kanallarından doğrulanmış sayfa adresi ve tüm oda alias'larını içeren çalıştırılabilir bir eşleştirme eksik.`,
+        `${market.label} için ANEX Tour (EUR/RUB), Booking.com, CHECK24 (EUR), Coral Travel (EUR/RUB), DERTOUR/ITS (EUR), Expedia, HolidayCheck, Loveholidays (EUR/GBP), On the Beach (GBP/Antalya), PEGAS Touristik (RUB), Restplatzbörse (EUR), Schauinsland (EUR), Stayforlong (EUR) veya TUI (EUR) kanallarından doğrulanmış sayfa adresi ve tüm oda alias'larını içeren çalıştırılabilir bir eşleştirme eksik.`,
       );
   }
 

@@ -224,4 +224,19 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   searchTemplate: "https://www.coral.ru/",
 },
 
+{
+  key: "dertour",
+  name: "DERTOUR / ITS",
+  shortName: "DER/ITS",
+  collectionType: "api",
+  liveSupported: true,
+  readiness: "api-contract",
+  notes:
+    "DERTOUR Almanya otel sayfasındaki kesin tarihli Nur Hotel tekliflerini okur. " +
+    "Yalnızca DER ve ITS operatörleri, 1 oda / 2 yetişkin, EUR konaklama toplamı, " +
+    "otel kimliği, tarih, oda ve pansiyon doğrulandıktan sonra rapora alınır.",
+  supportedScopes: ["beach-eu", "sy-hotels-eu"],
+  searchTemplate: "https://www.dertour.de/hotels/",
+},
+
 ];

@@ -7,6 +7,16 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "/benchmark",
+        permanent: false,
+        basePath: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

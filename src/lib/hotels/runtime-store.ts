@@ -22,6 +22,7 @@ export interface DynamicHotelRuntimeContext {
   bookingConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   check24Configs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   coraltravelConfigs?: Readonly<Record<string, DynamicOtaCollectorConfig>>;
+  dertourConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   expediaConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   holidaycheckConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
   loveholidaysConfigs: Readonly<Record<string, DynamicOtaCollectorConfig>>;
@@ -90,6 +91,7 @@ export async function loadDynamicHotelRuntimeContext(
       | "booking"
       | "check24"
       | "coraltravel"
+      | "dertour"
       | "expedia"
       | "holidaycheck"
       | "loveholidays"
@@ -116,6 +118,7 @@ export async function loadDynamicHotelRuntimeContext(
     bookingConfigs: configsFor("booking"),
     check24Configs: configsFor("check24"),
     coraltravelConfigs: configsFor("coraltravel"),
+    dertourConfigs: configsFor("dertour"),
     expediaConfigs: configsFor("expedia"),
     holidaycheckConfigs: configsFor("holidaycheck"),
     loveholidaysConfigs: configsFor("loveholidays"),

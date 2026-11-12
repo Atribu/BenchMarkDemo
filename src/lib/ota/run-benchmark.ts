@@ -48,6 +48,7 @@ import type {
 import type { DynamicHotelRuntimeContext } from "@/src/lib/hotels/runtime-store";
 
 import { collectCoralTravelLiveQuotes } from "@/src/lib/ota/live-coraltravel"
+import { collectDertourLiveQuotes } from "@/src/lib/ota/live-dertour";
 import {
   convertRubToEur,
   getRubEurRate,
@@ -154,6 +155,14 @@ coraltravel: {
   missingModulo: 13,
   soldOutModulo: 19,
   canUndercut: false,
+},
+
+dertour: {
+  baseMarkup: 0.1,
+  volatility: 0.08,
+  missingModulo: 13,
+  soldOutModulo: 19,
+  canUndercut: true,
 },
 
 };
@@ -394,6 +403,13 @@ async function collectLiveProviderQuotes(
       return collectTuiLiveQuotes(provider, scope, runtimeCollectorConfig);
     case "coraltravel":
       return collectCoralTravelLiveQuotes(provider, scope, runtimeCollectorConfig);
+    case "dertour":
+      return collectDertourLiveQuotes(
+        provider,
+        scope,
+        fetch,
+        runtimeCollectorConfig,
+      );
     default:
       return buildManualReviewQuotes(
         provider,
@@ -437,7 +453,12 @@ export async function runBenchmarkJob(
     | "stayforlongConfigs"
     | "tuiConfigs"
   > &
-    Partial<Pick<DynamicHotelRuntimeContext, "manifestWarnings">>,
+    Partial<
+      Pick<
+        DynamicHotelRuntimeContext,
+        "manifestWarnings" | "dertourConfigs"
+      >
+    >,
 ) {
   const scopeCatalog = runtimeContext?.catalog ?? REPORT_SCOPES;
   const providerCatalog = runtimeContext?.providers ?? OTA_PROVIDERS;
@@ -516,6 +537,8 @@ export async function runBenchmarkJob(
                   ? runtimeContext?.check24Configs[scope.id]
                 : provider.key === "coraltravel"
                   ? runtimeContext?.coraltravelConfigs?.[scope.id]
+                : provider.key === "dertour"
+                  ? runtimeContext?.dertourConfigs?.[scope.id]
                 : provider.key === "expedia"
                   ? runtimeContext?.expediaConfigs[scope.id]
                   : provider.key === "holidaycheck"

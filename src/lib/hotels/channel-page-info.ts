@@ -9,6 +9,7 @@ const PROVIDER_DOMAINS: Record<string, readonly string[]> = {
   booking: ["booking.com"],
   check24: ["check24.de"],
   coraltravel: ["coraltravel.de", "coral.ru"],
+  dertour: ["dertour.de"],
   expedia: ["expedia.com", "expedia.de", "expedia.co.uk"],
   holidaycheck: ["holidaycheck.de"],
   loveholidays: ["loveholidays.com"],
@@ -53,6 +54,8 @@ function extractExternalHotelId(providerKey: string, url: URL) {
         ["requestId", "locationId"],
         /^\d+-7-\d+-6$/,
       );
+    case "dertour":
+      return pathMatch(url, /\/hotel\/[^/]+-([a-z0-9]+)\/?$/i);
     case "expedia":
       return (
         queryId(url, ["hotelId", "propertyId"]) ??

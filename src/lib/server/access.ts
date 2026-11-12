@@ -64,24 +64,40 @@ export async function checkAccess(
   );
 }
 
-export function checkRequestOrigin(request: Request): Response | null {
-  let expected: string;
+export function checkRequestOrigin(
+  request: Request,
+  config: { production?: boolean; publicOrigin?: string } = {},
+): Response | null {
+  let expectedOrigins: Set<string>;
   try {
     // Next may normalize the internal URL to localhost. Use the actual HTTP Host,
-    // not a client-supplied forwarded host; deployments pin their public origin.
+    // not a client-supplied forwarded host. Production remains pinned to the
+    // configured public origin; development also permits the directly opened
+    // local server so the app can run both standalone and behind the panel proxy.
     const internal = new URL(request.url);
     const host = request.headers.get("host");
-    const address = new URL(
-      process.env.BENCHMARK_PUBLIC_ORIGIN ||
-        (host ? `${internal.protocol}//${host}` : request.url),
+    const directAddress = new URL(
+      host ? `${internal.protocol}//${host}` : request.url,
     );
-    if (
-      !["http:", "https:"].includes(address.protocol) ||
-      address.username ||
-      address.password
-    )
-      throw new Error("Invalid origin");
-    expected = address.origin;
+    const publicOrigin = config.publicOrigin ?? process.env.BENCHMARK_PUBLIC_ORIGIN;
+    const configuredAddress = publicOrigin
+      ? new URL(publicOrigin)
+      : undefined;
+    for (const address of [directAddress, configuredAddress].filter(
+      (candidate): candidate is URL => Boolean(candidate),
+    ))
+      if (
+        !["http:", "https:"].includes(address.protocol) ||
+        address.username ||
+        address.password
+      )
+        throw new Error("Invalid origin");
+    expectedOrigins = new Set([
+      (configuredAddress ?? directAddress).origin,
+      ...(!(config.production ?? process.env.NODE_ENV === "production")
+        ? [directAddress.origin]
+        : []),
+    ]);
   } catch {
     return Response.json(
       { error: "Sunucu adresi ayarı geçersiz." },
@@ -90,7 +106,7 @@ export function checkRequestOrigin(request: Request): Response | null {
   }
   const origin = request.headers.get("origin");
   if (
-    (origin && origin !== expected) ||
+    (origin && !expectedOrigins.has(origin)) ||
     request.headers.get("sec-fetch-site") === "cross-site"
   )
     return Response.json(

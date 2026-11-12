@@ -15,6 +15,7 @@ export type OtaKey =
   | "booking"
   | "check24"
    | "coraltravel"
+  | "dertour"
   | "expedia"
   | "holidaycheck"
   | "loveholidays"

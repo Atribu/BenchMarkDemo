@@ -43,6 +43,11 @@ const cases: Array<[string, string, string]> = [
     "https://www.expedia.de/Example-Hotel.h8108100.Hotel-Beschreibung",
     "8108100",
   ],
+  [
+    "dertour",
+    "https://www.dertour.de/hotel/miramare-beach-1116XL",
+    "1116XL",
+  ],
 ];
 
 for (const [providerKey, url, expected] of cases)

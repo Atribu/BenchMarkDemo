@@ -63,6 +63,7 @@ Orijinal SVG logo ve renkler [DGTLFACE](https://dgtlface.com/tr/) sitesinden ali
 | Kanal | Mevcut akis | Kalan gereksinim |
 | --- | --- | --- |
 | ANEX Tour | Miramare Beach ve Port Nature icin kesin tarihli Nur Hotel teklifleri; 1 oda/2 yetiskin, EUR toplam, ANEX operatoru, oda ve All Inclusive kontrolu | Son fiyat ve iptal/vergi kosullari rezervasyon adiminda yeniden kontrol edilmeli |
+| DERTOUR / ITS | Miramare Beach ve SY Hotels icin resmi DERTOUR otel sayfasindaki kesin tarihli hotel-only teklifler; DER ve ITS operatorleri, 1 oda/2 yetiskin, EUR konaklama toplami, otel/tarih/oda/pansiyon kontrolu | Iptal, vergi ve son musaitlik teklif detayinda yeniden kontrol edilmeli; diger oteller resmi sayfa kimligi ve oda alias'lariyla dinamik eklenir |
 | CHECK24 | Miramare Beach, Miramare Queen, Port Nature ve SY Hotels icin tarihli Hotel Only aramasi; 1 oda/2 yetiskin, EUR toplam, All Inclusive ve otel bazli oda eslestirmesi | Tum alternatif tarifeler API ozetine girmeyebilir; iptal/vergi kosullari ayri gosterilir. SY Hotels 10-15 Mayis 2027 canli kontrolunde 233 tekliften 8 oda kategorisi eslesti |
 | TUI | Ucaksiz rooms-panel servisi; toplam fiyat, otel/tarih/kisi/para birimi kontrolu; oda/balkon ayrimi; pansiyon, iptal ve sehir vergisi bilgisi | Kosullarin diger kanallarla tam esdegerligi ve duzenli erisim garantisi yok |
 | HolidayCheck | Exact-date hotel-only; otel kimligi, 1 oda/2 yetiskin, para birimi; kati oda eslesmesi ve alternatif teklifler; operator, pansiyon, iptal, cashback | Vergi dokumu ve tum iptal kosullari her teklifte mevcut degil; son fiyat/musaitlik yeniden kontrol edilmeli |
@@ -380,7 +381,7 @@ collector'larin statik sistem oteli ayarlarini degistirmez. Dinamik kaydin
 collector calisma zamaninda kullanilmasi `src/lib/hotels/runtime-manifest.ts`
 ve `runtime-store.ts` sinirlarinda yapilir. Desteklenen dinamik collector'lar
 ANEX Tour Almanya/EUR ve Rusya/RUB, Booking.com, CHECK24 Almanya/EUR,
-Expedia, HolidayCheck, Loveholidays EUR/GBP, On the Beach GBP/Antalya,
+DERTOUR/ITS Almanya/EUR, Expedia, HolidayCheck, Loveholidays EUR/GBP, On the Beach GBP/Antalya,
 PEGAS Touristik Rusya/RUB, Schauinsland Almanya/EUR, Restplatzborse EUR,
 Stayforlong Almanya/EUR ve TUI
 Almanya/EUR'dur. Otelin `active` durumuna gecebilmesi
@@ -392,7 +393,7 @@ Aktif kullanici otellerinin pazar ve oda kayitlari sunucu tarafinda mevcut
 statik rapor kataloguyla birlestirilir. Yalnizca manifestte desteklenen OTA,
 ilgili dinamik scope'a eklenir; diger OTA'lar veya Google/HolidayCheck ikincil
 kaynaklari statik konfigurasyon olmadan dinamik otel icin calistirilmaz.
-ANEX Tour, Booking, CHECK24, Expedia, HolidayCheck, Loveholidays,
+ANEX Tour, Booking, CHECK24, DERTOUR/ITS, Expedia, HolidayCheck, Loveholidays,
 On the Beach, PEGAS Touristik, Restplatzborse, Schauinsland, Stayforlong ve TUI
 collector'lari
 sayfa adresi, oda alias'lari
@@ -405,6 +406,14 @@ Dinamik CHECK24 eslestirmesinde CHECK24 sayfa adresi, sayisal otel kimligi
 pazari calistirilabilir sayilir. Modern `hotels.check24.de/accommodation/...`
 adresi verilirse accommodation kimligi ve slug URL'den alinir; aksi halde
 dogrulanmis sayisal kimlikle tarihli eski otel arama yolu kullanilir.
+
+Dinamik DERTOUR/ITS eslestirmesinde resmi
+`dertour.de/hotel/{otel}-{coreId}` sayfasi, URL sonundaki buyuk/kucuk harfe
+duyarli olmayan `coreId` ile ayni `externalHotelId` ve tum rapor odalari icin
+alias zorunludur. Yalnizca EUR pazari calistirilabilir sayilir. Collector
+yalnizca DER ve ITS operatorlerinin kesin otel, tarih, 1 oda / 2 yetiskin,
+EUR konaklama toplami ve All Inclusive kosullarini gecen tekliflerini rapora
+alir; sayfa korumasi asilmaya calisilmaz.
 
 Dinamik TUI eslestirmesinde TUI Almanya sayfa adresi, sayisal GIATA kimligi
 (`externalHotelId`) ve tum rapor odalari icin alias zorunludur. Pazar EUR

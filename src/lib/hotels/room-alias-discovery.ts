@@ -42,6 +42,7 @@ function discoveryContext(manifest: DynamicHotelRuntimeManifest) {
     bookingConfigs: configsFor("booking"),
     check24Configs: configsFor("check24"),
     coraltravelConfigs: configsFor("coraltravel"),
+    dertourConfigs: configsFor("dertour"),
     expediaConfigs: configsFor("expedia"),
     holidaycheckConfigs: configsFor("holidaycheck"),
     loveholidaysConfigs: configsFor("loveholidays"),

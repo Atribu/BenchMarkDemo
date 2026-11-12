@@ -219,6 +219,12 @@ check24: {
       "yalnızca doğrulanmış hotel-only teklifler kabul edilir.",
     type: "beta",
   },
+  dertour: {
+    label: "Hotel-only · Canlı SSR",
+    detail:
+      "DERTOUR Almanya sayfasındaki Nur Hotel akışından yalnızca DERTOUR ve ITS operatörlerinin kesin tarihli, 1 oda / 2 yetişkin EUR konaklama toplamlarını okur. Oda adı ve pansiyon doğrulanmayan teklifler karşılaştırmaya alınmaz.",
+    type: "beta",
+  },
 
 };
 

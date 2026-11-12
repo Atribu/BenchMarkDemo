@@ -16,6 +16,7 @@ const CHANNEL_RULES: Record<string, ChannelRule> = {
   booking: { currencies: ["EUR", "GBP"] },
   check24: { currencies: ["EUR"] },
   coraltravel: { currencies: ["EUR", "RUB"], countryCodes: ["TR"] },
+  dertour: { currencies: ["EUR"] },
   expedia: { currencies: ["EUR", "GBP"] },
   holidaycheck: { currencies: ["EUR"] },
   loveholidays: { currencies: ["EUR", "GBP"] },

@@ -93,6 +93,39 @@ test("local HTTP Host is used when Next normalizes its internal URL to localhost
   }
 });
 
+test("development accepts the direct local origin alongside a configured panel origin", () => {
+  const options = {
+    production: false,
+    publicOrigin: "http://127.0.0.1:3000",
+  };
+  const direct = new Request("http://localhost:3100/api/benchmark/run", {
+    headers: { host: "localhost:3100", origin: "http://localhost:3100" },
+  });
+  assert.equal(checkRequestOrigin(direct, options), null);
+  const foreign = new Request("http://localhost:3100/api/benchmark/run", {
+    headers: { host: "localhost:3100", origin: "https://evil.test" },
+  });
+  assert.equal(checkRequestOrigin(foreign, options)?.status, 403);
+});
+
+test("production remains pinned to the configured public origin", () => {
+  const options = {
+    production: true,
+    publicOrigin: "https://panel.example.com",
+  };
+  const direct = new Request("http://localhost:3100/api/benchmark/run", {
+    headers: { host: "localhost:3100", origin: "http://localhost:3100" },
+  });
+  assert.equal(checkRequestOrigin(direct, options)?.status, 403);
+  const proxied = new Request("http://localhost:3100/api/benchmark/run", {
+    headers: {
+      host: "localhost:3100",
+      origin: "https://panel.example.com",
+    },
+  });
+  assert.equal(checkRequestOrigin(proxied, options), null);
+});
+
 test("JSON body limits apply to actual streamed bytes, not just Content-Length", async () => {
   assert.deepEqual(await readBoundedJson(Response.json({ ok: true }), 100), {
     ok: true,

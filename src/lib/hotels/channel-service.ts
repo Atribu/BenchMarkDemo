@@ -152,6 +152,7 @@ function providerPageUrl(
     coral: ["coraltravel.de", "coral.ru"],
     coraltravel: ["coraltravel.de", "coral.ru"],
     "coral-travel": ["coraltravel.de", "coral.ru"],
+    dertour: ["dertour.de"],
   };
 
   const defaultDomain = template.hostname

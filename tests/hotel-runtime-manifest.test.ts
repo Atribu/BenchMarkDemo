@@ -262,7 +262,7 @@ test("activation manifest fails closed without a supported verified collector", 
       ),
     (error: unknown) =>
       error instanceof DynamicHotelRuntimeError &&
-      /ANEX Tour \(EUR\/RUB\), Booking\.com, CHECK24 \(EUR\), Coral Travel \(EUR\/RUB\), Expedia, HolidayCheck, Loveholidays \(EUR\/GBP\), On the Beach \(GBP\/Antalya\), PEGAS Touristik \(RUB\), Restplatzbörse \(EUR\), Schauinsland \(EUR\), Stayforlong \(EUR\) veya TUI/.test(
+      /ANEX Tour \(EUR\/RUB\), Booking\.com, CHECK24 \(EUR\), Coral Travel \(EUR\/RUB\), DERTOUR\/ITS \(EUR\), Expedia, HolidayCheck, Loveholidays \(EUR\/GBP\), On the Beach \(GBP\/Antalya\), PEGAS Touristik \(RUB\), Restplatzbörse \(EUR\), Schauinsland \(EUR\), Stayforlong \(EUR\) veya TUI/.test(
         error.message,
       ),
   );
@@ -1117,6 +1117,54 @@ test("Coral Travel dynamic mapping rejects unsupported currency and malformed ID
         })),
       }),
     /Coral Travel \(EUR\/RUB\)/,
+  );
+});
+
+test("DERTOUR mapping derives the official core identity and dynamic room aliases", () => {
+  const manifest = buildDynamicHotelRuntimeManifest(
+    readyHotel({
+      providerKey: "dertour",
+      externalHotelId: "1116XL",
+      pageUrl: "https://www.dertour.de/hotel/miramare-beach-1116XL",
+    }),
+  );
+  const config = manifest.collectorConfigs.dertour?.["example-eu"];
+  assert.deepEqual(config?.dertour, {
+    coreId: "1116XL",
+    slug: "miramare-beach",
+  });
+  assert.deepEqual(config?.roomAliases, {
+    "standard-land": ["Standard Room with Land View"],
+  });
+});
+
+test("DERTOUR dynamic mapping rejects unsupported currency and mismatched identity", () => {
+  const hotel = readyHotel({
+    providerKey: "dertour",
+    externalHotelId: "1116XL",
+    pageUrl: "https://www.dertour.de/hotel/miramare-beach-1116XL",
+  });
+  assert.throws(
+    () =>
+      buildDynamicHotelRuntimeManifest({
+        ...hotel,
+        markets: hotel.markets.map((market) => ({
+          ...market,
+          currency: "GBP" as const,
+        })),
+      }),
+    /DERTOUR\/ITS \(EUR\)/,
+  );
+  assert.throws(
+    () =>
+      buildDynamicHotelRuntimeManifest({
+        ...hotel,
+        channelMappings: hotel.channelMappings.map((mapping) => ({
+          ...mapping,
+          externalHotelId: "12t1zL",
+        })),
+      }),
+    /DERTOUR\/ITS \(EUR\)/,
   );
 });
 
