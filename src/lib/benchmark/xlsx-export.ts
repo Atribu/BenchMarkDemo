@@ -282,13 +282,18 @@ if (url) {
         if (entry.status === "available" && entry.price !== null) {
 
 
-        const difference =
+const difference =
   (entry.price - room.referencePrice) / room.referencePrice;
 
 row.getCell(2).value = entry.price;
 row.getCell(2).numFmt = currencyFormat(group.currency);
 
-row.getCell(3).value = difference;
+row.getCell(3).value = {
+  formula: `(B${currentRow}-B${referenceRowNumber})/B${referenceRowNumber}`,
+  result: difference,
+  date1904: false,
+};
+
 row.getCell(3).numFmt = "0.00%";
 
 
