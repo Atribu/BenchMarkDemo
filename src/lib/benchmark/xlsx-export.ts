@@ -264,12 +264,21 @@ export function buildBenchmarkXlsxWorkbook(payload: BenchmarkXlsxPayload) {
       for (const entry of room.entries) {
         const row = sheet.getRow(currentRow);
         const url = sourceUrl(entry.sourceHint);
-        row.getCell(1).value = url
-          ? { text: entry.providerName, hyperlink: url, tooltip: "Kanal aramasını aç" }
-          : entry.providerName;
-        if (url) {
-          row.getCell(1).font = { color: { argb: "FF0563C1" }, underline: true };
-        }
+
+       row.getCell(1).value = url
+  ? {
+      text: entry.providerName,
+      hyperlink: url,
+    }
+  : entry.providerName;
+
+if (url) {
+  row.getCell(1).font = {
+    color: { argb: "FF0563C1" },
+    underline: true,
+  };
+}
+          
         if (entry.status === "available" && entry.price !== null) {
           const difference = (entry.price - room.referencePrice) / room.referencePrice;
           row.getCell(2).value = entry.price;
