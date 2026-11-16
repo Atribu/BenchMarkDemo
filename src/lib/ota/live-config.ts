@@ -36,7 +36,7 @@ interface SchauinslandHotelConfig {
 }
 
 interface AnexHotelConfig {
-  accommodationId: string;
+  accommodationId?: string;
   ruHotelId?: string;
   ruHotelSlug?: string;
   roomMatchers: {
@@ -97,6 +97,28 @@ export const ANEX_HOTEL_CONFIG: Partial<
         patterns: [
           /(?=.*\b(standard|doppelzimmer|double room)\b)(?=.*\b(meerblick|sea view|ocean view)\b)(?!.*\b(seitl|seitlich|side sea|partial sea|teilmeerblick)\b)/,
         ],
+      },
+    ],
+  },
+  "sy-hotels-belek": {
+    ruHotelId: "43846",
+    ruHotelSlug: "sy-hotels-belek-luxury",
+    roomMatchers: [
+      {
+        roomId: "deluxe-family",
+        patterns: [/^family room$/],
+      },
+      {
+        roomId: "deluxe-superior",
+        patterns: [/^superior room$/],
+      },
+      {
+        roomId: "deluxe-pool",
+        patterns: [/^standard room pool view$/],
+      },
+      {
+        roomId: "deluxe-land",
+        patterns: [/^standard land view$/],
       },
     ],
   },

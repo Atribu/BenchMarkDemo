@@ -19,6 +19,16 @@ const GERMAN_MONTHS = [
   "Dezember",
 ] as const;
 
+export const CORAL_HOTEL_ONLY_LABELS = ["Nur Hotel", "Hotels"] as const;
+
+export function hasCoralHotelOnlyLabel(value: string) {
+  const labels = new Set<string>(CORAL_HOTEL_ONLY_LABELS);
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .some((line) => labels.has(line));
+}
+
 function parseIsoDate(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
 
@@ -170,10 +180,11 @@ export async function searchCoralTravel(
 
   // 1. Yalnızca konaklama modu
   await page
-    .getByText("Nur Hotel", { exact: true })
+    .getByText(/^(?:Nur Hotel|Hotels)$/, { exact: true })
+    .first()
     .click();
 
-  console.log("[CORALTRAVEL] Nur Hotel selected.");
+  console.log("[CORALTRAVEL] Hotel-only mode selected.");
 
   // 2. Otel arama panelini aç
   await page
@@ -252,7 +263,7 @@ export async function searchCoralTravel(
     .locator("body")
     .innerText();
 
-  if (!guestText.includes("Nur Hotel")) {
+  if (!hasCoralHotelOnlyLabel(guestText)) {
     throw new Error(
       "Hotel-only modu doğrulanamadı.",
     );

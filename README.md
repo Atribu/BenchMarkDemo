@@ -52,7 +52,7 @@ IBM Plex Sans ve Space Grotesk artik Fontsource paketlerinden yerel sunulur; bui
 
 ### Kanal ve pazar secimi
 
-Kayitli OTA'lar otel ve pazar desteklerine gore secilebilir; **Tum OTA'lari sec** hepsini isaretler. Otel/pazar degisince kanal secimleri silinmez. Pazar bir tercihtir: Avrupa seciliyken On the Beach ayni otelin GBP pazarina, UK seciliyken TUI/HolidayCheck ayni otelin EUR pazarina yonlendirilir. Secilen tarihler korunur. EUR ve GBP ayri tablolardadir; kur donusumu yapilmaz. Yalnizca yonlendirilen kanal ek tabloya konur; diger kanallarin sorgulari gereksiz yere tekrarlanmaz. Otel eslestirmesi olmayan bir kanal rapordan dusurulmez, nedeni gosterilir. Bir kanalin secilebilir olmasi canli erisiminin basarili oldugu anlamina gelmez.
+Kayitli OTA'lar otel ve pazar desteklerine gore secilebilir. Otel/pazar degistiginde yalnizca bu secimi dogrudan destekleyen kanallar otomatik isaretlenir; uygun olmayan kanallar pasif gosterilir. **Tum OTA'lari sec** de yalnizca uygun kanallari isaretler. Bir kanal baska bir ulke, pazar veya para birimine sessizce yonlendirilmez; EUR, GBP ve RUB birbirine donusturulmez. Coklu otel seciminde uygun kanallarin birlesimi kullanilir, ancak her kanal yalnizca dogrudan destekledigi otel/pazar icin sorgulanir. Bir kanalin secilebilir olmasi canli erisiminin basarili oldugu anlamina gelmez.
 
 ## Marka ve Arayuz
 
@@ -62,7 +62,7 @@ Orijinal SVG logo ve renkler [DGTLFACE](https://dgtlface.com/tr/) sitesinden ali
 
 | Kanal | Mevcut akis | Kalan gereksinim |
 | --- | --- | --- |
-| ANEX Tour | Miramare Beach ve Port Nature icin kesin tarihli Nur Hotel teklifleri; 1 oda/2 yetiskin, EUR toplam, ANEX operatoru, oda ve All Inclusive kontrolu | Son fiyat ve iptal/vergi kosullari rezervasyon adiminda yeniden kontrol edilmeli |
+| ANEX Tour | Miramare Beach ve Port Nature icin Almanya/EUR Nur Hotel teklifleri; Port Nature (`hotelId=8356`) ve SY Hotels (`43846`) icin Rusya/RUB hotel-only teklifleri; kesin tarih, 1 oda/2 yetiskin, otel, oda ve All Inclusive kontrolu | Son fiyat ve iptal/vergi kosullari rezervasyon adiminda yeniden kontrol edilmeli; Rusya erisimi zaman zaman proxy gerektirebilir |
 | DERTOUR / ITS | Miramare Beach ve SY Hotels icin resmi DERTOUR otel sayfasindaki kesin tarihli hotel-only teklifler; DER ve ITS operatorleri, 1 oda/2 yetiskin, EUR konaklama toplami, otel/tarih/oda/pansiyon kontrolu | Iptal, vergi ve son musaitlik teklif detayinda yeniden kontrol edilmeli; diger oteller resmi sayfa kimligi ve oda alias'lariyla dinamik eklenir |
 | CHECK24 | Miramare Beach, Miramare Queen, Port Nature ve SY Hotels icin tarihli Hotel Only aramasi; 1 oda/2 yetiskin, EUR toplam, All Inclusive ve otel bazli oda eslestirmesi | Tum alternatif tarifeler API ozetine girmeyebilir; iptal/vergi kosullari ayri gosterilir. SY Hotels 10-15 Mayis 2027 canli kontrolunde 233 tekliften 8 oda kategorisi eslesti |
 | TUI | Ucaksiz rooms-panel servisi; toplam fiyat, otel/tarih/kisi/para birimi kontrolu; oda/balkon ayrimi; pansiyon, iptal ve sehir vergisi bilgisi | Kosullarin diger kanallarla tam esdegerligi ve duzenli erisim garantisi yok |

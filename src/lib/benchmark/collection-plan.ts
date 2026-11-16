@@ -1,6 +1,8 @@
 import type {
+  OtaKey,
   ProviderDescriptor,
   ReportScopeDefinition,
+  ScopeKey,
   ScopeProviderSelection,
 } from "./types";
 
@@ -11,12 +13,24 @@ export interface CollectionTask {
   reason?: string;
 }
 
-// Market selection is a preference, not permission to silently drop an OTA.
-// A fallback must stay on the same hotel and retain its source currency.
+export function supportedProviderKeysForScopes(
+  scopeIds: readonly ScopeKey[],
+  providers: readonly ProviderDescriptor[],
+): OtaKey[] {
+  const requested = new Set(scopeIds);
+  return providers
+    .filter((provider) =>
+      provider.supportedScopes.some((scopeId) => requested.has(scopeId)),
+    )
+    .map((provider) => provider.key);
+}
+
+// A selected hotel/market is an exact boundary. Unsupported channels are not
+// redirected to another country or currency behind the user's selection.
 export function buildCollectionPlan(
   requested: ReportScopeDefinition[],
   providers: ProviderDescriptor[],
-  catalog: ReportScopeDefinition[],
+  _catalog: ReportScopeDefinition[],
 ) {
   const tasks: CollectionTask[] = [];
   const warnings: string[] = [];
@@ -26,34 +40,20 @@ export function buildCollectionPlan(
   for (const requestedScope of requested) {
     for (const provider of providers) {
       const direct = provider.supportedScopes.includes(requestedScope.id);
-      const alternate = direct
-        ? undefined
-        : catalog.find(
-            (scope) =>
-              scope.hotelKey === requestedScope.hotelKey &&
-              provider.supportedScopes.includes(scope.id),
-          );
-      const scope = alternate
-        ? { ...alternate, windows: requestedScope.windows }
-        : requestedScope;
-      const supported = direct || !!alternate;
-      const key = supported
-        ? `${scope.id}:${provider.key}`
-        : `${scope.hotelKey}:unsupported:${provider.key}`;
+      if (!direct) continue;
+      const key = `${requestedScope.id}:${provider.key}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const reason = supported
-        ? undefined
-        : `${provider.name}: ${scope.hotelName} için otel/pazar eşleştirmesi eksik. Bu kanala sorgu gönderilmedi.`;
-      if (alternate)
-        warnings.push(
-          `${provider.name} / ${scope.hotelName}: ${requestedScope.currency} yerine desteklenen ${scope.currency} pazarında sorgulanır. Para birimleri birbirine çevrilmez.`,
-        );
-      if (reason) warnings.push(reason);
-      tasks.push({ scope, provider, supported, reason });
-      scopes.set(scope.id, scope);
-      (providersByScope[scope.id] ??= []).push(provider.key);
+      tasks.push({ scope: requestedScope, provider, supported: true });
+      scopes.set(requestedScope.id, requestedScope);
+      (providersByScope[requestedScope.id] ??= []).push(provider.key);
     }
+  }
+  for (const provider of providers) {
+    if (!tasks.some((task) => task.provider.key === provider.key))
+      warnings.push(
+        `${provider.name}: seçilen otel ve pazarları desteklemediği için seçime dahil edilmedi.`,
+      );
   }
   return { tasks, scopes: [...scopes.values()], providersByScope, warnings };
 }

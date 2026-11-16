@@ -29,6 +29,9 @@ const portNatureUk = REPORT_SCOPES.find(
 const portNatureRu = REPORT_SCOPES.find(
   (scope) => scope.id === "port-nature-ru",
 )!;
+const syHotelsRu = REPORT_SCOPES.find(
+  (scope) => scope.id === "sy-hotels-ru",
+)!;
 
 test("hotel catalog generates unique report scopes and complete hotel metadata", () => {
   assert.equal(new Set(HOTEL_CATALOG.map((hotel) => hotel.key)).size, 4);
@@ -131,12 +134,74 @@ test("SY Hotels exposes only channels with a verified hotel identity", () => {
     OTA_PROVIDERS.filter((provider) =>
       provider.supportedScopes.includes("sy-hotels-ru"),
     ).map((provider) => provider.key),
-    ["pegastour"],
+    ["anextour", "pegastour"],
+  );
+  assert.equal(ANEX_HOTEL_CONFIG["sy-hotels-belek"]?.ruHotelId, "43846");
+  assert.equal(
+    ANEX_HOTEL_CONFIG["sy-hotels-belek"]?.ruHotelSlug,
+    "sy-hotels-belek-luxury",
   );
   assert.equal(
     CHECK24_HOTEL_CONFIG["sy-hotels-belek"].accommodationId,
     "019ab53308e673799d4d0b164fb80e79",
   );
+});
+
+test("SY Hotels ANEX Russia room names map only through verified API names", () => {
+  const cases = [
+    ["Family Room", "deluxe-family"],
+    ["Superior Room", "deluxe-superior"],
+    ["STANDARD ROOM POOL VIEW", "deluxe-pool"],
+    ["STANDARD LAND VIEW", "deluxe-land"],
+  ] as const;
+
+  for (const [name, roomId] of cases) {
+    assert.equal(matchAnexRoom(syHotelsRu, name)?.id, roomId, name);
+  }
+  assert.equal(matchAnexRoom(syHotelsRu, "Standard Room"), undefined);
+});
+
+test("ANEX Russia accepts only the exact SY Hotels RUB hotel-only stay", () => {
+  const result = parseAnexRuOffers(
+    {
+      result: [
+        {
+          converted_price: 240000,
+          hotelInc: 43846,
+          checkIn: "2027-05-10",
+          checkOut: "2027-05-15",
+          nights: 5,
+          adult: 2,
+          roomName: "STANDARD LAND VIEW",
+          mealName: "Ультра все включено",
+        },
+        {
+          converted_price: 1,
+          hotelInc: 8356,
+          checkIn: "2027-05-10",
+          checkOut: "2027-05-15",
+          nights: 5,
+          adult: 2,
+          roomName: "Wrong Hotel",
+          mealName: "Все включено",
+        },
+      ],
+    },
+    {
+      hotelId: "43846",
+      checkIn: "2027-05-10",
+      checkOut: "2027-05-15",
+      nights: 5,
+    },
+  );
+
+  assert.deepEqual(result, [
+    {
+      roomName: "STANDARD LAND VIEW",
+      board: "Ультра все включено",
+      price: 240000,
+    },
+  ]);
 });
 
 test("Port Nature ANEX room names map through provider configuration", () => {

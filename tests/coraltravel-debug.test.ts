@@ -1,6 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { __coralTravelDebugInternal as coralTravel } from "../src/lib/ota/coraltravel-debug";
+import {
+  CORAL_HOTEL_ONLY_LABELS,
+  hasCoralHotelOnlyLabel,
+} from "../src/lib/ota/coraltravel-search";
+
+test("Coral Travel supports both legacy and current hotel-only labels", () => {
+  assert.deepEqual(CORAL_HOTEL_ONLY_LABELS, ["Nur Hotel", "Hotels"]);
+  assert.equal(hasCoralHotelOnlyLabel("Pauschalreisen\nHotels\nReiseziel"), true);
+  assert.equal(hasCoralHotelOnlyLabel("Pauschalreisen\nNur Hotel\nReiseziel"), true);
+  assert.equal(hasCoralHotelOnlyLabel("Pauschalreisen\nHotelangebote"), false);
+});
 
 test("Coral Travel calendar labels use the German month and display format", () => {
   assert.equal(coralTravel.monthLabel("2026-11-20"), "November, 2026");

@@ -476,15 +476,18 @@ export async function runBenchmarkJob(
     baseScopes,
     resolvedRequest.customWindow,
   );
-  const selectedProviders = providerCatalog.filter((provider) =>
+  const requestedProviders = providerCatalog.filter((provider) =>
     resolvedRequest.providerKeys.includes(provider.key),
   );
   const plan = buildCollectionPlan(
     customWindowResult.scopes,
-    selectedProviders,
+    requestedProviders,
     scopeCatalog,
   );
   const selectedScopes = plan.scopes;
+  const selectedProviders = requestedProviders.filter((provider) =>
+    plan.tasks.some((task) => task.provider.key === provider.key),
+  );
 
   const warnings: string[] = [
     ...(runtimeContext?.manifestWarnings ?? []),

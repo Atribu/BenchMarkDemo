@@ -9,8 +9,13 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
   liveSupported: true,
   readiness: "selector-mapping",
   notes:
-    "Miramare Beach ve Port Nature Almanya EUR hotel-only akışından; Port Nature ayrıca ANEX Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
-  supportedScopes: ["beach-eu", "port-nature-eu", "port-nature-ru"],
+    "Miramare Beach ve Port Nature Almanya EUR hotel-only akışından; Port Nature ve SY Hotels ayrıca ANEX Rusya RUB hotel-only akışından sorgulanır. RUB kaynak fiyatı korunur; panelde TCMB resmi günlük satış kuruyla EUR karşılığı gösterilir.",
+  supportedScopes: [
+    "beach-eu",
+    "port-nature-eu",
+    "port-nature-ru",
+    "sy-hotels-ru",
+  ],
   searchTemplate: "https://anextour.ru/hotels/",
 },
   {

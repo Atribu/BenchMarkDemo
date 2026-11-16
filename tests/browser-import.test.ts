@@ -64,6 +64,12 @@ const otb = {
 };
 const prepare = (data: unknown = capture, query: unknown = request) =>
   prepareBrowserImport({ capture: data, request: query }, now);
+const prepareOtb = () =>
+  prepare(otb, {
+    ...request,
+    scopeKeys: ["queen-uk"],
+    providerKeys: ["onthebeach"],
+  });
 
 test("browser import creates a report without querying OTAs or inflating automated coverage", () => {
   const report = prepare();
@@ -85,8 +91,8 @@ test("browser import creates a report without querying OTAs or inflating automat
   assert.match(offer.terms.availability, /sunucu OTA'ya bağlanmadı/);
 });
 
-test("OTB import retains native GBP and separates partial sea even for EUR preference", () => {
-  const report = prepare(otb);
+test("OTB import requires its native GBP market and separates partial sea", () => {
+  const report = prepareOtb();
   const offers = report.browserOffers!;
   assert.equal(offers[0].scopeKey, "queen-uk");
   assert.equal(offers[0].currency, "GBP");
@@ -185,12 +191,10 @@ test("browser input features are ignored; nightly, wrong currency and empty pric
   assert.equal(prepare(data).browserOffers![0].price, 1356);
 });
 
-test("reimport replaces a whole batch, retains other channels, and never overwrites direct quotes or summary", () => {
+test("reimport replaces its batch and never overwrites direct quotes or summary", () => {
   const original = prepare();
-  const report = mergeBrowserImport(original, prepare(otb), now.getTime());
-  assert.equal(report.browserOffers!.length, 3);
-  const duplicate = mergeBrowserImport(report, prepare(), now.getTime());
-  assert.equal(duplicate.browserOffers!.length, 3);
+  const duplicate = mergeBrowserImport(original, prepare(), now.getTime());
+  assert.equal(duplicate.browserOffers!.length, 1);
   assert.deepEqual(duplicate.summary, original.summary);
   assert.deepEqual(duplicate.scopes, original.scopes);
   const incoming = prepare({
@@ -208,7 +212,7 @@ test("reimport replaces a whole batch, retains other channels, and never overwri
     incoming,
     now.getTime() + 30_000,
   );
-  assert.equal(replaced.browserOffers!.length, 3);
+  assert.equal(replaced.browserOffers!.length, 1);
   assert.equal(replaced.browserOffers!.at(-1)!.price, 1500);
   assert.throws(
     () => mergeBrowserImport(replaced, prepare(), now.getTime() + 30_000),

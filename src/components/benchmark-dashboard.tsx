@@ -25,7 +25,10 @@ import type {
 import { nightCount } from "@/src/lib/benchmark/request";
 import { benchmarkCsv } from "@/src/lib/benchmark/export";
 import type { BenchmarkXlsxPayload } from "@/src/lib/benchmark/xlsx-export";
-import { buildCollectionPlan } from "@/src/lib/benchmark/collection-plan";
+import {
+  buildCollectionPlan,
+  supportedProviderKeysForScopes,
+} from "@/src/lib/benchmark/collection-plan";
 import { withBasePath } from "@/src/lib/base-path";
 import {
   benchmarkErrorLabel,
@@ -847,7 +850,12 @@ export function BenchmarkDashboard({
   const [section, setSection] = useState<Section>("benchmark");
   const [report, setReport] = useState<BenchmarkRunResult | null>(null);
   const [selectedProviders, setSelectedProviders] = useState(
-    defaultRequest.providerKeys,
+    defaultRequest.providerKeys.filter((key) =>
+      supportedProviderKeysForScopes(
+        defaultRequest.scopeKeys,
+        providerCatalog,
+      ).includes(key),
+    ),
   );
   const [selectedScopes, setSelectedScopes] = useState(
     defaultRequest.scopeKeys,
@@ -889,6 +897,10 @@ export function BenchmarkDashboard({
       selectedProviders.includes(provider.key),
     ),
     scopeCatalog,
+  );
+  const availableProviderKeys = supportedProviderKeysForScopes(
+    selectedScopes,
+    providerCatalog,
   );
   const canRun = !!nights && selectedProviders.length > 0 && !isRunning;
   const manualCount =
@@ -992,6 +1004,9 @@ export function BenchmarkDashboard({
   function selectPortfolio(value: string) {
     const scopes = portfolios.find((option) => option.value === value)!.scopes;
     setSelectedScopes(scopes);
+    setSelectedProviders(
+      supportedProviderKeysForScopes(scopes, providerCatalog),
+    );
   }
 
   async function runBenchmark() {
@@ -1364,59 +1379,72 @@ export function BenchmarkDashboard({
                 </div>
                 <div className="channelSelectorHeading">
                   <span>Karşılaştırılacak kanallar</span>
-                  <small>{selectedProviders.length} seçili</small>
+                  <small>
+                    {selectedProviders.length} / {availableProviderKeys.length}{" "}
+                    seçili
+                  </small>
                   <button
                     type="button"
                     className="textButton"
                     disabled={
                       isRunning ||
-                      selectedProviders.length === providerCatalog.length
-                    }
-                    onClick={() =>
-                      setSelectedProviders(
-                        providerCatalog.map((provider) => provider.key),
+                      availableProviderKeys.length === 0 ||
+                      availableProviderKeys.every((key) =>
+                        selectedProviders.includes(key),
                       )
                     }
+                    onClick={() => setSelectedProviders(availableProviderKeys)}
                   >
                     Tüm OTA'ları seç
                   </button>
                 </div>
                 <div className="channelChips">
-                  {providerCatalog.map((provider) => (
-                    <label
-                      key={provider.key}
-                      className={`channelChip ${selectedProviders.includes(provider.key) ? "selected" : ""}`}
-                      title={CHANNEL_INFO[provider.key].detail}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={provider.name}
-                        checked={selectedProviders.includes(provider.key)}
-                        disabled={isRunning}
-                        onChange={() =>
-                          setSelectedProviders((current) =>
-                            current.includes(provider.key)
-                              ? current.filter((key) => key !== provider.key)
-                              : [...current, provider.key],
-                          )
+                  {providerCatalog.map((provider) => {
+                    const available = availableProviderKeys.includes(
+                      provider.key,
+                    );
+                    return (
+                      <label
+                        key={provider.key}
+                        className={`channelChip ${selectedProviders.includes(provider.key) ? "selected" : ""} ${available ? "" : "unavailable"}`}
+                        title={
+                          available
+                            ? CHANNEL_INFO[provider.key].detail
+                            : "Seçilen otel ve pazar için desteklenmiyor."
                         }
-                      />
-                      <span className="checkboxMark">
-                        <Icon name="check" />
-                      </span>
-                      <span>{provider.name}</span>
-                    </label>
-                  ))}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={provider.name}
+                          checked={selectedProviders.includes(provider.key)}
+                          disabled={isRunning || !available}
+                          onChange={() =>
+                            setSelectedProviders((current) =>
+                              current.includes(provider.key)
+                                ? current.filter(
+                                    (key) => key !== provider.key,
+                                  )
+                                : [...current, provider.key],
+                            )
+                          }
+                        />
+                        <span className="checkboxMark">
+                          <Icon name="check" />
+                        </span>
+                        <span>{provider.name}</span>
+                      </label>
+                    );
+                  })}
                 </div>
                 <p className="dateHelp">
-                  Tüm kanallar seçilebilir. Kanal tercih edilen pazarı
-                  desteklemiyorsa aynı otel desteklenen pazarda sorgulanır. EUR
-                  ve GBP ayrı tablolarda gösterilir.
+                  Yalnızca seçilen otel ve pazarı doğrudan destekleyen kanallar
+                  sorgulanır. Pazar değiştiğinde uygun kanallar otomatik seçilir;
+                  başka ülke veya para birimine yönlendirme yapılmaz.
                 </p>
                 {collectionPlan.warnings.length > 0 && (
                   <details className="rateConditions routingNotes">
                     <summary>
-                      Bu seçimdeki pazar yönlendirmeleri (
+                      Seçime dahil edilmeyen kanallar (
                       {collectionPlan.warnings.length})
                     </summary>
                     {collectionPlan.warnings.map((warning) => (
