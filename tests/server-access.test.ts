@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { checkAccess, checkRequestOrigin } from "../src/lib/server/access";
 import { readBoundedJson } from "../src/lib/server/bounded-json";
-import { acquireQuery } from "../src/lib/server/query-gate";
+import { createQueryGate } from "../src/lib/server/query-gate";
 
 const config = {
   production: true,
@@ -144,13 +144,32 @@ test("JSON body limits apply to actual streamed bytes, not just Content-Length",
 });
 
 test("one query at a time with cooldown prevents simultaneous browser fleets", () => {
+  const { acquire } = createQueryGate();
   const start = Date.now();
-  const release = acquireQuery(start);
+  const release = acquire(start);
   assert.ok(release);
-  assert.equal(acquireQuery(start + 20_000), null);
+  assert.equal(acquire(start + 20_000), null);
   release();
-  assert.equal(acquireQuery(start + 9999), null);
-  const next = acquireQuery(start + 10_000);
+  assert.equal(acquire(start + 9999), null);
+  const next = acquire(start + 10_000);
   assert.ok(next);
   next();
+});
+
+test("an abandoned query lease expires without letting an old release unlock new work", () => {
+  const { acquire } = createQueryGate({ cooldownMs: 10, leaseMs: 100 });
+  const firstRelease = acquire(1_000);
+  assert.ok(firstRelease);
+  assert.equal(acquire(1_099), null);
+
+  const secondRelease = acquire(1_100);
+  assert.ok(secondRelease);
+  assert.equal(acquire(1_199), null);
+
+  secondRelease();
+  const thirdRelease = acquire(1_200);
+  assert.ok(thirdRelease);
+  firstRelease();
+  assert.equal(acquire(1_201), null);
+  thirdRelease();
 });

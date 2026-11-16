@@ -581,7 +581,6 @@ test("XLSX export keeps numeric prices, formulas and unavailable channel labels"
   assert.deepEqual(sheet.getCell("A5").value, {
     text: "TUI",
     hyperlink: "https://example.com/offer",
-    tooltip: "Kanal aramasını aç",
   });
   const bytes = await workbook.xlsx.writeBuffer();
   const reopened = new ExcelJS.Workbook();
