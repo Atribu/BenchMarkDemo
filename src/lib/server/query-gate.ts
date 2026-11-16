@@ -9,6 +9,11 @@ interface QueryGateOptions {
   leaseMs?: number;
 }
 
+export interface QueryGateStatus {
+  reason: "running" | "cooldown" | null;
+  retryAfterMs: number;
+}
+
 export function createQueryGate(options: QueryGateOptions = {}) {
   const cooldownMs = options.cooldownMs ?? QUERY_COOLDOWN_MS;
   const leaseMs = options.leaseMs ?? QUERY_LEASE_MS;
@@ -22,10 +27,18 @@ export function createQueryGate(options: QueryGateOptions = {}) {
   let runningUntil = 0;
   let nextAt = 0;
 
+  const status = (now = Date.now()): QueryGateStatus => {
+    if (activeId !== 0 && now < runningUntil)
+      return { reason: "running", retryAfterMs: runningUntil - now };
+    if (now < nextAt)
+      return { reason: "cooldown", retryAfterMs: nextAt - now };
+    return { reason: null, retryAfterMs: 0 };
+  };
+
   return {
+    status,
     acquire(now = Date.now()): (() => void) | null {
-      const running = activeId !== 0 && now < runningUntil;
-      if (running || now < nextAt) return null;
+      if (status(now).reason) return null;
 
       const queryId = ++sequence;
       activeId = queryId;
@@ -49,4 +62,8 @@ const gate = (shared.benchmarkQueryGateV2 ??= createQueryGate());
 
 export function acquireQuery(now = Date.now()): (() => void) | null {
   return gate.acquire(now);
+}
+
+export function getQueryGateStatus(now = Date.now()): QueryGateStatus {
+  return gate.status(now);
 }

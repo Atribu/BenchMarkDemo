@@ -3,7 +3,10 @@ import { parseBenchmarkRequest } from "@/src/lib/benchmark/request";
 import { runBenchmarkJob } from "@/src/lib/ota/run-benchmark";
 import { checkAccess, checkRequestOrigin } from "@/src/lib/server/access";
 import { readBoundedJson } from "@/src/lib/server/bounded-json";
-import { acquireQuery } from "@/src/lib/server/query-gate";
+import {
+  acquireQuery,
+  getQueryGateStatus,
+} from "@/src/lib/server/query-gate";
 import { loadDynamicHotelRuntimeContext } from "@/src/lib/hotels/runtime-store";
 import { createFileHotelStore } from "@/src/lib/hotels/file-store";
 import { recordLiveCollectorEvidence } from "@/src/lib/hotels/live-verification";
@@ -61,17 +64,28 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   const release = acquireQuery();
-  if (!release)
+  if (!release) {
+    const gateStatus = getQueryGateStatus();
+    const retryAfter = Math.max(
+      1,
+      Math.ceil(gateStatus.retryAfterMs / 1_000),
+    );
     return NextResponse.json(
       {
         error:
-          "Bir sorgu çalışıyor veya çok kısa süre önce başlatıldı. Lütfen bekleyip tekrar deneyin.",
+          gateStatus.reason === "running"
+            ? "Başka bir canlı sorgu halen arka planda çalışıyor. Tamamlandığında yeniden deneyin."
+            : "Yeni bir sorgu başlatmak için 10 saniyelik bekleme süresinin dolmasını bekleyin.",
       },
       {
         status: 429,
-        headers: { "Retry-After": "10", "Cache-Control": "no-store" },
+        headers: {
+          "Retry-After": String(retryAfter),
+          "Cache-Control": "no-store",
+        },
       },
     );
+  }
   try {
     const report = await runBenchmarkJob(payload, undefined, runtimeContext);
     if (payload.mode === "live") {

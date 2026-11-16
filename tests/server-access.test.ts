@@ -126,6 +126,33 @@ test("production remains pinned to the configured public origin", () => {
   assert.equal(checkRequestOrigin(proxied, options), null);
 });
 
+test("production accepts an exact panel and standalone benchmark origin list", () => {
+  const options = {
+    production: true,
+    publicOrigins: [
+      "https://panel.example.com",
+      "https://benchmark.example.com",
+    ],
+  };
+  for (const origin of options.publicOrigins) {
+    const request = new Request("http://benchmark.internal/api/benchmark/run", {
+      headers: { host: "benchmark.internal", origin },
+    });
+    assert.equal(checkRequestOrigin(request, options), null);
+  }
+  const foreign = new Request("http://benchmark.internal/api/benchmark/run", {
+    headers: { host: "benchmark.internal", origin: "https://evil.test" },
+  });
+  assert.equal(checkRequestOrigin(foreign, options)?.status, 403);
+  assert.equal(
+    checkRequestOrigin(foreign, {
+      production: true,
+      publicOrigins: ["https://panel.example.com/benchmark"],
+    })?.status,
+    503,
+  );
+});
+
 test("JSON body limits apply to actual streamed bytes, not just Content-Length", async () => {
   assert.deepEqual(await readBoundedJson(Response.json({ ok: true }), 100), {
     ok: true,
@@ -157,9 +184,14 @@ test("one query at a time with cooldown prevents simultaneous browser fleets", (
 });
 
 test("an abandoned query lease expires without letting an old release unlock new work", () => {
-  const { acquire } = createQueryGate({ cooldownMs: 10, leaseMs: 100 });
+  const gate = createQueryGate({ cooldownMs: 10, leaseMs: 100 });
+  const { acquire } = gate;
   const firstRelease = acquire(1_000);
   assert.ok(firstRelease);
+  assert.deepEqual(gate.status(1_050), {
+    reason: "running",
+    retryAfterMs: 50,
+  });
   assert.equal(acquire(1_099), null);
 
   const secondRelease = acquire(1_100);
@@ -172,4 +204,8 @@ test("an abandoned query lease expires without letting an old release unlock new
   firstRelease();
   assert.equal(acquire(1_201), null);
   thirdRelease();
+  assert.deepEqual(gate.status(1_201), {
+    reason: "cooldown",
+    retryAfterMs: 9,
+  });
 });

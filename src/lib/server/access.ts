@@ -66,7 +66,11 @@ export async function checkAccess(
 
 export function checkRequestOrigin(
   request: Request,
-  config: { production?: boolean; publicOrigin?: string } = {},
+  config: {
+    production?: boolean;
+    publicOrigin?: string;
+    publicOrigins?: string[];
+  } = {},
 ): Response | null {
   let expectedOrigins: Set<string>;
   try {
@@ -79,21 +83,30 @@ export function checkRequestOrigin(
     const directAddress = new URL(
       host ? `${internal.protocol}//${host}` : request.url,
     );
-    const publicOrigin = config.publicOrigin ?? process.env.BENCHMARK_PUBLIC_ORIGIN;
-    const configuredAddress = publicOrigin
-      ? new URL(publicOrigin)
-      : undefined;
-    for (const address of [directAddress, configuredAddress].filter(
-      (candidate): candidate is URL => Boolean(candidate),
-    ))
+    const environmentOrigins = process.env.BENCHMARK_PUBLIC_ORIGINS
+      ?.split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const configuredOrigins = config.publicOrigins ?? environmentOrigins ?? [];
+    const legacyOrigin = config.publicOrigin ?? process.env.BENCHMARK_PUBLIC_ORIGIN;
+    const configuredAddresses = [
+      ...configuredOrigins,
+      ...(legacyOrigin ? [legacyOrigin] : []),
+    ].map((value) => new URL(value));
+    for (const address of [directAddress, ...configuredAddresses])
       if (
         !["http:", "https:"].includes(address.protocol) ||
         address.username ||
         address.password
       )
         throw new Error("Invalid origin");
+    for (const address of configuredAddresses)
+      if (address.pathname !== "/" || address.search || address.hash)
+        throw new Error("Invalid configured origin");
     expectedOrigins = new Set([
-      (configuredAddress ?? directAddress).origin,
+      ...(configuredAddresses.length > 0
+        ? configuredAddresses.map((address) => address.origin)
+        : [directAddress.origin]),
       ...(!(config.production ?? process.env.NODE_ENV === "production")
         ? [directAddress.origin]
         : []),
