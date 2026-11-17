@@ -185,6 +185,8 @@ BOOKING_BROWSER_CHANNEL=chrome
 BOOKING_USE_STEALTH=true
 EXPEDIA_PROXY_URL=http://username:password@host:port
 EXPEDIA_HEADLESS=true
+CORALTRAVEL_PROXY_URL=http://username:password@host:port
+CORALTRAVEL_RU_PROXY_URL=http://username:password@host:port
 PEGASTOUR_RU_PROXY_URL=http://username:password@host:port
 ```
 

@@ -64,6 +64,30 @@ const scope: ReportScopeDefinition = {
 
 const window = scope.windows[0];
 
+test("Coral Travel uses a market proxy first and otherwise inherits the shared proxy", () => {
+  assert.equal(
+    coralTravel.resolveCoralTravelProxy("ru", {
+      OTA_PROXY_URL: "http://shared.example:8080",
+      CORALTRAVEL_RU_PROXY_URL: " http://ru.example:8080 ",
+    }),
+    "http://ru.example:8080",
+  );
+  assert.equal(
+    coralTravel.resolveCoralTravelProxy("ru", {
+      OTA_PROXY_URL: " http://shared.example:8080 ",
+      CORALTRAVEL_RU_PROXY_URL: "   ",
+    }),
+    "http://shared.example:8080",
+  );
+  assert.equal(
+    coralTravel.resolveCoralTravelProxy("de", {
+      CORALTRAVEL_PROXY_URL: "http://de.example:8080",
+      OTA_PROXY_URL: "http://shared.example:8080",
+    }),
+    "http://de.example:8080",
+  );
+});
+
 function offer(overrides: Record<string, unknown> = {}) {
   return {
     productType: "hotelonly",

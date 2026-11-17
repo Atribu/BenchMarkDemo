@@ -18,6 +18,25 @@ import type { DynamicOtaCollectorConfig } from "../hotels/runtime-manifest";
 const HOME = "https://coraltravel.de/";
 const HOME_RU = "https://www.coral.ru/";
 
+type CoralProxyEnvironment = {
+  [key: string]: string | undefined;
+  OTA_PROXY_URL?: string;
+  CORALTRAVEL_PROXY_URL?: string;
+  CORALTRAVEL_RU_PROXY_URL?: string;
+};
+
+function resolveCoralTravelProxy(
+  market: "de" | "ru",
+  environment: CoralProxyEnvironment = process.env,
+) {
+  const providerProxy =
+    market === "ru"
+      ? environment.CORALTRAVEL_RU_PROXY_URL
+      : environment.CORALTRAVEL_PROXY_URL;
+
+  return providerProxy?.trim() || environment.OTA_PROXY_URL?.trim() || undefined;
+}
+
 type CoralRuSearchCriteria = {
   beginDates: string[];
   arrivalLocations: Array<{
@@ -310,7 +329,7 @@ async function collectCoralRuLiveQuotes(
         profilePath: `./.benchmark-state/coraltravel-ru-${scope.id}-${process.pid}`,
         headless: false,
         market: "ru",
-        proxyUrl: process.env.CORALTRAVEL_RU_PROXY_URL || undefined,
+        proxyUrl: resolveCoralTravelProxy("ru"),
       });
       const { page, context } = handle;
       const navigation = await page.goto(HOME_RU, {
@@ -599,6 +618,7 @@ export const __coralTravelInternal = {
   buildCoralRuSearchCriteria,
   validateCoralRuDecryptedSearch,
   parseCoralRuOffers,
+  resolveCoralTravelProxy,
 };
 
 export async function collectCoralTravelLiveQuotes(
@@ -659,7 +679,7 @@ export async function collectCoralTravelLiveQuotes(
         profilePath: `./.benchmark-state/coraltravel-${scope.id}-${process.pid}`,
         headless: false,
         market: "de",
-        proxyUrl: process.env.CORALTRAVEL_PROXY_URL || undefined,
+        proxyUrl: resolveCoralTravelProxy("de"),
       });
 
       const { page, context } = handle;
