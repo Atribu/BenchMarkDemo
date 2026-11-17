@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DGTLFACE | Hotel Benchmark",
   description:
-    "DGTLFACE Hotel Benchmark: Miramare Beach ve Miramare Queen için tarih bazlı, uçaksız OTA fiyat karşılaştırması.",
+    "DGTLFACE Hotel Benchmark: otel portföyü için tarih bazlı, uçaksız OTA fiyat karşılaştırması.",
 };
 
 export default function RootLayout({

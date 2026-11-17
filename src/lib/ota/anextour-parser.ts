@@ -1,6 +1,6 @@
 export interface AnexTourOffer {
   accommodationId: string;
-  operator: string;
+  operator: "ANEX Tour" | "ÖGER TOURS";
   roomName: string;
   board: string;
   checkIn: string;
@@ -51,14 +51,18 @@ export function parseAnexTourOffers(
     checkIn: string;
     checkOut: string;
     nights: number;
+    operatorIds?: readonly string[];
   },
 ): AnexTourOffer[] {
   return (response.data?.items ?? []).flatMap((item) => {
     const total = item.price?.total;
     const unit = item.units?.[0];
+    const operatorId = item.tourOperator?.id;
+    const allowedOperatorIds = expected.operatorIds ?? ["ANEX"];
 
     if (
-      item.tourOperator?.id !== "ANEX" ||
+      !operatorId ||
+      !allowedOperatorIds.includes(operatorId) ||
       item.accommodationId !== expected.accommodationId ||
       item.startDate !== expected.checkIn ||
       item.endDate !== expected.checkOut ||
@@ -75,9 +79,11 @@ export function parseAnexTourOffers(
       return [];
     }
 
+    const operator = operatorId === "OGE" ? "ÖGER TOURS" : "ANEX Tour";
+
     return [{
       accommodationId: item.accommodationId,
-      operator: "ANEX Tour",
+      operator,
       roomName: unit.room.name,
       board: unit.board.code,
       checkIn: item.startDate,

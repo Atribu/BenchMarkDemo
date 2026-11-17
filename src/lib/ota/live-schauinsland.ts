@@ -749,7 +749,9 @@ const sourceHint = buildSchauinslandUrl(
           const updatedOperations = operations.map(
             (operation) => {
               if (
-                operation?.operationName !== "getOfferList"
+                !["getOfferList", "getCheapestOffer"].includes(
+                  operation?.operationName,
+                )
               ) {
                 return operation;
               }
@@ -786,7 +788,8 @@ const sourceHint = buildSchauinslandUrl(
 
   pagination: {
     ...packageRequest.pagination,
-    resultsPerPage: 50,
+    resultsPerPage:
+      operation.operationName === "getOfferList" ? 50 : 1,
     showingResultsFrom: 0,
   },
 
@@ -861,7 +864,7 @@ await route.continue(
 
       });
 
-      // Yalnızca doğru getOfferList isteğini bekle.
+      // Eski ve yeni sayfa sürümlerindeki doğru teklif isteğini bekle.
 
 const offerResponsePromise = page.waitForResponse(
   (response) => {
@@ -887,7 +890,9 @@ const offerResponsePromise = page.waitForResponse(
             ?.productSearch;
 
         return (
-          operation?.operationName === "getOfferList" &&
+          ["getOfferList", "getCheapestOffer"].includes(
+            operation?.operationName,
+          ) &&
           search?.bookingType === "HOTEL_ONLY" &&
           search?.hotelFilter?.references
   ?.hotelCodes?.includes(hotelConfig.giataId) &&
@@ -912,6 +917,13 @@ const offerResponsePromise = page.waitForResponse(
         throw new Error(
           `Schauinsland navigasyon HTTP ${navigation?.status() ?? "unknown"}`,
         );
+      }
+
+      const rejectCookies = page.locator(
+        "#CybotCookiebotDialogBodyButtonDecline",
+      );
+      if (await rejectCookies.isVisible().catch(() => false)) {
+        await rejectCookies.click();
       }
 
    // GraphQL teklif yanıtını doğrula.
@@ -939,12 +951,14 @@ const offerResponsePromise = page.waitForResponse(
 
       const offerIndex = operations.findIndex(
         (operation) =>
-          operation?.operationName === "getOfferList",
+          ["getOfferList", "getCheapestOffer"].includes(
+            operation?.operationName,
+          ),
       );
 
       if (offerIndex < 0) {
         throw new Error(
-          "Schauinsland getOfferList yanıtı bulunamadı.",
+          "Schauinsland teklif yanıtı bulunamadı.",
         );
       }
 
@@ -995,11 +1009,29 @@ if (!capturedGraphqlRequest) {
 }
 
 const completeOfferResult =
-  await fetchSchauinslandRemainingPages(
-    page.request,
-    capturedGraphqlRequest,
-    offerResult,
-  );
+  operations[offerIndex]?.operationName === "getOfferList"
+    ? await fetchSchauinslandRemainingPages(
+        page.request,
+        capturedGraphqlRequest,
+        offerResult,
+      )
+    : offerResult;
+
+const completeProductOffers = getRecord(
+  getRecord(
+    asRecord(completeOfferResult),
+    "data",
+  ),
+  "productOffers",
+);
+const completeHotels = completeProductOffers?.hotels;
+const confirmedEmpty =
+  Array.isArray(completeHotels) &&
+  completeHotels.every((rawHotel) => {
+    const offers = asRecord(rawHotel)?.offers;
+
+    return Array.isArray(offers) && offers.length === 0;
+  });
 
 const parsedOffers = parseSchauinslandOffers(
   completeOfferResult,
@@ -1027,14 +1059,6 @@ console.table(
 
 
 
-
-const completeProductOffers = getRecord(
-  getRecord(
-    asRecord(completeOfferResult),
-    "data",
-  ),
-  "productOffers",
-);
 
 const completePagination = getRecord(
   completeProductOffers,
@@ -1096,7 +1120,11 @@ const best = selectSchauinslandBestOffer(
           windowId: window.id,
           price: best?.price ?? null,
           currency: scope.currency,
-          status: best ? "available" : "manual-review",
+          status: best
+            ? "available"
+            : confirmedEmpty
+              ? "sold_out"
+              : "manual-review",
           dataMode: "live",
           captureMethod: "automated",
           observedAt: collectedAt,
@@ -1109,7 +1137,9 @@ const best = selectSchauinslandBestOffer(
             : undefined,
           reason: best
             ? undefined
-            : "Bu oda kategorisi için doğrulanmış Schauinsland eşleşmesi bulunamadı.",
+            : confirmedEmpty
+              ? "Schauinsland tamamlanan kesin tarihli hotel-only aramasında teklif döndürmedi."
+              : "Bu oda kategorisi için doğrulanmış Schauinsland eşleşmesi bulunamadı.",
         });
       }
     } catch (error) {

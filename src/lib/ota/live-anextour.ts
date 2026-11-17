@@ -464,6 +464,7 @@ export async function collectAnexTourLiveQuotes(
         checkIn: window.checkIn,
         checkOut: window.checkOut,
         nights: window.nights,
+        operatorIds: hotelConfig?.operatorIds,
       });
 
       console.log("[ANEX] Collection:", {
@@ -498,7 +499,7 @@ export async function collectAnexTourLiveQuotes(
             board: offer.board,
             cancellation: "Kaynakta doğrulanmalı",
             taxes: "Kaynakta doğrulanmalı",
-            operator: "ANEX Tour",
+            operator: offer.operator,
             availability: "Teklif yanıtında listelendi",
           },
           sourceHint,

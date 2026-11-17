@@ -231,7 +231,7 @@ check24: {
 
 };
 
-function buildPortfolios(scopeCatalog: ReportScopeDefinition[]) {
+export function buildPortfolios(scopeCatalog: ReportScopeDefinition[]) {
   const hotelCount = new Set(scopeCatalog.map((scope) => scope.hotelKey)).size;
   const options: { value: string; label: string; scopes: ScopeKey[] }[] = [
     {
@@ -240,6 +240,17 @@ function buildPortfolios(scopeCatalog: ReportScopeDefinition[]) {
       scopes: scopeCatalog.map((scope) => scope.id),
     },
   ];
+
+  const miramareEuropeScopes = scopeCatalog.filter((scope) =>
+    ["beach-eu", "queen-eu"].includes(scope.id),
+  );
+  if (miramareEuropeScopes.length === 2) {
+    options.push({
+      value: "miramare-eu",
+      label: "Miramare Beach + Miramare Queen · Avrupa",
+      scopes: miramareEuropeScopes.map((scope) => scope.id),
+    });
+  }
 
   for (const currency of ["EUR", "GBP", "RUB"] as const) {
     const scopes = scopeCatalog.filter((scope) => scope.currency === currency);

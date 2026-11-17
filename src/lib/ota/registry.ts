@@ -14,6 +14,7 @@ export const OTA_PROVIDERS: ProviderDescriptor[] = [
     "beach-eu",
     "port-nature-eu",
     "port-nature-ru",
+    "sy-hotels-eu",
     "sy-hotels-ru",
   ],
   searchTemplate: "https://anextour.ru/hotels/",

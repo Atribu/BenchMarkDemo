@@ -11,6 +11,7 @@ import {
   EXPEDIA_HOTEL_CONFIG,
   HOLIDAYCHECK_HOTEL_CONFIG,
   ONTHEBEACH_HOTEL_CONFIG,
+  SCHAUINSLAND_HOTEL_CONFIG,
 } from "../src/lib/ota/live-config";
 import { GOOGLE_HOTEL_IDS } from "../src/lib/ota/google-hotel-config";
 import {
@@ -28,6 +29,9 @@ const portNatureUk = REPORT_SCOPES.find(
 )!;
 const portNatureRu = REPORT_SCOPES.find(
   (scope) => scope.id === "port-nature-ru",
+)!;
+const syHotelsEu = REPORT_SCOPES.find(
+  (scope) => scope.id === "sy-hotels-eu",
 )!;
 const syHotelsRu = REPORT_SCOPES.find(
   (scope) => scope.id === "sy-hotels-ru",
@@ -114,6 +118,7 @@ test("SY Hotels exposes only channels with a verified hotel identity", () => {
       provider.supportedScopes.includes("sy-hotels-eu"),
     ).map((provider) => provider.key),
     [
+      "anextour",
       "booking",
       "check24",
       "expedia",
@@ -136,6 +141,10 @@ test("SY Hotels exposes only channels with a verified hotel identity", () => {
     ).map((provider) => provider.key),
     ["anextour", "pegastour"],
   );
+  assert.equal(
+    ANEX_HOTEL_CONFIG["sy-hotels-belek"]?.accommodationId,
+    "297825",
+  );
   assert.equal(ANEX_HOTEL_CONFIG["sy-hotels-belek"]?.ruHotelId, "43846");
   assert.equal(
     ANEX_HOTEL_CONFIG["sy-hotels-belek"]?.ruHotelSlug,
@@ -145,6 +154,31 @@ test("SY Hotels exposes only channels with a verified hotel identity", () => {
     CHECK24_HOTEL_CONFIG["sy-hotels-belek"].accommodationId,
     "019ab53308e673799d4d0b164fb80e79",
   );
+  assert.equal(
+    SCHAUINSLAND_HOTEL_CONFIG["sy-hotels-belek"]?.pageUrl,
+    "https://www.schauinsland-reisen.de/hotel/1449005-sy-hotels-luxury-belek",
+  );
+});
+
+test("SY Hotels ANEX Germany room names map to exact dynamic room types", () => {
+  const cases = [
+    ["Doppelzimmer Deluxe Superior", "deluxe-superior"],
+    ["DZ Superior Deluxe", "deluxe-superior"],
+    ["Doppelzimmer Deluxe Poolblick", "deluxe-pool"],
+    ["Doppelzimmer mit Landblick", "deluxe-land"],
+    ["Doppelzimmer Deluxe Poolbassin", "deluxe-shallow-pool"],
+    ["Doppelzimmer Deluxe Swim Up", "deluxe-swim-up"],
+    ["Familienzimmer Deluxe", "deluxe-family"],
+    ["Familienzimmer", "deluxe-family"],
+    ["Familienzimmer Deluxe Duplex", "deluxe-duplex-family"],
+    ["Familienzimmer Dublex", "deluxe-duplex-family"],
+    ["Familienzimmer Deluxe Swim Up", "deluxe-family-swim-up"],
+  ] as const;
+
+  for (const [name, roomId] of cases) {
+    assert.equal(matchAnexRoom(syHotelsEu, name)?.id, roomId, name);
+  }
+  assert.equal(matchAnexRoom(syHotelsEu, "Doppelzimmer Deluxe"), undefined);
 });
 
 test("SY Hotels ANEX Russia room names map only through verified API names", () => {

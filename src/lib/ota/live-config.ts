@@ -39,6 +39,7 @@ interface AnexHotelConfig {
   accommodationId?: string;
   ruHotelId?: string;
   ruHotelSlug?: string;
+  operatorIds?: readonly string[];
   roomMatchers: {
     roomId: string;
     patterns: RegExp[];
@@ -101,24 +102,63 @@ export const ANEX_HOTEL_CONFIG: Partial<
     ],
   },
   "sy-hotels-belek": {
+    accommodationId: "297825",
     ruHotelId: "43846",
     ruHotelSlug: "sy-hotels-belek-luxury",
+    operatorIds: ["ANEX", "OGE"],
     roomMatchers: [
       {
+        roomId: "deluxe-family-swim-up",
+        patterns: [
+          /(?=.*\b(familienzimmer|family room)\b)(?=.*\b(swim up|swimup|poolzugang)\b)/,
+        ],
+      },
+      {
+        roomId: "deluxe-duplex-family",
+        patterns: [
+          /(?=.*\b(familienzimmer|family room)\b)(?=.*\b(duplex|dubleks|2 etagen)\b)/,
+          /^familienzimmer dublex$/,
+        ],
+      },
+      {
         roomId: "deluxe-family",
-        patterns: [/^family room$/],
+        patterns: [
+          /^family room$/,
+          /^familienzimmer$/,
+          /\bfamilienzimmer deluxe\b/,
+        ],
+      },
+      {
+        roomId: "deluxe-shallow-pool",
+        patterns: [/\b(poolbassin|flachwasserpool|shallow pool)\b/],
+      },
+      {
+        roomId: "deluxe-swim-up",
+        patterns: [
+          /(?=.*\b(doppelzimmer|double room|deluxe)\b)(?=.*\b(swim up|swimup|poolzugang)\b)/,
+        ],
       },
       {
         roomId: "deluxe-superior",
-        patterns: [/^superior room$/],
+        patterns: [
+          /^superior room$/,
+          /^dz superior deluxe$/,
+          /\b(doppelzimmer deluxe superior|deluxe superior)\b/,
+        ],
       },
       {
         roomId: "deluxe-pool",
-        patterns: [/^standard room pool view$/],
+        patterns: [
+          /^standard room pool view$/,
+          /(?=.*\b(doppelzimmer|double room|deluxe)\b)(?=.*\b(poolblick|pool view)\b)/,
+        ],
       },
       {
         roomId: "deluxe-land",
-        patterns: [/^standard land view$/],
+        patterns: [
+          /^standard land view$/,
+          /(?=.*\b(doppelzimmer|double room|deluxe)\b)(?=.*\b(landblick|land view)\b)/,
+        ],
       },
     ],
   },
@@ -719,7 +759,7 @@ export const SCHAUINSLAND_HOTEL_CONFIG: Partial<
   "sy-hotels-belek": {
     giataId: "1449005",
     pageUrl:
-      "https://www.schauinsland-reisen.de/hotel/1449005-sy-hotels-belek-boutique-luxury",
+      "https://www.schauinsland-reisen.de/hotel/1449005-sy-hotels-luxury-belek",
     market: "de",
     currency: "EUR",
   },
